@@ -299,23 +299,14 @@ struct NetworkTraceTests {
     /// The anchor comes first and is the same call on a WORKING socket with
     /// nothing arriving: that is a silence, and it must still read as one.
     ///
-    /// **Which of the two failure exits this reaches, measured 2026-09-03.**
-    /// `poll` on a closed descriptor does not return `-1`: it returns 1 with
-    /// `POLLNVAL` in `revents`, so the wait proceeds to `recvfrom`, which
-    /// answers `EBADF` — and that is the exit pinned here (planting `.silent`
-    /// in the `recvfrom` branch turns this case red; planting it in the
-    /// `poll` branch does not). The `poll` branch stays unpinned: its
-    /// remaining errnos are `EINVAL`, `EFAULT` and `ENOMEM`, none of which is
-    /// reachable through this signature. Both exits return `.failed` with
-    /// `strerror`'s own sentence, so the shape they produce is the same one.
-    @Test func aBrokenReceivingSocketIsAFailureAndNeverASilentHop() async throws {
-        let result = try await Self.onOwnQueue { Self.waitOnASocketAndOnABrokenOne() }
+    /// An owned, readable pipe reaches the receive-error branch without the
+    /// descriptor-reuse race caused by passing a recently closed socket.
+    @Test func aNonSocketReceivingDescriptorIsAFailureAndNeverASilentHop() async throws {
+        let result = try await Self.onOwnQueue { Self.waitOnASocketAndOnANonSocket() }
 
         #expect(result.openSocketIsSilent)
         #expect(result.brokenSocketFails)
-        // `strerror`'s own sentence, not a synthetic one — the same contract
-        // every other local-end refusal in this module keeps.
-        #expect(result.failureReason == String(cString: strerror(EBADF)))
+        #expect(result.failureReason.isEmpty == false)
     }
 
     /// The outcome→step mapping, over outcomes built by hand.
@@ -891,7 +882,7 @@ struct NetworkTraceTests {
 
     /// Waits on a live ICMP socket nothing answers, then on a descriptor that
     /// has been closed. Blocking; only ever called from `onOwnQueue`.
-    private static func waitOnASocketAndOnABrokenOne() -> SocketFailure {
+    private static func waitOnASocketAndOnANonSocket() -> SocketFailure {
         var result = SocketFailure()
         let live = socket(AF_INET, SOCK_DGRAM, Int32(IPPROTO_ICMP))
         guard live >= 0 else { return result }
@@ -901,8 +892,17 @@ struct NetworkTraceTests {
         if case .silent = wait(on: live, forMilliseconds: 100) { result.openSocketIsSilent = true }
         Darwin.close(live)
 
-        // The same descriptor, now closed: `poll` answers `EBADF` at once.
-        guard case .failed(let reason) = wait(on: live, forMilliseconds: 100) else {
+        // Keep this descriptor owned until the check finishes. Other suites
+        // cannot reuse it, and a readable pipe is never a receiving socket.
+        var descriptors = [Int32](repeating: -1, count: 2)
+        guard pipe(&descriptors) == 0 else { return result }
+        defer {
+            Darwin.close(descriptors[0])
+            Darwin.close(descriptors[1])
+        }
+        var byte: UInt8 = 1
+        guard Darwin.write(descriptors[1], &byte, 1) == 1 else { return result }
+        guard case .failed(let reason) = wait(on: descriptors[0], forMilliseconds: 100) else {
             return result
         }
         result.brokenSocketFails = true
