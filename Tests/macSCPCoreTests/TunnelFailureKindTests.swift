@@ -1,0 +1,533 @@
+import Foundation
+import NIOCore
+import Testing
+
+@testable import macSCPCore
+
+/// `DialSupport.failureKind(for:)` and `DialSupport.reason(for:)` read one
+/// switch: the kind the forwarding STATE carries, and the English sentence
+/// the diagnostic LOG keeps.
+///
+/// The sentences below are literals on purpose. Every one of them, except
+/// the Keychain's and the two local-bind causes', is the text `reason(for:)`
+/// produced before the kind existed (BASE `9167f325`), so a row that goes
+/// red here is log-text churn — which this change was not allowed to cause.
+@Suite struct TunnelFailureKindTests {
+    struct Row: CustomTestStringConvertible, Sendable {
+        let label: String
+        let error: any Error & Sendable
+        let kind: TunnelFailureKind
+        let sentence: String
+        var testDescription: String { label }
+    }
+
+    static let rows: [Row] = [
+        Row(
+            label: "host key mismatch",
+            error: HostKeyError.mismatch(
+                host: "server.test", expected: "SHA256:expected", presented: "SHA256:presented"),
+            kind: .hostKeyMismatch(host: "server.test"),
+            sentence:
+                "host key MISMATCH for server.test: the presented key differs from the recorded one"),
+        Row(
+            label: "host key not accepted", error: HostKeyError.rejectedByUser,
+            kind: .hostKeyNotAccepted,
+            sentence: "the host key is not known to this app and was not accepted"),
+        Row(
+            label: "authentication", error: RemoteFSError.authenticationFailed,
+            kind: .authenticationFailed, sentence: "authentication failed"),
+        Row(
+            label: "jump authentication", error: RemoteFSError.jumpAuthenticationFailed,
+            kind: .authenticationFailed, sentence: "authentication at the jump host failed"),
+        Row(
+            label: "key file missing", error: SSHKeyError.fileNotFound(path: "/keys/id_test"),
+            kind: .keyFileNotFound(path: "/keys/id_test"), sentence: "no key file at /keys/id_test"),
+        Row(
+            label: "passphrase required", error: SSHKeyError.passphraseRequired,
+            kind: .keyPassphraseRequired,
+            sentence: "the key is encrypted and no passphrase was available"),
+        Row(
+            label: "passphrase wrong", error: SSHKeyError.wrongPassphrase,
+            kind: .keyPassphraseRejected, sentence: "the key's passphrase was rejected"),
+        Row(
+            label: "key unparsable", error: SSHKeyError.unsupportedFormat(reason: "dropped"),
+            kind: .keyUnparsable, sentence: "the key file could not be parsed"),
+        Row(
+            label: "key type", error: SSHKeyError.typeNotLoadable(algorithm: "ssh-dss"),
+            kind: .keyTypeNotLoadable(algorithm: "ssh-dss"),
+            sentence: "this app cannot load a key of type ssh-dss"),
+        Row(
+            label: "PEM", error: SSHKeyError.pemNotReadable(.cipher("dropped")),
+            kind: .keyPEMNotReadable,
+            sentence: "the key is a PEM file with a feature this app does not read"),
+        // NEW sentence (2026-09-18, review follow-ups Task 6): the error did
+        // not exist before; the dial said `passphrase required` instead.
+        // The path was added on 2026-09-27 (deferred minor: the sentence
+        // named the file but not where to find it) — the fixed
+        // `~`-relative one the store's default directory resolves to, not
+        // the resolved URL, which would carry the account's short name into
+        // every log line and JSON error this sentence reaches.
+        Row(
+            label: "managed key store", error: SSHKeyError.managedKeyStoreUnreadable,
+            kind: .managedKeyStoreUnreadable,
+            sentence:
+                "the key is encrypted, and its passphrase was not looked up "
+                + "because the managed key store "
+                + "(~/Library/Application Support/macSCP/managed_keys.json) could not be read"),
+        Row(
+            label: "agent socket", error: AgentError.socketUnavailable, kind: .agentUnavailable,
+            sentence: "no ssh-agent answered on SSH_AUTH_SOCK"),
+        Row(
+            label: "agent empty", error: AgentError.noIdentities, kind: .agentHasNoIdentities,
+            sentence: "the ssh-agent holds no identities"),
+        Row(
+            label: "agent unusable", error: AgentError.noUsableIdentities,
+            kind: .agentHasNoUsableIdentity,
+            sentence: "the ssh-agent holds no identity of a type this app can offer"),
+        Row(
+            label: "agent refused", error: AgentError.refused, kind: .agentRefusedEveryIdentity,
+            sentence: "the ssh-agent refused every identity it offered"),
+        Row(
+            label: "agent protocol", error: AgentError.protocolError(reason: "dropped"),
+            kind: .agentMisbehaved, sentence: "the ssh-agent connection misbehaved"),
+        // The one NEW sentence: this was "The operation couldn’t be completed.
+        // (macSCPCore.KeychainError error 1.)" (BACKLOG, 2026-09-16).
+        Row(
+            label: "keychain", error: KeychainError(status: -25293), kind: .keychainUnreadable,
+            sentence: "the keychain could not be read"),
+        Row(
+            label: "connection", error: RemoteFSError.connectionFailed(reason: "dropped"),
+            kind: .connectionFailed, sentence: "the connection failed"),
+        Row(
+            label: "server answer", error: RemoteFSError.protocolError(reason: "dropped"),
+            kind: .serverAnswerUnusable,
+            sentence: "the server answered something this app could not use"),
+        Row(
+            label: "login set", error: TunnelRefusal.loginSet(session: "prod"),
+            kind: .sessionUsesLoginSet(session: "prod"),
+            sentence: "session prod belongs to a login set; forwardings dial with the session's own login"),
+        Row(
+            label: "jump host", error: TunnelRefusal.jumpHost(session: "behind"),
+            kind: .sessionUsesJumpHost(session: "behind"),
+            sentence: "session behind uses a jump host; forwardings cannot dial through one"),
+        Row(
+            label: "S3", error: TunnelRefusal.notSSH(session: "objects", connectionKind: .s3),
+            kind: .sessionIsNotSSH(session: "objects", connectionKind: .s3),
+            sentence: "session objects is an S3 session; forwardings need SSH"),
+        Row(
+            label: "WebDAV", error: TunnelRefusal.notSSH(session: "cloud", connectionKind: .webdav),
+            kind: .sessionIsNotSSH(session: "cloud", connectionKind: .webdav),
+            sentence: "session cloud is a WebDAV session; forwardings need SSH"),
+        Row(
+            label: "session missing", error: TunnelRefusal.sessionMissing, kind: .sessionMissing,
+            sentence: "the connection this forwarding belongs to no longer exists"),
+        Row(
+            label: "port in use", error: TunnelFailure.portInUse(port: 8080),
+            kind: .portInUse(port: 8080), sentence: "port 8080 is already in use"),
+        // NEW sentences (2026-09-18): both were "The operation couldn’t be
+        // completed. (NIOCore.IOError error 1.)" as `bindFailed` before.
+        Row(
+            label: "bind address unavailable",
+            error: TunnelFailure.bindAddressUnavailable(address: "192.0.2.1"),
+            kind: .bindAddressUnavailable(address: "192.0.2.1"),
+            sentence:
+                "the bind address 192.0.2.1 is not an address of this machine (EADDRNOTAVAIL)"),
+        Row(
+            label: "bind permission denied", error: TunnelFailure.bindPermissionDenied(port: 80),
+            kind: .bindPermissionDenied(port: 80),
+            sentence: "binding port 80 was not permitted (EACCES)"),
+        // The four free-text `TunnelFailure` cases: the kind drops the
+        // payload, the log keeps it verbatim.
+        Row(
+            label: "bind", error: TunnelFailure.bindFailed(reason: "payload one"),
+            kind: .bindFailed, sentence: "payload one"),
+        Row(
+            label: "channel", error: TunnelFailure.channelOpenFailed(reason: "payload two"),
+            kind: .channelOpenFailed, sentence: "payload two"),
+        Row(
+            label: "destination", error: TunnelFailure.destinationUnreachable(host: "service.test", port: 8000),
+            kind: .destinationUnreachable(host: "service.test", port: 8000),
+            sentence: "the SSH server could not reach service.test:8000; check the service, listening port, DNS and network"),
+        Row(
+            label: "connect", error: TunnelFailure.connectFailed(reason: "payload three"),
+            kind: .connectFailed, sentence: "payload three"),
+        Row(
+            label: "pump", error: TunnelFailure.pumpFailed(reason: "payload four"),
+            kind: .pumpFailed, sentence: "payload four"),
+        Row(
+            label: "already started", error: TunnelFailure.alreadyStarted, kind: .alreadyStarted,
+            sentence: "this forward has already been started"),
+        // The three remote-forward start failures that were `bindFailed`
+        // with a fixed sentence until fix round 1: the log text is what the
+        // throw sites wrote at `ab4a2c4c`.
+        Row(
+            label: "remote port zero", error: TunnelFailure.remotePortZeroRefused,
+            kind: .remotePortZeroRefused,
+            sentence:
+                "a remote forward must name the port the server listens on; "
+                + "letting the server choose it is not supported by this client"),
+        Row(
+            label: "remote bind, non-loopback",
+            error: TunnelFailure.remoteBindRefused(
+                reason: "server text", needsGatewayPorts: true),
+            kind: .remoteBindRefused(needsGatewayPorts: true),
+            sentence:
+                "server text (a bind address other than loopback needs the server's GatewayPorts)"),
+        Row(
+            label: "remote bind, loopback",
+            error: TunnelFailure.remoteBindRefused(reason: "server text", needsGatewayPorts: false),
+            kind: .remoteBindRefused(needsGatewayPorts: false), sentence: "server text"),
+        Row(
+            label: "remote unanswered", error: TunnelFailure.remoteForwardUnanswered,
+            kind: .remoteForwardUnanswered,
+            sentence: "the server did not answer the forwarding request"),
+        // Errors a forwarding's dial does not produce keep their sentence and
+        // are `unknown` as a kind.
+        Row(
+            label: "not found", error: RemoteFSError.notFound(path: "/srv/x"), kind: .unknown,
+            sentence: "nothing at /srv/x"),
+        Row(
+            label: "bucket list", error: RemoteFSError.bucketListEmpty, kind: .unknown,
+            sentence: "the account has no buckets"),
+        // A named finding (2026-09-28) keeps the KIND its site produced
+        // before it was typed and only improves the sentence, from the
+        // kind's generic one to the finding's own. Both branches of that
+        // arm, because there are two: a finding from a `.protocolError`
+        // site stays `.serverAnswerUnusable`, and one of the three redirect
+        // refusals stays `.connectionFailed`. Those three were built as a
+        // `.connectionFailed` by `S3HTTPChannel.refusedRedirect()` until the
+        // plan's Task 4 typed them; `S3RedirectSessionDelegate` records them
+        // as findings now, and the only `.connectionFailed` that path still
+        // builds is its fourth refusal, a foreign origin, which is not a
+        // finding and never reaches this arm.
+        // Without the second row the arm could return `.unknown` for the
+        // redirects and nothing here would notice.
+        Row(
+            label: "a named finding from a protocolError site",
+            error: RemoteFSError.finding(.outOfStorage), kind: .serverAnswerUnusable,
+            sentence: "the server is out of storage"),
+        Row(
+            label: "a named finding that reads as a connection failure",
+            error: RemoteFSError.finding(.redirectNotResignable), kind: .connectionFailed,
+            sentence: "the server redirected the request, and the new target could not be signed, "
+                + "so the redirect was refused"),
+        // `StoredSessionConnectionError`, the arm that was missing until
+        // 2026-09-25: every one of these fell to `classify`'s `default:` and
+        // reached the log as "The operation couldn't be completed.
+        // (macSCPCore.StoredSessionConnectionError error N.)" — a case index
+        // (`docs/BACKLOG.md`, "A forwarding's `.secretRequired` renders as a
+        // case index in the diagnostic log"). The sentences are
+        // `StoredSessionConnectionError.sentence`'s, the one spelling
+        // `CLIErrorMapping` prefixes with "Error: " — so a row that goes red
+        // here is stderr churn as well as log churn.
+        //
+        // The kind stays `.unknown` for all six: a forwarding is refused by
+        // `TunnelCarriers.refusalError(for:)` as a typed `TunnelRefusal`
+        // before `StoredSessionConnectionConfig.build` is reached, and the
+        // one case a forwarding does reach — `.secretRequired` — routes to
+        // `TunnelState.needsConfirmation` (`TunnelRunner.needsAPerson`),
+        // which carries no payload at all.
+        Row(
+            label: "session uses a login set",
+            error: StoredSessionConnectionError.loginSetSessionsNotSupported, kind: .unknown,
+            sentence: "this session's credentials come from a login set, "
+                + "which the CLI does not resolve yet"),
+        Row(
+            label: "session uses a jump host",
+            error: StoredSessionConnectionError.jumpSessionsNotSupported, kind: .unknown,
+            sentence: "this session dials through a jump host, "
+                + "which the CLI does not resolve yet"),
+        Row(
+            label: "backend configuration missing",
+            error: StoredSessionConnectionError.missingBackendConfiguration(kind: .s3),
+            kind: .unknown, sentence: "the stored session is missing its S3 configuration"),
+        Row(
+            label: "secret required, two places checked",
+            error: StoredSessionConnectionError.secretRequired(
+                checked: [.keychain, .managedKeyPassphrase]),
+            kind: .unknown,
+            sentence: "no secret available "
+                + "(checked the keychain and the managed key's passphrase)"),
+        Row(
+            label: "secret required, no chain to name",
+            error: StoredSessionConnectionError.secretRequired(checked: []), kind: .unknown,
+            sentence: "no secret available"),
+        Row(
+            label: "incomplete configuration",
+            error: StoredSessionConnectionError.incompleteConfiguration(field: "Host"),
+            kind: .unknown, sentence: "the stored session's Host is missing or invalid"),
+    ]
+
+    @Test(arguments: rows)
+    func theErrorMapsToItsKindAndKeepsItsSentence(_ row: Row) {
+        #expect(DialSupport.failureKind(for: row.error) == row.kind)
+        #expect(DialSupport.reason(for: row.error) == row.sentence)
+    }
+
+    /// A foreign error is `unknown`, and its log text is still what it was:
+    /// reduced to `localizedDescription`, never rebuilt through
+    /// `String(describing:)`. Two exits, so two checks — the positive pins
+    /// what the sentence IS, the negative beside it pins what it is NOT; an
+    /// `NSError` whose `localizedDescription` and `String(describing:)`
+    /// render differently is the one case that can tell the two paths
+    /// apart, so the negative would actually fail if `classify` ever
+    /// switched to describing.
+    @Test func aForeignErrorIsUnknownAndKeepsItsDescription() {
+        let error = NSError(domain: "test.domain", code: 7)
+        let sentence = DialSupport.reason(for: error)
+        let matchesLocalizedDescription = sentence == error.localizedDescription
+        let matchesDescribing = sentence == String(describing: error)
+        #expect(DialSupport.failureKind(for: error) == .unknown)
+        #expect(matchesLocalizedDescription)
+        #expect(!matchesDescribing)
+    }
+
+    /// An `IOError` carrying an errno outside the three the local-bind path
+    /// names its own case for reads that errno's C macro name in the
+    /// sentence — the gap `docs/BACKLOG.md` records (recorded 2026-09-19)
+    /// as still logging the bare bridged text "The operation couldn’t be
+    /// completed. (NIOCore.IOError error 1.)", a case index nobody could
+    /// act on, for any errno besides the two the row above it named.
+    /// `EINVAL` is not one of `LocalForwardListener.bindFailure`'s three
+    /// named errnos (`EADDRINUSE`, `EADDRNOTAVAIL`, `EACCES`), so a raw
+    /// `IOError(errnoCode: EINVAL, ...)` reaches `classify`'s fall-through
+    /// exactly the way an unrecognized bind failure would.
+    @Test func anIOErrorOutsideTheThreeNamedErrnosReadsItsErrnoName() {
+        let error = IOError(errnoCode: EINVAL, reason: "bind")
+        let sentence = DialSupport.reason(for: error)
+        // The whole shape, not just the name: `strerror`'s own text stays
+        // in the sentence beside the macro name, the "<text> (<NAME>)"
+        // form `errnoText(for:)`'s doc comment promises and
+        // `TunnelFailureKind`'s EADDRNOTAVAIL/EACCES sentences already
+        // use. `strerror(EINVAL)` on Darwin is "Invalid argument" —
+        // pinned directly rather than only via `.contains`, so a fix that
+        // dropped the `strerror` half and kept only the bare macro name
+        // would still be caught here.
+        #expect(sentence == "Invalid argument (EINVAL)")
+        #expect(DialSupport.failureKind(for: error) == .unknown)
+    }
+
+    /// The positive beside `errnoText(for:)`'s own silent-miss shape: its
+    /// `guard let name = errnoNames[code] else { return text }` degrades a
+    /// missing table entry to plain `strerror` text with no parenthetical
+    /// and no failure — invisible to `anIOErrorOutsideTheThreeNamedErrnosReadsItsErrnoName`
+    /// above, which only ever asks about `EINVAL`. This scans the table's
+    /// own KEYS instead, but NOT against `ELAST`: fix round 2 (CI run
+    /// 36021395795, head `40963b5a`) measured that `ENOTCAPABLE` does not
+    /// exist on the macOS 15.5 SDK CI builds against, only on this
+    /// machine's newer one, so `ELAST` (Darwin's "must be equal largest
+    /// errno" sentinel) is 107 on one SDK and 106 on the other — a bound
+    /// that moves under the same source is not a bound the table's
+    /// coverage can be measured against. Two checks instead, both derived
+    /// from the table itself:
+    ///
+    /// 1. `highestKey >= 106` — a POSITIVE floor. Without it, a table
+    ///    whose own topmost entry silently went missing would just lower
+    ///    `highestKey` and the contiguous scan below would still pass
+    ///    (there is no gap to find below a lowered ceiling) — exactly the
+    ///    failure mode a scan anchored only on its own data can have. 106
+    ///    is `EQFULL`'s value, the table's actual highest key on every
+    ///    SDK this project builds on (`ENOTCAPABLE`, 107, is deliberately
+    ///    not a key — see `errnoNames`'s own doc comment).
+    /// 2. Every errno from 1 through that measured `highestKey` must
+    ///    resolve — the contiguous scan, now bounded by data the table
+    ///    itself supplies rather than by a platform constant.
+    ///
+    /// `ELAST >= highestKey` is asserted too, but only as a sanity check
+    /// that this SDK's own sentinel is not somehow lower than what the
+    /// table claims to cover — true on both the newer SDK this machine
+    /// runs (`ELAST == 107 > 106`) and the older one CI does
+    /// (`ELAST == 106 == 106`), so it can never itself go red from an SDK
+    /// difference the way `for code in 1...ELAST` could.
+    ///
+    /// `errnoNames` had to become `internal` for this suite's `@testable
+    /// import macSCPCore` to reach it; nothing else reads it from outside
+    /// `DialProbes.swift`.
+    ///
+    /// Run red first, twice (recorded in the Task 4 fix-round-2 report):
+    /// with `ENOSR: "ENOSR",` (errno 98, a middle entry) deleted from
+    /// `errnoNames` by hand, the contiguous scan failed at `code == 98`
+    /// with `DialSupport.errnoNames[98] != nil` → false; restored, green
+    /// again. Separately, with `EQFULL: "EQFULL",` (106, the table's own
+    /// top entry) deleted instead, `highestKey` became 105 and the
+    /// floor `#expect(highestKey >= 106)` failed — proving the floor
+    /// catches exactly the silent-shrink case the contiguous scan alone
+    /// cannot; restored, green again.
+    @Test func theTableIsContiguousFromOneThroughItsOwnHighestKey() {
+        let highestKey = DialSupport.errnoNames.keys.max() ?? 0
+        #expect(
+            highestKey >= 106,
+            "errnoNames's highest key is \(highestKey), below the 106 floor (EQFULL) — its own top entry may have gone missing"
+        )
+        for code in CInt(1)...highestKey {
+            #expect(DialSupport.errnoNames[code] != nil, "no table entry for errno \(code)")
+        }
+        #expect(
+            ELAST >= highestKey,
+            "this SDK's ELAST (\(ELAST)) is below errnoNames's own highest key (\(highestKey)) — the table claims to cover more than this platform's errno range holds"
+        )
+    }
+
+    /// Where a kind's payload is everything its sentence needs, the log's
+    /// sentence IS the kind's — one spelling, read from the kind.
+    ///
+    /// A named finding (2026-09-28) is the deliberate exception, and it is
+    /// INVERTED here rather than skipped: it keeps the kind its site
+    /// produced and replaces the kind's generic sentence with its own,
+    /// which is the entire improvement the arm exists for. Skipping those
+    /// rows would let the arm quietly fall back to the kind's sentence
+    /// again and nothing would say so.
+    @Test(arguments: rows)
+    func aKindThatCarriesItsWholeSentenceIsTheLogSentence(_ row: Row) {
+        let freeText: Set<TunnelFailureKind.Name> = [
+            .bindFailed, .channelOpenFailed, .connectFailed, .pumpFailed, .unknown,
+            .remoteBindRefused,
+        ]
+        guard !freeText.contains(row.kind.name), row.label != "jump authentication" else { return }
+        if let fsError = row.error as? RemoteFSError, case .finding(let finding) = fsError {
+            #expect(row.sentence == finding.logSentence)
+            #expect(row.kind.sentence != row.sentence, """
+                \(finding.name) reads the kind's generic sentence again — the finding's own \
+                sentence is what this arm exists to produce.
+                """)
+            return
+        }
+        #expect(row.kind.sentence == row.sentence)
+    }
+
+    /// Every kind renders a sentence, and `name` round-trips — reached
+    /// through `Name.allCases`, so a new kind is covered without an edit
+    /// here beyond the compiler's demand in `TunnelFailureKindSamples`.
+    @Test(arguments: TunnelFailureKind.Name.allCases)
+    func everyKindHasANameAndAnEnglishSentence(_ name: TunnelFailureKind.Name) {
+        let kind = TunnelFailureKindSamples.sample(name)
+        #expect(kind.name == name)
+        #expect(!kind.sentence.isEmpty)
+    }
+
+    /// Together the rows reach every name but `connectionLost` — the
+    /// plan's own, which no error produces. Not one row per name: the two
+    /// named-finding rows added 2026-09-28 share `.serverAnswerUnusable`
+    /// and `.connectionFailed` with the `.protocolError` and
+    /// `.connectionFailed` rows above them, deliberately, because what they
+    /// pin is that the kind is unchanged while the sentence improves.
+    @Test func theRowsReachEveryKindAnErrorCanProduce() {
+        let reached = Set(Self.rows.map(\.kind.name)).union([.connectionLost])
+        #expect(reached == Set(TunnelFailureKind.Name.allCases))
+    }
+
+    /// The per-connection initialiser Task 7 reads is the same mapping.
+    @Test func aTunnelFailureMapsThroughTheSameSwitch() {
+        let failures: [TunnelFailure] = [
+            .portInUse(port: 1), .bindAddressUnavailable(address: "192.0.2.1"),
+            .bindPermissionDenied(port: 80), .bindFailed(reason: "a"), .channelOpenFailed(reason: "b"),
+            .connectFailed(reason: "c"), .pumpFailed(reason: "d"), .alreadyStarted,
+            .remotePortZeroRefused, .remoteBindRefused(reason: "e", needsGatewayPorts: true),
+            .remoteForwardUnanswered,
+        ]
+        for failure in failures {
+            #expect(TunnelFailureKind(failure) == DialSupport.failureKind(for: failure))
+        }
+        #expect(TunnelFailureKind(.portInUse(port: 1)) == .portInUse(port: 1))
+        #expect(
+            TunnelFailureKind(.remoteBindRefused(reason: "e", needsGatewayPorts: true))
+                == .remoteBindRefused(needsGatewayPorts: true))
+    }
+
+    /// Decision (d) holds on the kind too: the mismatch carries the host
+    /// and nothing that was compared.
+    @Test func theMismatchKindCarriesNoFingerprint() {
+        let expected = "SHA256:expected-fingerprint"
+        let presented = "SHA256:presented-fingerprint"
+        let kind = DialSupport.failureKind(
+            for: HostKeyError.mismatch(host: "server.test", expected: expected, presented: presented))
+        let rendered = "\(kind) \(kind.sentence)"
+        let leaks = rendered.contains(expected) || rendered.contains(presented)
+        #expect(leaks == false)
+    }
+
+    /// One spelling for the two surfaces a `StoredSessionConnectionError`
+    /// reaches: the command line's stderr and the diagnostic log. The CLI's
+    /// line is its own "Error: " prefix in front of the SAME sentence, so
+    /// neither can be changed without the other following.
+    ///
+    /// Reached through `Self.rows` rather than a second list, so a case
+    /// added to `StoredSessionConnectionError` is covered by the row its
+    /// `sentence`'s exhaustive switch already forces someone to write.
+
+    /// The row this closes, stated as the shape it had: `.secretRequired`
+    /// bridged to `NSError` reads "The operation couldn't be completed.
+    /// (macSCPCore.StoredSessionConnectionError error 3.)" — the enum's
+    /// fourth case by declaration order, as an index. The positive beside
+    /// the negative is the sentence itself; the negative is that neither
+    /// the bridge's shape nor the case's own spelling survives into the log.
+    @Test func theSecretRequiredSentenceIsNotACaseIndex() {
+        let error = StoredSessionConnectionError.secretRequired(checked: [.keychain])
+        let sentence = DialSupport.reason(for: error)
+        let bridged = (error as NSError).localizedDescription
+        let isTheBridgedIndex = sentence == bridged
+        let namesTheCase = sentence.contains("secretRequired")
+        #expect(sentence == "no secret available (checked the keychain)")
+        #expect(isTheBridgedIndex == false)
+        #expect(namesTheCase == false)
+    }
+
+    /// `checked` names PLACES, never what was found in them — and it can
+    /// hold nothing else: `SecretSourceKind` is a payload-free enum, so the
+    /// cause is structurally unable to carry a value, a path or an
+    /// environment variable's name. What this pins is the rendering of the
+    /// WHOLE chain, every place `SecretSourceKind.allCases` holds: a case
+    /// added there reaches this sentence, and it must arrive as a place.
+    @Test func theSecretRequiredSentenceNamesPlacesAndNothingElse() {
+        let error = StoredSessionConnectionError.secretRequired(
+            checked: SecretSourceKind.allCases)
+        #expect(
+            DialSupport.reason(for: error) == "no secret available (checked --password-command, "
+                + "the environment, the keychain, and the managed key's passphrase)")
+    }
+}
+
+/// One value per `TunnelFailureKind.Name`, by an exhaustive switch: a name
+/// added to the enum does not compile here until it has a sample.
+enum TunnelFailureKindSamples {
+    static func sample(_ name: TunnelFailureKind.Name) -> TunnelFailureKind {
+        switch name {
+        case .hostKeyMismatch: return .hostKeyMismatch(host: "server.test")
+        case .hostKeyNotAccepted: return .hostKeyNotAccepted
+        case .authenticationFailed: return .authenticationFailed
+        case .keyFileNotFound: return .keyFileNotFound(path: "/keys/id_test")
+        case .keyPassphraseRequired: return .keyPassphraseRequired
+        case .keyPassphraseRejected: return .keyPassphraseRejected
+        case .keyUnparsable: return .keyUnparsable
+        case .keyTypeNotLoadable: return .keyTypeNotLoadable(algorithm: "ssh-dss")
+        case .keyPEMNotReadable: return .keyPEMNotReadable
+        case .managedKeyStoreUnreadable: return .managedKeyStoreUnreadable
+        case .agentUnavailable: return .agentUnavailable
+        case .agentHasNoIdentities: return .agentHasNoIdentities
+        case .agentHasNoUsableIdentity: return .agentHasNoUsableIdentity
+        case .agentRefusedEveryIdentity: return .agentRefusedEveryIdentity
+        case .agentMisbehaved: return .agentMisbehaved
+        case .keychainUnreadable: return .keychainUnreadable
+        case .connectionFailed: return .connectionFailed
+        case .serverAnswerUnusable: return .serverAnswerUnusable
+        case .sessionUsesLoginSet: return .sessionUsesLoginSet(session: "prod")
+        case .sessionUsesJumpHost: return .sessionUsesJumpHost(session: "behind")
+        case .sessionIsNotSSH: return .sessionIsNotSSH(session: "objects", connectionKind: .s3)
+        case .sessionMissing: return .sessionMissing
+        case .portInUse: return .portInUse(port: 8080)
+        case .bindAddressUnavailable: return .bindAddressUnavailable(address: "192.0.2.1")
+        case .bindPermissionDenied: return .bindPermissionDenied(port: 80)
+        case .bindFailed: return .bindFailed
+        case .channelOpenFailed: return .channelOpenFailed
+        case .destinationUnreachable: return .destinationUnreachable(host: "service.test", port: 8000)
+        case .connectFailed: return .connectFailed
+        case .pumpFailed: return .pumpFailed
+        case .alreadyStarted: return .alreadyStarted
+        case .remotePortZeroRefused: return .remotePortZeroRefused
+        case .remoteBindRefused: return .remoteBindRefused(needsGatewayPorts: true)
+        case .remoteForwardUnanswered: return .remoteForwardUnanswered
+        case .connectionLost: return .connectionLost
+        case .unknown: return .unknown
+        }
+    }
+}

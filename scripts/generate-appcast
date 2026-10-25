@@ -1,0 +1,34 @@
+#!/bin/bash
+# Sign a direct-distribution feed. Private keys never appear in arguments.
+set -euo pipefail
+cd "$(dirname "$0")/.."
+VERSION="${MACSCP_VERSION:-$(< VERSION)}"
+[[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+([-+][0-9A-Za-z.-]+)?$ ]] || {
+    echo "error: invalid release version" >&2; exit 1;
+}
+[[ "${MACSCP_DISTRIBUTION:-direct}" == direct ]] || {
+    echo "error: Store builds cannot publish a Sparkle feed" >&2; exit 1;
+}
+DMG="dist/MacSCP-${VERSION}.dmg"
+[[ -f "$DMG" ]] || { echo "error: release DMG is missing" >&2; exit 1; }
+TOOL=".build/sparkle/Build/Products/Release/generate_appcast"
+[[ -x "$TOOL" ]] || { echo "error: run bash scripts/build-sparkle --tools" >&2; exit 1; }
+# A fresh directory prevents an older artifact or feed from being republished.
+WORK="$(mktemp -d .build/appcast.XXXXXX)"
+cp "$DMG" "$WORK/"
+ARGS=(--download-url-prefix "https://github.com/retrotools-apps/MacSCP/releases/download/v${VERSION}/"
+    --maximum-deltas 0 --maximum-versions 1)
+if [[ -n "${MACSCP_SPARKLE_PRIVATE_KEY:-}" ]]; then
+    # Upstream error messages can echo a malformed key. Never forward its
+    # diagnostics to CI logs, even when GitHub's secret masking is enabled.
+    if ! printf '%s\n' "$MACSCP_SPARKLE_PRIVATE_KEY" | "$TOOL" --ed-key-file - "${ARGS[@]}" "$WORK" >/dev/null 2>&1; then
+        echo "error: appcast generation failed; check the Sparkle key and release archive" >&2; exit 1
+    fi
+else
+    if ! "$TOOL" --account retroTools.MacSCP.updates "${ARGS[@]}" "$WORK" >/dev/null 2>&1; then
+        echo "error: appcast generation failed; check the Sparkle Keychain entry and release archive" >&2; exit 1
+    fi
+fi
+test -s "$WORK/appcast.xml"
+swift scripts/verify-appcast.swift "$WORK/appcast.xml" "$DMG" dist/MacSCP.app Resources/Sparkle-public-key.txt
+cp "$WORK/appcast.xml" dist/appcast.xml

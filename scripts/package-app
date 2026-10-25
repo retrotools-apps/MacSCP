@@ -1,0 +1,222 @@
+#!/bin/bash
+# Assembles dist/MacSCP.app from a fresh release build. Localization
+# NOTE (M5i lesson): macOS picks the app language from the MAIN bundle's
+# localizations — language markers make the matching catalogs inside the
+# SPM resource bundles reachable for every supported interface language.
+set -euo pipefail
+cd "$(dirname "$0")/.."
+
+# Store artifacts must never contain the external update request path.
+DISTRIBUTION="${MACSCP_DISTRIBUTION:-direct}"
+case "$DISTRIBUTION" in
+    direct|app-store) ;;
+    *) echo "error: MACSCP_DISTRIBUTION must be direct or app-store" >&2; exit 2 ;;
+esac
+
+scripts/check-vendor
+swift package resolve
+scripts/check-vendor
+scripts/third-party-notices --check
+
+if [[ "$DISTRIBUTION" == direct ]]; then
+    bash scripts/build-sparkle --tools
+    export MACSCP_ENABLE_SPARKLE=1
+else
+    unset MACSCP_ENABLE_SPARKLE
+fi
+
+# MACSCP_VERSION overrides (the release workflow derives it from the tag).
+VERSION="${MACSCP_VERSION:-$(< VERSION)}"
+BUILD="${MACSCP_BUILD:-$VERSION}"
+
+# Build separate Apple Silicon and Intel slices, then merge them below.
+# Use the supported engine, with separate trees so the second architecture
+# cannot overwrite the first slice before lipo runs.
+BUILD_FLAGS=(-c release --product MacSCP --build-system swiftbuild --disable-automatic-resolution --disable-dependency-cache)
+# Clang's __FILE__ strings (including BoringSSL diagnostics) and debug paths
+# must not disclose the builder's home directory in public artifacts.
+BUILD_FLAGS+=(-Xcc "-ffile-prefix-map=$PWD=/MacSCPSource")
+if [[ "$DISTRIBUTION" == app-store ]]; then
+    BUILD_FLAGS+=(-Xswiftc -DMACSCP_APP_STORE)
+fi
+ARM_FLAGS=("${BUILD_FLAGS[@]}" --arch arm64 --scratch-path .build/package/arm64)
+X86_FLAGS=("${BUILD_FLAGS[@]}" --arch x86_64 --scratch-path .build/package/x86_64)
+swift build "${ARM_FLAGS[@]}"
+swift build "${X86_FLAGS[@]}"
+ARM_BIN="$(swift build "${ARM_FLAGS[@]}" --show-bin-path)"
+X86_BIN="$(swift build "${X86_FLAGS[@]}" --show-bin-path)"
+
+APP="dist/MacSCP.app"
+mkdir -p dist
+if [[ -e "$APP" ]]; then
+    PREVIOUS_APP="$(mktemp -d .build/previous-package.XXXXXX)"
+    mv "$APP" "$PREVIOUS_APP/MacSCP.app"
+    echo "preserved previous application in $PREVIOUS_APP"
+fi
+mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
+
+lipo -create "$ARM_BIN/MacSCP" "$X86_BIN/MacSCP" \
+    -output "$APP/Contents/MacOS/MacSCP"
+# Swift Build may add framework-search RPATHs to the release executable.
+# The packaged framework is resolved via @executable_path, never the checkout.
+while IFS= read -r SEARCH_PATH; do
+    case "$SEARCH_PATH" in
+        "$PWD"/*) install_name_tool -delete_rpath "$SEARCH_PATH" "$APP/Contents/MacOS/MacSCP" ;;
+    esac
+done < <(otool -l "$APP/Contents/MacOS/MacSCP" | awk '
+    $1 == "path" {
+        sub(/^[[:space:]]*path[[:space:]]/, "")
+        sub(/ \(offset .*/, "")
+        print
+    }' | sort -u)
+# Keep local object-file locations in the build tree, not the shipped symbol table.
+xcrun strip -S "$APP/Contents/MacOS/MacSCP"
+cp Resources/AppIcon.icns "$APP/Contents/Resources/AppIcon.icns"
+# Resource bundles are architecture-independent — take the arm64 build's.
+cp -R "$ARM_BIN/macSCP_MacSCPAppKit.bundle" "$APP/Contents/Resources/"
+cp -R "$ARM_BIN/macSCP_macSCPCore.bundle" "$APP/Contents/Resources/"
+# "What's New" (What's New plan, Task 2): `ChangelogResource.load()` reads
+# this straight out of `Bundle.main` — never a target's own SwiftPM
+# resource bundle, which cannot carry a file living outside its target
+# directory. See `ChangelogResource.swift`'s doc comment.
+cp CHANGELOG.md "$APP/Contents/Resources/CHANGELOG.md"
+# Ship the readable, offline legal document rather than repository Markdown.
+cp output/pdf/THIRD_PARTY_NOTICES.pdf "$APP/Contents/Resources/THIRD_PARTY_NOTICES.pdf"
+cp LICENSE "$APP/Contents/Resources/LICENSE"
+cp licenses/macSCP-NOTICE.txt "$APP/Contents/Resources/NOTICE"
+if [[ "$DISTRIBUTION" == direct ]]; then
+    mkdir -p "$APP/Contents/Frameworks"
+    ditto .build/sparkle/Build/Products/Release/Sparkle.framework "$APP/Contents/Frameworks/Sparkle.framework"
+fi
+mkdir "$APP/Contents/Resources/en.lproj" "$APP/Contents/Resources/de.lproj" \
+      "$APP/Contents/Resources/fr.lproj" "$APP/Contents/Resources/pl.lproj" \
+      "$APP/Contents/Resources/es.lproj" "$APP/Contents/Resources/ro.lproj" \
+      "$APP/Contents/Resources/it.lproj"
+
+cat > "$APP/Contents/Info.plist" <<PLIST
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>CFBundleDevelopmentRegion</key><string>en</string>
+    <key>CFBundleLocalizations</key>
+    <array>
+        <string>en</string>
+        <string>de</string>
+        <string>fr</string>
+        <string>pl</string>
+        <string>es</string>
+        <string>ro</string>
+        <string>it</string>
+    </array>
+    <key>CFBundleDisplayName</key><string>MacSCP</string>
+    <key>MacSCPDistribution</key><string>${DISTRIBUTION}</string>
+    <key>CFBundleExecutable</key><string>MacSCP</string>
+    <key>CFBundleIconFile</key><string>AppIcon</string>
+    <key>CFBundleIdentifier</key><string>retroTools.MacSCP</string>
+    <key>CFBundleInfoDictionaryVersion</key><string>6.0</string>
+    <key>CFBundleName</key><string>MacSCP</string>
+    <key>CFBundlePackageType</key><string>APPL</string>
+    <key>CFBundleShortVersionString</key><string>${VERSION}</string>
+    <key>CFBundleVersion</key><string>${BUILD}</string>
+    <key>LSMinimumSystemVersion</key><string>15.0</string>
+    <key>NSHumanReadableCopyright</key><string>© 2026 RetroTools; inherited MIT notices included</string>
+    <key>NSPrincipalClass</key><string>NSApplication</string>
+    <key>UTExportedTypeDeclarations</key>
+    <array>
+        <dict>
+            <key>UTTypeIdentifier</key><string>retroTools.MacSCP.sessions</string>
+            <key>UTTypeDescription</key><string>MacSCP Sessions</string>
+            <key>UTTypeConformsTo</key>
+            <array>
+                <string>public.json</string>
+            </array>
+            <key>UTTypeTagSpecification</key>
+            <dict>
+                <key>public.filename-extension</key>
+                <array>
+                    <string>macscpsessions</string>
+                </array>
+            </dict>
+        </dict>
+        <dict>
+            <key>UTTypeIdentifier</key><string>retroTools.MacSCP.logins</string>
+            <key>UTTypeDescription</key><string>MacSCP Logins</string>
+            <key>UTTypeConformsTo</key>
+            <array>
+                <string>public.json</string>
+            </array>
+            <key>UTTypeTagSpecification</key>
+            <dict>
+                <key>public.filename-extension</key>
+                <array>
+                    <string>macscplogins</string>
+                </array>
+            </dict>
+        </dict>
+        <!-- The tab drag's own type (drag-detach fix, 2026-09-05). Shaped
+             deliberately unlike the session and login types above: it conforms to raw
+             data only, never to a text kind, and it declares no filename
+             extension. A tab drag means something only inside this app, and
+             a type with neither of those gives the Finder nothing to accept
+             and nothing to write; before this entry existed the drag was
+             carried as plain text, and dropping a tab on the desktop made a
+             clipping file instead of opening a window. See
+             Sources/MacSCPAppKit/TabDragPayload.swift.
+
+             This comment sits OUTSIDE the <dict> on purpose:
+             TabDragTypeDeclarationTests reads the entry's own span and would
+             otherwise find a type name in a sentence about it (CLAUDE.md,
+             "Source-scanning guards read comments too"). It also avoids
+             naming the type identifiers it describes, for the same reason. -->
+        <dict>
+            <key>UTTypeIdentifier</key><string>retroTools.MacSCP.tab</string>
+            <key>UTTypeDescription</key><string>MacSCP Tab</string>
+            <key>UTTypeConformsTo</key>
+            <array>
+                <string>public.data</string>
+            </array>
+        </dict>
+    </array>
+</dict>
+</plist>
+PLIST
+
+if [[ "$DISTRIBUTION" == direct ]]; then
+    PUBLIC_KEY="$(< Resources/Sparkle-public-key.txt)"
+    /usr/libexec/PlistBuddy -c "Add :SUPublicEDKey string $PUBLIC_KEY" "$APP/Contents/Info.plist"
+    /usr/libexec/PlistBuddy -c 'Add :SUFeedURL string https://github.com/retrotools-apps/MacSCP/releases/latest/download/appcast.xml' "$APP/Contents/Info.plist"
+    for key in SUEnableAutomaticChecks SUVerifyUpdateBeforeExtraction SURequireSignedFeed; do
+        /usr/libexec/PlistBuddy -c "Add :$key bool true" "$APP/Contents/Info.plist"
+    done
+    for key in SUAutomaticallyUpdate SUAllowsAutomaticUpdates SUEnableSystemProfiling SUEnableJavaScript; do
+        /usr/libexec/PlistBuddy -c "Add :$key bool false" "$APP/Contents/Info.plist"
+    done
+    /usr/libexec/PlistBuddy -c 'Add :SUSignedFeedFailureExpirationInterval integer 0' "$APP/Contents/Info.plist"
+else
+    test ! -e "$APP/Contents/Frameworks/Sparkle.framework"
+    if otool -L "$APP/Contents/MacOS/MacSCP" | grep -q Sparkle; then
+        echo "error: Store build unexpectedly links Sparkle" >&2; exit 1
+    fi
+fi
+
+plutil -lint "$APP/Contents/Info.plist"
+test -x "$APP/Contents/MacOS/MacSCP"
+if grep -aFq "$PWD" "$APP/Contents/MacOS/MacSCP"; then
+    echo "error: release executable contains the absolute build workspace" >&2
+    exit 1
+fi
+# Both architectures must be present (Intel Macs run macOS 15 too).
+for BIN in MacSCP; do
+    lipo -archs "$APP/Contents/MacOS/$BIN" | grep -q x86_64
+    lipo -archs "$APP/Contents/MacOS/$BIN" | grep -q arm64
+done
+test -d "$APP/Contents/Resources/macSCP_MacSCPAppKit.bundle"
+test -d "$APP/Contents/Resources/macSCP_macSCPCore.bundle"
+test -f "$APP/Contents/Resources/CHANGELOG.md"
+test -f "$APP/Contents/Resources/THIRD_PARTY_NOTICES.pdf"
+test -d "$APP/Contents/Resources/en.lproj" -a -d "$APP/Contents/Resources/de.lproj" \
+     -a -d "$APP/Contents/Resources/fr.lproj" -a -d "$APP/Contents/Resources/pl.lproj" \
+     -a -d "$APP/Contents/Resources/es.lproj" -a -d "$APP/Contents/Resources/ro.lproj" \
+     -a -d "$APP/Contents/Resources/it.lproj"
+echo "wrote $APP (v${VERSION}, build ${BUILD})"

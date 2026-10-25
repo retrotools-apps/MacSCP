@@ -1,0 +1,981 @@
+import Crypto
+import Foundation
+import Testing
+@testable import macSCPCore
+
+/// Runs only with MACSCP_ITEST=1 and a running Docker test rig
+/// (docker compose -f docker/test-server/compose.yml up -d), which brings up
+/// the `s3` container seeded with a bucket containing `a.txt` and
+/// `sub/b.txt` (M12/T5). Same gating pattern as
+/// `CitadelFileSystemIntegrationTests`. That server was MinIO until
+/// 2026-09-25 and is RustFS since, because the MinIO images were withdrawn
+/// from Docker Hub; the dated measurements below name whichever server they
+/// were made against, and nothing in the assertions had to change.
+@Suite(
+    "S3FileSystem against the Docker S3 rig",
+    .enabled(if: ProcessInfo.processInfo.environment["MACSCP_ITEST"] == "1"),
+    .serialized
+)
+struct S3FileSystemIntegrationTests {
+    private func connect() async throws -> S3FileSystem {
+        let config = S3ConnectionConfig(
+            accessKeyID: "macscp", secretAccessKey: "macscpsecretkey",
+            region: "us-east-1", endpoint: "http://127.0.0.1:19000",
+            bucket: "macscp-seed", usePathStyle: true, sessionToken: nil)
+        return try await S3FileSystem.connect(config)
+    }
+
+    /// M15: an S3 session bound to an S3 login set resolves its credentials
+    /// from the set and those credentials really authenticate against the rig.
+    /// Proves the resolve → S3ConnectionConfig → connect → list chain end to
+    /// end, not just in a fake.
+    @Test func setBoundS3SessionResolvesAndLists() async throws {
+        let set = LoginSet(
+            name: "rig", username: "",
+            kind: .s3, accessKeyID: "macscp")
+        let secrets = InMemorySecretStore()
+        try secrets.savePassword("macscpsecretkey", for: set.id)
+        let session = s3Session(name: "rig-session", loginSetID: set.id)
+
+        // M22/T9: one resolver for every backend, returning the same
+        // `FieldValues` the form produces.
+        let resolved = try #require(
+            try LoginResolver.resolve(session: session, sets: [set], secrets: secrets))
+
+        let config = S3ConnectionConfig(
+            accessKeyID: resolved[S3Field.accessKeyID],
+            secretAccessKey: resolved[S3Field.secretAccessKey],
+            region: "us-east-1", endpoint: "http://127.0.0.1:19000",
+            bucket: "macscp-seed", usePathStyle: true, sessionToken: nil)
+
+        let fs = try await S3FileSystem.connect(config)
+        defer { Task { await fs.disconnect() } }
+        let items = try await fs.list(path: "/")
+        #expect(items.count >= 0)
+    }
+
+    @Test func listsSeededBucketRoot() async throws {
+        let fs = try await connect()
+        defer { Task { await fs.disconnect() } }
+
+        let items = try await fs.list(path: "/")
+        let names = items.map(\.name)
+        #expect(names.contains("a.txt"))
+        #expect(names.contains("sub"))
+        #expect(items.first { $0.name == "a.txt" }?.kind == .file)
+        #expect(items.first { $0.name == "sub" }?.kind == .directory)
+    }
+
+    @Test func listsSeededSubdirectory() async throws {
+        let fs = try await connect()
+        defer { Task { await fs.disconnect() } }
+
+        let items = try await fs.list(path: "/sub")
+        #expect(items.map(\.name).contains("b.txt"))
+    }
+
+    @Test func statReturnsTheSeededFilesSize() async throws {
+        let fs = try await connect()
+        defer { Task { await fs.disconnect() } }
+
+        let item = try await fs.stat(path: "/a.txt")
+        #expect(item.kind == .file)
+        #expect(item.size != nil)
+    }
+
+    @Test func connectFailsWithWrongCredentials() async throws {
+        let config = S3ConnectionConfig(
+            accessKeyID: "wrong", secretAccessKey: "alsowrongsecret",
+            region: "us-east-1", endpoint: "http://127.0.0.1:19000",
+            bucket: "macscp-seed", usePathStyle: true, sessionToken: nil)
+        await #expect(throws: RemoteFSError.authenticationFailed) {
+            _ = try await S3FileSystem.connect(config)
+        }
+    }
+
+    /// Regression for M13/T4: `buildSignedRequest` used to sign
+    /// `URL.path`, which silently drops a trailing slash, so the PUT of a
+    /// folder-marker key ("name/") was signed as "name" and the server rejected
+    /// it with a 403 SignatureDoesNotMatch. This only reproduces against a
+    /// real S3-compatible server — the fake-transport unit tests build the
+    /// signature and the wire request from the same (buggy) path, so they
+    /// can never see the two diverge.
+    @Test func createDirectoryThenListShowsTheFolderAgainstTheRig() async throws {
+        let fs = try await connect()
+        defer { Task { await fs.disconnect() } }
+        let name = "m13-createdir-probe"
+
+        var caught: Error?
+        do {
+            try await fs.createDirectory(at: "/\(name)")
+            let items = try await fs.list(path: "/")
+            #expect(items.contains { $0.name == name && $0.kind == .directory })
+        } catch {
+            caught = error
+        }
+        // Best-effort cleanup so re-runs stay reproducible. `S3FileSystem
+        // .delete` normalizes away a trailing slash (it targets FILE keys),
+        // so it cannot address a folder-marker key ("name/") — and since
+        // 2026-09-04 it refuses a directory outright. `deleteTree` could do
+        // it, but cleanup that leans on the code under test cannot be
+        // trusted when that code is what failed, so this issues a raw
+        // signed DELETE. Cleanup failing must never fail this test.
+        await Self.deleteMarkerObjectIgnoringErrors(key: "\(name)/")
+        if let caught { throw caught }
+    }
+
+    /// M13/T5: a small object round-trip against a REAL S3 server. Unit
+    /// tests (`S3UploaderTests.swift`) exercise `S3Uploader`'s buffering and
+    /// error-mapping logic with a fake builder that signs and sends the
+    /// request from the SAME data, so they can never catch a SigV4 signing
+    /// bug — only a live server that independently re-derives the signature
+    /// from the wire bytes can. This is that check: `write` a few KiB to a
+    /// unique key, `readStream` it back, and assert the bytes are identical.
+    @Test func writeThenReadStreamRoundTripsBitIdenticalContent() async throws {
+        let fs = try await connect()
+        defer { Task { await fs.disconnect() } }
+        let key = "m13-uploader-roundtrip-\(UUID().uuidString).bin"
+        let body = Data((0..<4096).map { UInt8($0 & 0xFF) })
+
+        var caught: Error?
+        do {
+            let uploadStream = AsyncThrowingStream<Data, Error> { continuation in
+                continuation.yield(body)
+                continuation.finish()
+            }
+            try await fs.write(path: "/\(key)", mode: .overwrite, contents: uploadStream)
+
+            var received = Data()
+            for try await chunk in try await fs.readStream(path: "/\(key)", fromOffset: 0) {
+                received.append(chunk)
+            }
+            #expect(received == body)
+        } catch {
+            caught = error
+        }
+        // Best-effort cleanup so re-runs stay reproducible, mirroring the
+        // pattern above for the folder-marker probe.
+        try? await fs.delete(path: "/\(key)")
+        if let caught { throw caught }
+    }
+
+    /// M13/T6: a >8 MiB object write→read round-trip against a REAL S3
+    /// server — the one check that actually exercises the multipart
+    /// handshake end to end. Unit tests (`S3UploaderTests.swift`) exercise
+    /// `S3Uploader`'s part-cutting and abort-on-failure logic with a fake
+    /// builder that signs and sends from the SAME data, so they can never
+    /// catch a SigV4 signing bug in the Initiate/UploadPart/Complete
+    /// requests — only a live server that independently re-derives the
+    /// signature from the wire bytes can (mirrors the reasoning for the
+    /// small-object round-trip above, M13/T5).
+    @Test func writeThenReadStreamRoundTripsBitIdenticalContentAboveMultipartThreshold() async throws {
+        let fs = try await connect()
+        defer { Task { await fs.disconnect() } }
+        let key = "m13-multipart-roundtrip-\(UUID().uuidString).bin"
+        // 12 MiB of deterministic pseudo-random bytes (a simple LCG) — large
+        // enough to force >=2 multipart parts (partSize is 8 MiB) while
+        // staying fast to generate/verify.
+        let size = 12 * 1024 * 1024
+        var state: UInt64 = 0x1234_5678_9abc_def0
+        var body = Data(capacity: size)
+        for _ in 0..<size {
+            state = state &* 6_364_136_223_846_793_005 &+ 1_442_695_040_888_963_407
+            body.append(UInt8((state >> 33) & 0xFF))
+        }
+
+        var caught: Error?
+        do {
+            let uploadStream = AsyncThrowingStream<Data, Error> { continuation in
+                // Yield in chunks rather than one huge Data blob, so this
+                // exercises the same incremental-buffering path a real
+                // transfer would use.
+                let chunkSize = 256 * 1024
+                var offset = 0
+                while offset < body.count {
+                    let end = min(offset + chunkSize, body.count)
+                    continuation.yield(body.subdata(in: offset..<end))
+                    offset = end
+                }
+                continuation.finish()
+            }
+            try await fs.write(path: "/\(key)", mode: .overwrite, contents: uploadStream)
+
+            var received = Data()
+            for try await chunk in try await fs.readStream(path: "/\(key)", fromOffset: 0) {
+                received.append(chunk)
+            }
+            #expect(received == body)
+        } catch {
+            caught = error
+        }
+        // Best-effort cleanup so re-runs stay reproducible, mirroring the
+        // pattern above for the small-object round-trip.
+        try? await fs.delete(path: "/\(key)")
+        if let caught { throw caught }
+    }
+
+    /// M13/T7: rename on a FILE — a signed `x-amz-copy-source` PUT followed
+    /// by a DELETE of the source, against a REAL S3 server. Unit tests
+    /// (`S3FileSystemTests.swift`) exercise the copy-source header shape and
+    /// the destination pre-check with a fake transport that signs and sends
+    /// from the SAME data, so they can never catch a SigV4 signing bug in
+    /// the copy-source header — only a live server that independently
+    /// re-derives the signature from the wire bytes can (mirrors the
+    /// reasoning for the write/multipart round trips above).
+    @Test func renameFileMovesTheObjectToTheNewKey() async throws {
+        let fs = try await connect()
+        defer { Task { await fs.disconnect() } }
+        let sourceKey = "m13-rename-file-src-\(UUID().uuidString).txt"
+        let destKey = "m13-rename-file-dest-\(UUID().uuidString).txt"
+        let body = Data("rename me".utf8)
+
+        var caught: Error?
+        do {
+            let uploadStream = AsyncThrowingStream<Data, Error> { continuation in
+                continuation.yield(body)
+                continuation.finish()
+            }
+            try await fs.write(path: "/\(sourceKey)", mode: .overwrite, contents: uploadStream)
+
+            try await fs.rename(from: "/\(sourceKey)", to: "/\(destKey)")
+
+            var received = Data()
+            for try await chunk in try await fs.readStream(path: "/\(destKey)", fromOffset: 0) {
+                received.append(chunk)
+            }
+            #expect(received == body)
+
+            do {
+                _ = try await fs.stat(path: "/\(sourceKey)")
+                Issue.record("expected the source key to be gone after rename")
+            } catch let error as RemoteFSError {
+                // Rethrown, not `return`ed: the outer `catch` puts it in
+                // `caught`, so the two cleanups below still run. Same shape
+                // as the refusal case further down — a fourth site of the
+                // same defect, found while fixing that one.
+                guard case .notFound = error else { throw error }
+            }
+        } catch {
+            caught = error
+        }
+        // Best-effort cleanup so re-runs stay reproducible — the source
+        // should already be gone if the rename succeeded, but a partial
+        // failure could leave it behind.
+        try? await fs.delete(path: "/\(sourceKey)")
+        try? await fs.delete(path: "/\(destKey)")
+        if let caught { throw caught }
+    }
+
+    /// M13/T7: rename on a DIRECTORY — every object under the source prefix
+    /// (here two, one nested under a sub-prefix) must be re-keyed to the
+    /// destination prefix, and NONE may remain at the source, against a
+    /// REAL S3 server. Same signing-bug rationale as the file-rename
+    /// test above, applied to the `allObjectKeys` pagination + per-key
+    /// copy+delete loop.
+    @Test func renameDirectoryMovesEveryObjectToTheNewPrefix() async throws {
+        let fs = try await connect()
+        defer { Task { await fs.disconnect() } }
+        let suffix = UUID().uuidString
+        let sourceFolder = "m13-rename-dir-src-\(suffix)"
+        let destFolder = "m13-rename-dir-dest-\(suffix)"
+        let childKeys = ["child-a.txt", "sub/child-b.txt"]
+
+        var caught: Error?
+        do {
+            for child in childKeys {
+                let uploadStream = AsyncThrowingStream<Data, Error> { continuation in
+                    continuation.yield(Data(child.utf8))
+                    continuation.finish()
+                }
+                try await fs.write(path: "/\(sourceFolder)/\(child)", mode: .overwrite, contents: uploadStream)
+            }
+
+            try await fs.rename(from: "/\(sourceFolder)", to: "/\(destFolder)")
+
+            for child in childKeys {
+                var received = Data()
+                for try await chunk in try await fs.readStream(path: "/\(destFolder)/\(child)", fromOffset: 0) {
+                    received.append(chunk)
+                }
+                #expect(received == Data(child.utf8))
+            }
+
+            // Nothing must remain at the OLD prefix; the NEW one must show
+            // up as a directory in a root listing.
+            let rootItems = try await fs.list(path: "/")
+            #expect(!rootItems.contains { $0.name == sourceFolder })
+            #expect(rootItems.contains { $0.name == destFolder && $0.kind == .directory })
+        } catch {
+            caught = error
+        }
+        // Best-effort cleanup at BOTH prefixes so re-runs stay reproducible
+        // even if an assertion above fails partway through the rename.
+        for child in childKeys {
+            try? await fs.delete(path: "/\(sourceFolder)/\(child)")
+            try? await fs.delete(path: "/\(destFolder)/\(child)")
+        }
+        if let caught { throw caught }
+    }
+
+    /// M13/T8: `deleteTree` against a REAL S3 server — creates a folder
+    /// with several objects (one nested under a sub-prefix, plus the
+    /// folder's own trailing-slash marker), deletes the whole tree, and
+    /// asserts BOTH that a root listing no longer shows the folder AND that
+    /// no keys remain under its prefix. Same signing-bug rationale as the
+    /// rename tests above: the `DeleteObjects` `Content-MD5` header and the
+    /// bucket-root (`key: ""`) request path are exactly the kind of thing
+    /// only a live server that independently re-derives the SigV4 signature
+    /// from the wire bytes can validate.
+    @Test func deleteTreeRemovesEveryObjectUnderThePrefix() async throws {
+        let fs = try await connect()
+        defer { Task { await fs.disconnect() } }
+        let folder = "m13-deletetree-\(UUID().uuidString)"
+        let childKeys = ["a.txt", "sub/b.txt"]
+
+        var caught: Error?
+        do {
+            try await fs.createDirectory(at: "/\(folder)")
+            for child in childKeys {
+                let uploadStream = AsyncThrowingStream<Data, Error> { continuation in
+                    continuation.yield(Data(child.utf8))
+                    continuation.finish()
+                }
+                try await fs.write(path: "/\(folder)/\(child)", mode: .overwrite, contents: uploadStream)
+            }
+
+            try await fs.deleteTree(at: "/\(folder)")
+
+            let rootItems = try await fs.list(path: "/")
+            #expect(!rootItems.contains { $0.name == folder })
+            // `allObjectKeys` itself is private, so the "no keys remain
+            // under the prefix" half of the assertion goes through `list`
+            // on the (now nonexistent) folder path instead: ListObjectsV2
+            // returns an empty page for a prefix with zero matching keys
+            // rather than a 404, so an empty result here is exactly "no
+            // keys remain under this prefix".
+            let folderItems = try await fs.list(path: "/\(folder)")
+            #expect(folderItems.isEmpty)
+        } catch {
+            caught = error
+        }
+        // Best-effort cleanup so re-runs stay reproducible even if an
+        // assertion above fails partway through.
+        for child in childKeys {
+            try? await fs.delete(path: "/\(folder)/\(child)")
+        }
+        await Self.deleteMarkerObjectIgnoringErrors(key: "\(folder)/")
+        if let caught { throw caught }
+    }
+
+    // MARK: - The delete contracts against a real store
+
+    /// `RemoteFileSystem.deleteTree`'s contract says a plain file behaves
+    /// exactly like `delete`. The prefix walk enumerated `<key>/`, which a
+    /// plain object never matches, so `deleteTree` batched zero keys and
+    /// answered success while the object was still there — a shape only a
+    /// real store shows, because the stub answers whatever listing the test
+    /// queued regardless of the prefix that was asked for.
+    @Test func deleteTreeRemovesAPlainObject() async throws {
+        let fs = try await connect()
+        defer { Task { await fs.disconnect() } }
+        let key = "m21-s3-deletetree-file-\(UUID().uuidString).bin"
+
+        var caught: Error?
+        do {
+            let uploadStream = AsyncThrowingStream<Data, Error> { continuation in
+                continuation.yield(Data("delete me".utf8))
+                continuation.finish()
+            }
+            try await fs.write(path: "/\(key)", mode: .overwrite, contents: uploadStream)
+            #expect(try await fs.stat(path: "/\(key)").kind == .file)
+
+            try await fs.deleteTree(at: "/\(key)")
+
+            await Self.expectNotFound(fs, path: "/\(key)")
+        } catch {
+            caught = error
+        }
+        // Best-effort, so a failed assertion above still leaves the bucket
+        // as it was found.
+        try? await fs.delete(path: "/\(key)")
+        if let caught { throw caught }
+    }
+
+    /// `RemoteFileSystem.delete`'s contract says a directory is a
+    /// `protocolError`, and S3 cannot say so on its own: a directory is a
+    /// `<name>/` marker key, `DeleteObject` answers 204 for the bare
+    /// `<name>` that never existed, and the marker survives. So the refusal
+    /// is asserted together with the marker still being listed — a refusal
+    /// that deleted something anyway would pass the first half alone.
+    /// `deleteTree` then removes it, which is the operation that was always
+    /// meant to.
+    @Test func deleteRefusesADirectoryAndLeavesItsMarkerForDeleteTree() async throws {
+        let fs = try await connect()
+        defer { Task { await fs.disconnect() } }
+        let folder = "m21-s3-delete-dir-\(UUID().uuidString)"
+
+        var caught: Error?
+        do {
+            try await fs.createDirectory(at: "/\(folder)")
+
+            do {
+                try await fs.delete(path: "/\(folder)")
+                Issue.record("expected delete on a directory to throw")
+            } catch let error as RemoteFSError {
+                // Rethrown, not `return`ed: the outer `catch` puts it in
+                // `caught`, so the marker cleanup below still runs and the
+                // test still fails with the wrong error. An early return
+                // here left the marker object in the bucket.
+                guard case .protocolError = error else { throw error }
+            }
+            // Read the marker BEFORE anything heals it: the refusal is only
+            // worth something if the directory is still there afterwards.
+            let afterRefusal = try await fs.list(path: "/")
+            #expect(afterRefusal.contains { $0.name == folder && $0.kind == .directory })
+
+            try await fs.deleteTree(at: "/\(folder)")
+
+            await Self.expectNotFound(fs, path: "/\(folder)")
+        } catch {
+            caught = error
+        }
+        await Self.deleteMarkerObjectIgnoringErrors(key: "\(folder)/")
+        if let caught { throw caught }
+    }
+
+    /// The other half of `delete`'s contract, and the reason it needs a
+    /// lookup at all: the rig really does answer `DeleteObject` with 204 for a
+    /// key that never existed, so before the lookup this returned normally.
+    /// Creates nothing.
+    @Test func deleteOnAKeyThatIsNotThereIsNotFound() async throws {
+        let fs = try await connect()
+        defer { Task { await fs.disconnect() } }
+
+        let path = "/m21-s3-absent-\(UUID().uuidString).bin"
+        await #expect(throws: RemoteFSError.notFound(path: path)) {
+            try await fs.delete(path: path)
+        }
+    }
+
+    /// `delete`'s S3-specific rule for a key that is BOTH an object and a
+    /// prefix (`docs/BACKLOG.md`, "A key that is both an object and a
+    /// prefix"): refuse, and remove nothing. `deleteTree` on the same shape
+    /// takes the object AND the subtree.
+    ///
+    /// This could not be proven against a real store until the rig's server
+    /// changed. Measured against the MinIO rig on 2026-09-05 (`docker exec
+    /// macscp-test-minio mc find/ls/cat`): `mc cat` retrieved `x/child` — the
+    /// object existed and answered a direct GET — but `mc find` and `mc ls
+    /// --recursive` never listed it while `x` also existed as a bare key, in
+    /// either creation order, and removing `x` made it reappear.
+    /// `deleteLookup`'s ambiguity check IS such a listing, so it never saw
+    /// the child and `delete("x")` never refused: a rig limitation, not a
+    /// code defect. Re-measured against the RustFS rig on 2026-09-25 with the
+    /// same key pair written by raw signed PUT: `?list-type=2&prefix=x/&max-keys=1`
+    /// — the exact call `deleteLookup` makes — came back `KeyCount 1` naming
+    /// `x/child`, and `?list-type=2&delimiter=/&prefix=x` reported the object
+    /// and the `x/` CommonPrefix together. The rig is no longer blind to the
+    /// shape, so what the unit tests' canned responses proved
+    /// (`S3FileSystemTests.swift`) is proven here against a real store too.
+    /// Real AWS S3 stays unmeasured — this suite calls no AWS endpoint.
+    @Test func deleteRefusesAKeyThatIsBothAnObjectAndAPrefixWhileDeleteTreeTakesBoth() async throws {
+        let fs = try await connect()
+        defer { Task { await fs.disconnect() } }
+        let key = "m21-s3-object-and-prefix-\(UUID().uuidString)"
+        let objectBody = Data("the bare key's own object".utf8)
+
+        var caught: Error?
+        do {
+            try await Self.put(fs, path: "/\(key)", objectBody)
+            try await Self.put(fs, path: "/\(key)/child", Data("the child under the prefix".utf8))
+
+            do {
+                try await fs.delete(path: "/\(key)")
+                Issue.record("expected delete on an object-and-prefix key to throw")
+            } catch let error as RemoteFSError {
+                // Rethrown rather than returned, like every other refusal in
+                // this file, so the cleanup below still runs.
+                guard case .protocolError(let reason) = error else { throw error }
+                // `.protocolError` alone is not enough HERE, unlike in the
+                // other refusal cases: `delete` throws it for `.directory`
+                // too, and a key misclassified as a plain directory is
+                // exactly the mistake this case exists to catch — the
+                // ambiguity is the whole subject. The `.both` arm is the
+                // only one whose sentence says "both"
+                // (`S3FileSystem.delete`), so that word discriminates the
+                // two on its own and no second copy of either sentence is
+                // written here. Deliberately only this positive check: a
+                // negative naming the OTHER arm's wording would start
+                // matching nothing the moment that wording moved, and pass
+                // in silence.
+                //
+                // The KEY is removed from the sentence first, because the
+                // sentence interpolates it: the first version of this check
+                // read `reason.contains("both")` against a fixture named
+                // `m21-s3-both-…`, so the key answered the assertion for the
+                // server. Planting the `.directory` sentence in the `.both`
+                // arm left it green — measured 2026-09-25, which is why the
+                // key is stripped and why the fixture no longer carries the
+                // word either.
+                let sentence = reason.replacingOccurrences(of: key, with: "")
+                let namesTheAmbiguity = sentence.contains("both")
+                #expect(namesTheAmbiguity)
+            }
+            // Read the object BEFORE `deleteTree` heals the bucket: a refusal
+            // that deleted something anyway would pass the refusal half alone.
+            var afterRefusal = Data()
+            for try await chunk in try await fs.readStream(path: "/\(key)", fromOffset: 0) {
+                afterRefusal.append(chunk)
+            }
+            #expect(afterRefusal == objectBody)
+
+            try await fs.deleteTree(at: "/\(key)")
+
+            await Self.expectNotFound(fs, path: "/\(key)")
+            await Self.expectNotFound(fs, path: "/\(key)/child")
+        } catch {
+            caught = error
+        }
+        try? await fs.delete(path: "/\(key)/child")
+        try? await fs.delete(path: "/\(key)")
+        if let caught { throw caught }
+    }
+
+    /// One object written through the backend under test, spelled once here
+    /// because the case above writes two.
+    private static func put(_ fs: S3FileSystem, path: String, _ body: Data) async throws {
+        try await fs.write(path: path, mode: .overwrite, contents: AsyncThrowingStream { continuation in
+            continuation.yield(body)
+            continuation.finish()
+        })
+    }
+
+    /// A recording decorator around the real transport — the seam
+    /// `S3FileSystem.connect(_:transport:)` exposes for exactly this: every
+    /// `send`/`sendStreaming` call goes through a real `URLSessionHTTPTransport`
+    /// underneath, so the requests genuinely reach the server, and this only
+    /// records the HTTP method of each. `actor`, like `FakeS3Transport` in
+    /// the unit tests, because the log is mutated across concurrent `await`s.
+    ///
+    /// Records METHODS, not a bare count, so a regression that swapped the
+    /// `HEAD`/one-key-list pair for a different-shaped lookup that happened
+    /// to cost the same number of requests would still be caught — the
+    /// method sequence names which requests those were, a count never does.
+    private actor RecordingHTTPTransport: HTTPTransport {
+        private let inner: any HTTPTransport
+        private(set) var methods: [String] = []
+
+        init(inner: any HTTPTransport) { self.inner = inner }
+
+        func send(_ request: URLRequest) async throws -> (Data, HTTPURLResponse) {
+            methods.append(request.httpMethod ?? "?")
+            return try await inner.send(request)
+        }
+
+        func sendStreaming(_ request: URLRequest) async throws
+            -> (body: AsyncThrowingStream<Data, Error>, response: HTTPURLResponse) {
+            methods.append(request.httpMethod ?? "?")
+            return try await inner.sendStreaming(request)
+        }
+    }
+
+    /// The backlog row's headline shape, proven against a REAL server rather
+    /// than the unit tests' canned responses: `delete` on a file issues
+    /// exactly a `HEAD`, then the one-key list that checks the key is not
+    /// ALSO a prefix (`docs/BACKLOG.md`, "A key that is both an object and
+    /// a prefix"), then a `DELETE` — three constant requests, never a
+    /// paged `GET` listing of the parent prefix in between. Grew from two to
+    /// three on 2026-09-05: the ambiguity check used to run only when the
+    /// `HEAD` answered 404, so a plain file (`HEAD` 200) skipped it and left
+    /// through `["HEAD", "DELETE"]` alone.
+    @Test func deleteOnAFileCostsExactlyThreeRequestsAgainstTheRig() async throws {
+        let config = S3ConnectionConfig(
+            accessKeyID: "macscp", secretAccessKey: "macscpsecretkey",
+            region: "us-east-1", endpoint: "http://127.0.0.1:19000",
+            bucket: "macscp-seed", usePathStyle: true, sessionToken: nil)
+        let session = URLSession(configuration: .ephemeral)
+        defer { session.finishTasksAndInvalidate() }
+        let recorder = RecordingHTTPTransport(inner: URLSessionHTTPTransport(session: session))
+        let fs = try await S3FileSystem.connect(config, transport: recorder)
+        defer { Task { await fs.disconnect() } }
+        let key = "m21-s3-delete-request-count-\(UUID().uuidString).bin"
+
+        var caught: Error?
+        do {
+            let uploadStream = AsyncThrowingStream<Data, Error> { continuation in
+                continuation.yield(Data("count me".utf8))
+                continuation.finish()
+            }
+            try await fs.write(path: "/\(key)", mode: .overwrite, contents: uploadStream)
+
+            let before = await recorder.methods.count
+            try await fs.delete(path: "/\(key)")
+            let deleteMethods = await Array(recorder.methods.dropFirst(before))
+
+            #expect(deleteMethods == ["HEAD", "GET", "DELETE"])
+        } catch {
+            caught = error
+        }
+        try? await fs.delete(path: "/\(key)")
+        if let caught { throw caught }
+    }
+
+    /// `stat` at `path` must answer `RemoteFSError.notFound` — spelled once
+    /// here because the three cases above all end on it.
+    private static func expectNotFound(
+        _ fs: S3FileSystem, path: String, sourceLocation: SourceLocation = #_sourceLocation
+    ) async {
+        do {
+            _ = try await fs.stat(path: path)
+            Issue.record("expected .notFound at \(path)", sourceLocation: sourceLocation)
+        } catch let error as RemoteFSError {
+            guard case .notFound = error else {
+                Issue.record("expected .notFound, got \(error)", sourceLocation: sourceLocation)
+                return
+            }
+        } catch {
+            Issue.record("unexpected error type: \(error)", sourceLocation: sourceLocation)
+        }
+    }
+
+    /// M18a final review (Important-1): `createFile`'s existence probe now
+    /// only proceeds on a DEFINITE `RemoteFSError.notFound`. That verdict is
+    /// produced by `S3FileSystem.stat`, which is a `ListObjectsV2` under the
+    /// hood — a fake transport cannot prove the real server drives it to
+    /// that exact case, and getting it wrong would leave New File
+    /// permanently broken on S3 (worse than the bug being fixed). This
+    /// exercises the whole view-model path against the rig: the missing key
+    /// creates, the existing key collides, and the collision must not
+    /// truncate the object.
+    @MainActor
+    @Test func createFileCreatesThenCollidesAgainstTheRig() async throws {
+        let fs = try await connect()
+        defer { Task { await fs.disconnect() } }
+        let key = "m18a-createfile-\(UUID().uuidString).txt"
+
+        var caught: Error?
+        do {
+            let vm = RemoteBrowserViewModel(fs: fs, startPath: "/")
+            await vm.load()
+
+            #expect(await vm.createFile(named: key) == nil)
+            let created = try await fs.stat(path: "/\(key)")
+            #expect(created.kind == .file)
+            #expect(created.size == 0)
+
+            // Give the object content, then collide: the message comes back
+            // and the bytes survive.
+            let body = Data("keep me".utf8)
+            let uploadStream = AsyncThrowingStream<Data, Error> { continuation in
+                continuation.yield(body)
+                continuation.finish()
+            }
+            try await fs.write(path: "/\(key)", mode: .overwrite, contents: uploadStream)
+
+            #expect(await vm.createFile(named: key) != nil)
+            var readBack = Data()
+            for try await chunk in try await fs.readStream(path: "/\(key)", fromOffset: 0) {
+                readBack.append(chunk)
+            }
+            #expect(readBack == body)
+        } catch {
+            caught = error
+        }
+        try? await fs.delete(path: "/\(key)")
+        if let caught { throw caught }
+    }
+
+    /// M14/T2: the signing proof for `presignedURL(.get)` — a presigned GET
+    /// URL is only meaningful if a plain, unauthenticated `URLSession`
+    /// request against it (no `Authorization` header at all — the signature
+    /// lives entirely in the query string) is independently accepted by a
+    /// REAL S3-compatible server. The fake-transport unit test
+    /// (`S3FileSystemTests.swift`) only proves the URL's SHAPE; it signs and
+    /// "sends" from the same data, so it can never catch a SigV4 signing bug
+    /// — only a real server re-deriving the signature from the wire bytes can
+    /// (same rationale as the M13 write/rename/deleteTree gated tests).
+    @Test func presignedGetURLDownloadsTheObjectFromTheRig() async throws {
+        let fs = try await connect()
+        defer { Task { await fs.disconnect() } }
+        let key = "m14-presign-get-\(UUID().uuidString).txt"
+        let body = Data("hello presigned".utf8)
+
+        var caught: Error?
+        do {
+            let uploadStream = AsyncThrowingStream<Data, Error> { continuation in
+                continuation.yield(body)
+                continuation.finish()
+            }
+            try await fs.write(path: "/\(key)", mode: .overwrite, contents: uploadStream)
+
+            let url = try fs.presignedURL(method: .get, key: key, expiresIn: 600)
+            let (data, response) = try await URLSession.shared.data(from: url)
+            #expect((response as? HTTPURLResponse)?.statusCode == 200)
+            #expect(data == body)
+        } catch {
+            caught = error
+        }
+        // Best-effort cleanup so re-runs stay reproducible, mirroring every
+        // other gated test's pattern.
+        try? await fs.delete(path: "/\(key)")
+        if let caught { throw caught }
+    }
+
+    /// M14/T2: the signing proof for `presignedURL(.put)` — a presigned PUT
+    /// URL uploads to the exact key it was signed for when driven by a
+    /// plain `URLSession.upload(for:from:)`, again against a REAL S3
+    /// server (see the GET test above for the fuller rationale).
+    @Test func presignedPutURLUploadsToTheKeyOnTheRig() async throws {
+        let fs = try await connect()
+        defer { Task { await fs.disconnect() } }
+        let key = "m14-presign-put-\(UUID().uuidString).bin"
+
+        var caught: Error?
+        do {
+            let url = try fs.presignedURL(method: .put, key: key, expiresIn: 600)
+            var request = URLRequest(url: url)
+            request.httpMethod = "PUT"
+            let body = Data(repeating: 0x5A, count: 4096)
+            let (_, response) = try await URLSession.shared.upload(for: request, from: body)
+            #expect(((response as? HTTPURLResponse)?.statusCode ?? 0) / 100 == 2)
+
+            let stat = try await fs.stat(path: "/\(key)")
+            #expect(stat.size == 4096)
+        } catch {
+            caught = error
+        }
+        try? await fs.delete(path: "/\(key)")
+        if let caught { throw caught }
+    }
+
+    private static func deleteMarkerObjectIgnoringErrors(key: String) async {
+        let bucket = "macscp-seed"
+        let rawPath = "/\(bucket)/\(key)"
+        guard var components = URLComponents(string: "http://127.0.0.1:19000") else { return }
+        components.percentEncodedPath = rawPath
+        guard let url = components.url, let host = url.host else { return }
+        let hostHeader = url.port.map { "\(host):\($0)" } ?? host
+
+        let signer = SigV4Signer(
+            accessKeyID: "macscp", secretAccessKey: "macscpsecretkey",
+            region: "us-east-1", service: "s3", sessionToken: nil)
+        let (authorization, extraHeaders) = signer.authorizationHeader(
+            method: "DELETE", host: hostHeader, path: rawPath, query: [],
+            headers: ["host": hostHeader], payloadHash: SigV4Signer.emptyPayloadHash, date: Date())
+
+        var request = URLRequest(url: url)
+        request.httpMethod = "DELETE"
+        request.setValue(hostHeader, forHTTPHeaderField: "Host")
+        request.setValue(authorization, forHTTPHeaderField: "Authorization")
+        for (k, v) in extraHeaders { request.setValue(v, forHTTPHeaderField: k) }
+
+        _ = try? await URLSession.shared.data(for: request)
+    }
+
+
+    // MARK: - Checksums against a real store
+
+    /// What no canned XML can show: that a REAL object store puts the digest
+    /// where this code reads it, and that both ETag shapes come out of the
+    /// same call meaning different things.
+    ///
+    /// Both objects are uploaded here rather than taken from the seed,
+    /// because the point is the SHAPE of the upload: one small enough for a
+    /// single PUT, one past the uploader's 8 MiB part size so the server really
+    /// composes the ETag out of the parts' MD5s. The multipart half is the
+    /// one that matters — its hex is compared against the MD5 of the very
+    /// bytes that were uploaded, and it must NOT match, which is exactly
+    /// what `describesFileContent == false` is saying.
+    @Test func theStoreAnswersASinglePartETagAsTheObjectsMD5AndAMultipartOneAsNotThat() async throws {
+        let fs = try await connect()
+        defer { Task { await fs.disconnect() } }
+        let provider = try #require((fs as any RemoteFileSystem) as? any RemoteChecksumProvider)
+        let smallKey = "checksum-single-\(UUID().uuidString).bin"
+        let largeKey = "checksum-multipart-\(UUID().uuidString).bin"
+
+        let small = Data("the quick brown fox".utf8)
+        // 12 MiB, past the uploader's 8 MiB part size, so this arrives as
+        // more than one part — same size and generator as the multipart
+        // round-trip above.
+        var state: UInt64 = 0x1234_5678_9abc_def0
+        var large = Data(capacity: 12 * 1024 * 1024)
+        for _ in 0..<(12 * 1024 * 1024) {
+            state = state &* 6_364_136_223_846_793_005 &+ 1_442_695_040_888_963_407
+            large.append(UInt8((state >> 33) & 0xFF))
+        }
+
+        var caught: Error?
+        do {
+            for (key, body) in [(smallKey, small), (largeKey, large)] {
+                try await fs.write(
+                    path: "/\(key)", mode: .overwrite,
+                    contents: AsyncThrowingStream<Data, Error> { continuation in
+                        let chunkSize = 256 * 1024
+                        var offset = 0
+                        while offset < body.count {
+                            let end = min(offset + chunkSize, body.count)
+                            continuation.yield(body.subdata(in: offset..<end))
+                            offset = end
+                        }
+                        continuation.finish()
+                    })
+            }
+
+            let singleOutcome = try await provider.remoteChecksum(
+                forFileAt: "/\(smallKey)", algorithm: .md5)
+            guard case .checksum(let single) = singleOutcome else {
+                Issue.record("expected a checksum for the single-part object, got \(singleOutcome)")
+                return
+            }
+            #expect(single.provenance == .objectStorageETagSinglePart)
+            #expect(single.describesFileContent)
+            #expect(single.hex == Insecure.MD5.hash(data: small).map { String(format: "%02x", $0) }.joined())
+
+            let multipartOutcome = try await provider.remoteChecksum(
+                forFileAt: "/\(largeKey)", algorithm: .md5)
+            guard case .checksum(let multipart) = multipartOutcome else {
+                Issue.record("expected a checksum for the multipart object, got \(multipartOutcome)")
+                return
+            }
+            guard case .objectStorageETagMultipart(let partCount) = multipart.provenance else {
+                Issue.record("expected a multipart provenance, got \(multipart.provenance)")
+                return
+            }
+            #expect(partCount >= 2)
+            #expect(!multipart.describesFileContent)
+            let realMD5 = Insecure.MD5.hash(data: large).map { String(format: "%02x", $0) }.joined()
+            #expect(multipart.hex != realMD5)
+        } catch {
+            caught = error
+        }
+        try? await fs.delete(path: "/\(smallKey)")
+        try? await fs.delete(path: "/\(largeKey)")
+        if let caught { throw caught }
+    }
+
+    // MARK: - The bucket list against the rig (2026-09-02)
+
+    /// The rig's ROOT key with the toggle on: it may list every bucket.
+    private func connectAtBucketList(
+        accessKeyID: String = "macscp", secretAccessKey: String = "macscpsecretkey"
+    ) async throws -> S3FileSystem {
+        let config = S3ConnectionConfig(
+            accessKeyID: accessKeyID, secretAccessKey: secretAccessKey,
+            region: "us-east-1", endpoint: "http://127.0.0.1:19000",
+            bucket: "", usePathStyle: true, sessionToken: nil, startsAtBucketList: true)
+        return try await S3FileSystem.connect(config)
+    }
+
+    /// The root key sees both seeded buckets as directory rows carrying
+    /// the store's real creation dates.
+    @Test func rootKeyWithTheToggleListsBothBuckets() async throws {
+        let fs = try await connectAtBucketList()
+        defer { Task { await fs.disconnect() } }
+
+        let items = try await fs.list(path: "/")
+        let names = Set(items.map(\.name))
+        #expect(names.contains("macscp-seed"))
+        #expect(names.contains("macscp-second"))
+        #expect(items.allSatisfy { $0.kind == .directory })
+        #expect(items.allSatisfy { $0.modifiedAt != nil })
+        #expect(items.allSatisfy { $0.size == nil })
+        #expect(items.first { $0.name == "macscp-seed" }?.path == "/macscp-seed")
+    }
+
+    /// Opening a bucket row from that listing shows the bucket's contents,
+    /// and every row carries the bucket-qualified path the next navigation
+    /// will be handed back.
+    @Test func openingASeedBucketUnderTheBucketListShowsItsContents() async throws {
+        let fs = try await connectAtBucketList()
+        defer { Task { await fs.disconnect() } }
+
+        let items = try await fs.list(path: "/macscp-seed")
+        let names = items.map(\.name)
+        #expect(names.contains("a.txt"))
+        #expect(names.contains("sub"))
+        #expect(items.first { $0.name == "a.txt" }?.path == "/macscp-seed/a.txt")
+        #expect(items.first { $0.name == "sub" }?.kind == .directory)
+
+        let deeper = try await fs.list(path: "/macscp-seed/sub")
+        #expect(deeper.map(\.name).contains("b.txt"))
+
+        let second = try await fs.list(path: "/macscp-second")
+        #expect(second.map(\.name).contains("second.txt"))
+    }
+
+    /// A transfer under the bucket list really moves bytes into the bucket
+    /// the path names — `stat` and `readStream` route there too.
+    @Test func aTransferUnderTheBucketListRoutesIntoTheNamedBucket() async throws {
+        let fs = try await connectAtBucketList()
+        defer { Task { await fs.disconnect() } }
+        let path = "/macscp-second/bucketlist-\(UUID().uuidString).txt"
+        let body = Data("routed into the bucket from the path".utf8)
+        var caught: Error?
+        do {
+            try await fs.write(path: path, mode: .overwrite, contents: AsyncThrowingStream { continuation in
+                continuation.yield(body)
+                continuation.finish()
+            })
+            let item = try await fs.stat(path: path)
+            #expect(item.size == UInt64(body.count))
+            #expect(item.path == path)
+            var received = Data()
+            for try await chunk in try await fs.readStream(path: path, fromOffset: 0) {
+                received.append(chunk)
+            }
+            #expect(received == body)
+        } catch {
+            caught = error
+        }
+        try? await fs.delete(path: path)
+        if let caught { throw caught }
+    }
+
+    /// The scoped key, measured 2026-09-02 against MinIO
+    /// (`RELEASE.2024-07-16T23-46-41Z`) and again 2026-09-25 against RustFS
+    /// 1.0.0: its account-level listing does NOT fail with `AccessDenied` —
+    /// both servers return the FILTERED list of the buckets the key can
+    /// touch, and on MinIO not even an explicit `Deny` on
+    /// `s3:ListAllMyBuckets` changed that (docker/test-server/README.md). So
+    /// what the rig can prove is the filtered list, and the
+    /// `bucketListForbidden` case — which is what AWS answers — is pinned
+    /// with a canned 403 in `S3FileSystemTests` instead.
+    @Test func scopedKeyWithTheToggleSeesOnlyItsOwnBucket() async throws {
+        let fs = try await connectAtBucketList(
+            accessKeyID: "macscp-scoped", secretAccessKey: "macscpscopedsecret")
+        defer { Task { await fs.disconnect() } }
+
+        let items = try await fs.list(path: "/")
+        #expect(items.count == 1)
+        #expect(items.first?.name == "macscp-seed")
+        #expect(items.first?.kind == .directory)
+    }
+
+    /// The other half of that measurement: the bucket the scoped key's
+    /// policy does not name is a hard refusal when opened.
+    @Test func scopedKeyOpeningTheOtherBucketIsRefused() async throws {
+        let fs = try await connectAtBucketList(
+            accessKeyID: "macscp-scoped", secretAccessKey: "macscpscopedsecret")
+        defer { Task { await fs.disconnect() } }
+
+        await #expect(throws: RemoteFSError.authenticationFailed) {
+            _ = try await fs.list(path: "/macscp-second")
+        }
+    }
+
+    /// The "usual case" the backlog entry names: a key scoped to one
+    /// bucket, with the toggle OFF, connects and lists exactly as before —
+    /// the toggle changes nothing for it.
+    @Test func scopedKeyWithTheToggleOffConnectsToItsOwnBucket() async throws {
+        let config = S3ConnectionConfig(
+            accessKeyID: "macscp-scoped", secretAccessKey: "macscpscopedsecret",
+            region: "us-east-1", endpoint: "http://127.0.0.1:19000",
+            bucket: "macscp-seed", usePathStyle: true, sessionToken: nil)
+        let fs = try await S3FileSystem.connect(config)
+        defer { Task { await fs.disconnect() } }
+
+        let names = try await fs.list(path: "/").map(\.name)
+        #expect(names.contains("a.txt"))
+        #expect(names.contains("sub"))
+    }
+}

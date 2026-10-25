@@ -1,0 +1,591 @@
+import AppKit
+import SwiftUI
+import macSCPCore
+
+/// Sheet and alert wiring split out of `ContentView.swift`: every sheet,
+/// dialog, and file importer/exporter this window owns
+/// (`sheetsAndAlerts(_:)`), the two computed `Binding`s only that group
+/// needs, and the four "Settings → Manage Data" presentation functions that
+/// route a Settings-window entry back to this window's own sheets.
+///
+/// Extraction only (no behavior change) -- see `ContentView.swift` for the
+/// surrounding state and the rest of the window's modifier groups.
+extension ContentView {
+    /// Every sheet, alert, dialog, and file importer/exporter this window owns.
+    ///
+    /// See `windowChrome(_:)` for why these are grouped.
+    func sheetsAndAlerts<Content: View>(_ content: Content) -> some View {
+        content
+        // (M8a/T4) — mirrors `SessionSidebar`'s delete-confirmation pattern.
+        // An idle tab bypasses this and closes immediately (`requestClose`).
+        .confirmationDialog(
+            L10n.string("tabs.close.title", "Close tab?"),
+            isPresented: Binding(
+                get: { closeRequest != nil },
+                set: { isPresented in if !isPresented { closeRequest = nil } }
+            ),
+            titleVisibility: .visible
+        ) {
+            Button(L10n.string("tabs.close.confirm", "Close"), role: .destructive) {
+                if let tab = closeRequest {
+                    closeRequest = nil
+                    Task { await performClose(tab) }
+                }
+            }
+            Button(L10n.string("common.cancel", "Cancel"), role: .cancel) {
+                closeRequest = nil
+            }
+        } message: {
+            Text(closeWarningText)
+        }
+        // Bulk close confirmation ("Close Other Tabs") — the same shape as
+        // the single-tab dialog, asked ONCE for the whole group.
+        // Declining cancels the entire operation rather than sparing the
+        // busy tabs; see `TabCloseWarning.bulkMessage`. Tabs that are all
+        // idle never reach this: `requestCloseOthers` closes them straight
+        // away, exactly as `requestClose` does for one idle tab.
+        .confirmationDialog(
+            L10n.string("tabs.closeOthers.title", "Close other tabs?"),
+            isPresented: Binding(
+                get: { closeOthersRequest != nil },
+                set: { isPresented in if !isPresented { closeOthersRequest = nil } }
+            ),
+            titleVisibility: .visible
+        ) {
+            Button(L10n.string("tabs.close.confirm", "Close"), role: .destructive) {
+                if let tab = closeOthersRequest {
+                    closeOthersRequest = nil
+                    Task { await performCloseOthers(of: tab) }
+                }
+            }
+            Button(L10n.string("common.cancel", "Cancel"), role: .cancel) {
+                closeOthersRequest = nil
+            }
+        } message: {
+            Text(closeOthersWarningText)
+        }
+        // The toolbar's Upload/Download question (maintainer decision of
+        // 2026-09-16): asked for a selection of more than one item or a
+        // folder, never for a single file (`ToolbarTransferPlan`). The
+        // request reaches the buttons through `presenting:`; the confirm
+        // button transfers the selection captured at press, Cancel only
+        // closes the question, and the `isPresented:` setter only clears
+        // state.
+        .confirmationDialog(
+            toolbarTransferRequest.map { ToolbarTransferPlan.title(side: $0.side) } ?? "",
+            isPresented: Binding(
+                get: { toolbarTransferRequest != nil },
+                set: { isPresented in if !isPresented { toolbarTransferRequest = nil } }
+            ),
+            titleVisibility: .visible,
+            presenting: toolbarTransferRequest
+        ) { request in
+            Button(ToolbarTransferPlan.confirmLabel(side: request.side)) {
+                confirmToolbarTransfer(request)
+            }
+            Button(L10n.string("common.cancel", "Cancel"), role: .cancel) {}
+        } message: { request in
+            Text(ToolbarTransferPlan.message(
+                side: request.side, itemCount: request.itemCount,
+                includesFolders: request.includesFolders, destinationPath: request.destinationPath))
+        }
+        // "Session is already open" (C2) — the same shape as the two close
+        // dialogs above, and non-destructive: both answers do something, so
+        // neither carries a role. Only what is possible is offered, per this
+        // project's standing UI rule; there is nothing here to grey out.
+        // Cancel is the third way out and is simply closing the query.
+        .confirmationDialog(
+            L10n.string("tabs.alreadyOpen.title", "This session is already open"),
+            isPresented: Binding(
+                get: { alreadyOpenRequest != nil },
+                set: { isPresented in if !isPresented { alreadyOpenRequest = nil } }
+            ),
+            titleVisibility: .visible
+        ) {
+            Button(L10n.string("tabs.alreadyOpen.jump", "Go to Existing Tab")) {
+                if let request = alreadyOpenRequest {
+                    alreadyOpenRequest = nil
+                    jumpToOpenSession(request)
+                }
+            }
+            Button(L10n.string("tabs.alreadyOpen.openAnyway", "Open Anyway")) {
+                if let request = alreadyOpenRequest {
+                    alreadyOpenRequest = nil
+                    startWithoutAsking(
+                        request.stored, paneVisibility: request.paneVisibility)
+                }
+            }
+            Button(L10n.string("common.cancel", "Cancel"), role: .cancel) {
+                alreadyOpenRequest = nil
+            }
+        } message: {
+            Text(alreadyOpenMessage)
+        }
+        // Export sheet (M9a/T3): one view for all three scopes, opened by
+        // the sidebar's context menus via `exportSheetItem`.
+        .sheet(item: $exportSheetItem) { item in
+            SessionTransferExportSheet(
+                viewModel: sessionListViewModel,
+                scope: item.scope,
+                onExport: { options in performExport(scope: item.scope, options: options) }
+            )
+        }
+        // Share-link sheet (M14/T5): opened from the remote pane's
+        // "Share Link…" context-menu entry (an S3-only `backendFileAction`,
+        // see `detail`) — never offered for SSH, since its descriptor's
+        // `fileActions` is empty.
+        .sheet(item: $presignedSheetItem) { item in
+            PresignedURLSheet(
+                itemKey: item.itemKey, provider: item.provider, settingsStore: settingsStore)
+        }
+        // Audit log sheet (M9b/T3): opened from the sidebar context menu,
+        // available whether or not the session is currently connected — it
+        // reads straight from `auditStore`, independent of any tab.
+        .sheet(item: $auditLogSession) { stored in
+            AuditLogSheet(session: stored, store: auditStore)
+        }
+        // Key conversion sheet (PEM private keys plan, Task 4): the failed-
+        // connect surface's "Convert key…", opened by
+        // `convertFailedKey(_:)` over the PEM file that attempt used.
+        //
+        // The key manager's OWN import sheet, not a second one: the copy,
+        // the conversion, the inspection and the Keychain slot are its job
+        // already, and the passphrase field it needs for them is the field
+        // this remedy needs too. What is different is only what happens
+        // after — `convertedKeyImported(_:for:)` re-points the session and
+        // redials (or, for a session bound to a login set, asks whether to
+        // update the set), where the key manager just reloads its list.
+        //
+        // The sheet's second closure argument is DROPPED here (fix round 2,
+        // review finding MEDIUM 1). It is `keptPassphrase`, and it does not
+        // mean "a slot was written": it is `true` for an import with an empty
+        // passphrase, which writes none. `SSHKeysSheet.reportKeyOutcome(
+        // keptPassphrase:)` is the consumer it was written for — it warns
+        // that a passphrase the user TYPED did not reach the Keychain, which
+        // is exactly what the flag says. This site needs the other fact, and
+        // `convertedKeyImported(_:for:)` measures it itself.
+        //
+        // The store is the window's own `managedKeyStore` (fix round 1,
+        // review finding I2), the same instance `fillForm` and the two save
+        // paths read: `ContentView.init` takes it precisely so a test can
+        // point the whole window at a temporary key directory, and a
+        // `ManagedKeyStore(directory: SessionStore.defaultDirectory)` built
+        // here would reach the real one regardless.
+        //
+        // Applied to `target.tab` — the tab captured when the button was
+        // pressed — and NOT to `activeTab` (fix round 1, review finding C1).
+        // This closure runs when the sheet is dismissed, and ⌘1-9 switches
+        // tabs while it is open with nothing to stop it, so the active tab
+        // by then need not be the tab that failed: reading it here rewrote
+        // and re-dialled another session. `editFailedSession(_:)`'s doc
+        // comment argues the opposite way for ITS target and stays correct —
+        // it resolves inside the button's own event, where the active tab
+        // and the failing tab are the same one by construction. Nothing
+        // transfers that argument across an open sheet.
+        //
+        // `onDismiss:` is where the login-set question may open (maintainer
+        // decisions of 2026-09-16, Task 2): the import sheet runs the closure
+        // below and THEN dismisses itself, so a question raised from the
+        // closure would be presented while this sheet is still up.
+        .sheet(item: $convertKeyTarget, onDismiss: {
+            setRepointDialogArmed = setRepointRequest != nil
+        }) { target in
+            ImportKeySheet(fileURL: target.fileURL, store: managedKeyStore) { key, _ in
+                convertedKeyImported(key, for: target.tab)
+            }
+        }
+        // The login-set question (maintainer decisions of 2026-09-16, Task
+        // 2): a conversion for a session bound to an SSH private-key set asks
+        // whether to update the set, naming it and how many sessions use it.
+        // Both answers do something, so neither is destructive. The request
+        // reaches each button through `presenting:`, and each button acts on
+        // the request it was handed; "This attempt only" carries the cancel
+        // role, so Escape gives that answer. The `isPresented:` setter only
+        // clears state and runs no handler (Task 2 fix round 1). The title
+        // names the set as it stands now, through the plan's fresh read
+        // (technical backlog of 2026-09-16, Task 5), and the message counts
+        // the set's dependents the same way — read fresh, at the moment the
+        // dialog draws, through `sessionListViewModel.dependentSessionCount(
+        // of:)`, not a count captured with the request (technical
+        // follow-ups of 2026-09-18, Task 7): a session added or removed as a
+        // dependent of the set while the question is open is reflected
+        // before the user answers.
+        .confirmationDialog(
+            String(
+                format: L10n.string(
+                    "connection.convertKey.repoint.title %@", "Update the login set “%@”?"),
+                setRepointRequest.map {
+                    LoginSetRepointPlan.currentName(of: $0, in: sessionListViewModel.loginSets)
+                } ?? ""),
+            isPresented: Binding(
+                get: { setRepointDialogArmed && setRepointRequest != nil },
+                set: { isPresented in
+                    if !isPresented {
+                        setRepointRequest = nil
+                        setRepointDialogArmed = false
+                    }
+                }
+            ),
+            titleVisibility: .visible,
+            presenting: setRepointRequest
+        ) { request in
+            Button(L10n.string("connection.convertKey.repoint.confirm", "Update login set")) {
+                repointLoginSet(request)
+            }
+            Button(
+                L10n.string("connection.convertKey.repoint.thisAttempt", "This attempt only"),
+                role: .cancel
+            ) {
+                convertForThisAttemptOnly(request.tab, keyPath: request.keyPath)
+            }
+        } message: { request in
+            Text(String(
+                format: L10n.string(
+                    "connection.convertKey.repoint.message %lld %@",
+                    "This login set is used by %1$lld sessions, directly or as their jump host. Its key will point to the converted key “%2$@” for all of them."),
+                sessionListViewModel.dependentSessionCount(of: request.set.id), request.key.name))
+        }
+        // The window's ONE forwarding sheet (fix round 1): the profile
+        // table, or the unknown-host-key question, whichever
+        // `TunnelSheetPlan` says — never both, because macOS SwiftUI
+        // presents one sheet per presenter and the second modifier's sheet
+        // simply never appears. While the profile sheet is up it keeps the
+        // window, and the question is drawn inside it
+        // (`TunnelProfilesSheet`'s own `.sheet`).
+        //
+        // Both are opened for a session that need not be connected — a
+        // forwarding dials its own connection and borrows no tab's — and the
+        // decider is this window's, the same one the submenu's Start hands
+        // in.
+        .sheet(item: tunnelSheetBinding) { item in
+            switch item {
+            case .profiles(let stored):
+                TunnelProfilesSheet(
+                    session: stored, manager: TunnelManager.shared,
+                    decider: tunnelHostKeyDecider, bridge: tunnelHostKeyBridge,
+                    onClose: { tunnelProfilesSession = nil })
+            case .hostKey(let candidate):
+                TunnelHostKeyPromptView(
+                    candidate: candidate,
+                    onTrust: { tunnelHostKeyBridge.resolve(trust: true) },
+                    onCancel: { tunnelHostKeyBridge.resolve(trust: false) })
+            }
+        }
+        // Diagnostics panel: opened from the tab (toolbar or failed-connect
+        // surface), the sidebar's session menu and the connect-error dialog,
+        // all through `showDiagnostics(for:)`. Presenting it runs nothing —
+        // the panel's own button does, and only it (decision of 2026-09-02).
+        //
+        // Every way out goes through `endDiagnostics()`, which cancels before
+        // it forgets: the Close button, Esc and a click outside all set the
+        // binding to nil, and the panel's own `.onDisappear` cancels a second
+        // time for the dismissals SwiftUI performs without asking the binding.
+        .sheet(
+            item: Binding(
+                get: { diagnostics.open },
+                set: { if $0 == nil { endDiagnostics() } })
+        ) { model in
+            DiagnosticsPanel(model: model, onClose: { endDiagnostics() })
+        }
+        // Known-hosts sheet (M10a/T2) — same directory the connector's
+        // `KnownHostsStore` uses (`makeTab`), so it reflects the same
+        // TOFU state the connect flow reads from.
+        .sheet(isPresented: $showKnownHostsSheet) {
+            KnownHostsSheet(store: KnownHostsStore(directory: SessionStore.defaultDirectory))
+        }
+        // Server-certificate sheet — same directory the WebDAV connector's
+        // `TrustedCertificateStore` uses, so it reflects the same TOFU state
+        // the connect flow reads from.
+        .sheet(isPresented: $showServerCertificatesSheet) {
+            ServerCertificatesSheet(
+                store: TrustedCertificateStore(directory: SessionStore.defaultDirectory))
+        }
+        // Login-sets sheet (M10b/T3) — shares `sessionListViewModel` (not a
+        // fresh store) so the Sessions-menu/sidebar entry point and the
+        // form's own local "Manage logins…" sheet (`ConnectionFormView`)
+        // always show the exact same, up-to-date list.
+        .sheet(isPresented: $showLoginSetsSheet, onDismiss: {
+            loginSetsSheetStartsImport = false
+            detectedLoginImportData = nil
+        }) {
+            LoginSetsSheet(
+                sessionList: sessionListViewModel, startsImport: loginSetsSheetStartsImport,
+                initialImportData: detectedLoginImportData)
+        }
+        // SSH-keys sheet (M18/T5) — standalone overlay replacement for the
+        // M17 Settings tab; owns its own `ManagedKeyStore` instance the same
+        // way `showKnownHostsSheet` above does for `KnownHostsStore` (there
+        // is no shared observable object to pass in, unlike
+        // `showLoginSetsSheet`'s `sessionListViewModel`).
+        .sheet(isPresented: $showSSHKeysSheet) {
+            SSHKeysSheet()
+        }
+        .sheet(isPresented: $showHiddenImportsSheet) {
+            HiddenImportsSheet(
+                store: HiddenImportStore(directory: SessionStore.defaultDirectory),
+                hosts: fullImportedHosts,
+                onChange: { refreshImportedHosts() }
+            )
+        }
+        .fileExporter(
+            isPresented: $showExportFileExporter,
+            document: exportDocument,
+            contentType: .macscpSessions,
+            defaultFilename: "MacSCP Sessions.macscpsessions"
+        ) { result in
+            handleExportResult(result)
+        }
+        .alert(
+            L10n.string("export.error.title", "Export Failed"),
+            isPresented: Binding(
+                get: { exportErrorMessage != nil },
+                set: { isPresented in if !isPresented { exportErrorMessage = nil } })
+        ) {
+            Button(L10n.string("common.ok", "OK"), role: .cancel) {}
+        } message: {
+            Text(exportErrorMessage ?? "")
+        }
+        .alert(
+            L10n.string("export.result.title", "Export Complete"),
+            isPresented: $showExportMissingPasswordAlert
+        ) {
+            Button(L10n.string("common.ok", "OK"), role: .cancel) {}
+        } message: {
+            Text(String(
+                format: L10n.string("export.missingPasswords %lld", "Exported without password: %lld"),
+                exportMissingPasswordCount))
+        }
+        // Import flow (M9a/T3): file picker → probe → optional password
+        // sheet → decode/plan/apply → result/error alert. No auto-connect
+        // after import (spec M9a §3.5).
+        .onChange(of: showImportFileImporter) { _, requested in
+            if requested {
+                showImportFileImporter = false
+                presentSessionImportPanel()
+            }
+        }
+        .sheet(item: $winSCPTransferAction, onDismiss: {
+            detectedWinSCPData = nil
+            detectedWinSCPFileName = ""
+            if let payload = pendingWinSCPImport {
+                pendingWinSCPImport = nil
+                Task { await applyImport(PendingSessionImport(payload: payload, wasEncrypted: true)) }
+            }
+        }) { action in
+            WinSCPTransferSheet(action: action, sessions: sessionListViewModel,
+                               initialFileData: detectedWinSCPData,
+                               initialFileName: detectedWinSCPFileName) { payload in
+                pendingWinSCPImport = payload
+            }
+        }
+        .sheet(isPresented: $showImportPasswordSheet, onDismiss: {
+            // Covers every dismissal path, including ESC/click-outside,
+            // which bypasses the sheet's own Cancel button and its
+            // `onCancel` handler below (M9a final review, Finding 4) — the
+            // pending ciphertext must not linger in view state either way.
+            importFileData = nil
+            // Planning happens HERE, not in the sheet: it may open the
+            // conflict sheet, which cannot present while this one is up
+            // (M19/T8). A cancelled prompt leaves `pendingImport` nil and
+            // nothing runs.
+            if let pending = pendingImport {
+                pendingImport = nil
+                Task { await applyImport(pending) }
+            }
+        }) {
+            ImportPasswordSheet(
+                onSubmit: { password in
+                    guard let data = importFileData else { return nil }
+                    switch decodeImport(data: data, password: password) {
+                    case .ready(let pending):
+                        // Parked for `onDismiss` above; dismissing is what
+                        // clears the way for the conflict sheet.
+                        pendingImport = pending
+                        return nil
+                    case .retry(let message):
+                        return message
+                    case .failed:
+                        return nil
+                    }
+                },
+                onCancel: {
+                    importFileData = nil
+                    pendingImport = nil
+                }
+            )
+        }
+        // Import from another program (Cyberduck import, 2026-09-03): the
+        // folder picker for the case where the source's own folder is not
+        // where it should be, and the preview sheet.
+        //
+        // Pressing Import DISMISSES first and applies afterwards, for the
+        // same reason the password sheet does (see `showImportPasswordSheet`
+        // above): planning can open the connection-conflict sheet, and
+        // SwiftUI presents one sheet per view at a time.
+        .fileImporter(
+            isPresented: $showExternalImportFolderPicker,
+            allowedContentTypes: [.folder],
+            allowsMultipleSelection: false
+        ) { result in
+            handleExternalImportFolderSelection(result)
+        }
+        .sheet(item: $externalImport) { model in
+            ImportFromSourceSheet(model: model) {
+                externalImport = nil
+                Task { await applyExternalImport(model) }
+            }
+        }
+        // Shared import conflict sheet (M19/T7) for SESSION imports — the
+        // login-set import presents the same view through the same modifier
+        // inside `LoginSetsSheet`, so the resumption contract documented on
+        // `importConflictSheet(bridge:)` covers both flows.
+        .importConflictSheet(bridge: importConflictBridge)
+        .alert(
+            L10n.string("import.error.title", "Import Failed"),
+            isPresented: Binding(
+                get: { importErrorMessage != nil },
+                set: { isPresented in if !isPresented { importErrorMessage = nil } })
+        ) {
+            Button(L10n.string("common.ok", "OK"), role: .cancel) {}
+        } message: {
+            Text(importErrorMessage ?? "")
+        }
+        .alert(
+            L10n.string("import.result.title", "Import Complete"),
+            isPresented: $showImportResultAlert
+        ) {
+            Button(L10n.string("common.ok", "OK"), role: .cancel) {}
+        } message: {
+            Text(importResultMessage)
+        }
+    }
+
+    /// What the "already open" query says (C2): the session's name, read
+    /// from the request's own `StoredSession` snapshot.
+    ///
+    /// It says "in a tab", not "in another tab", because the tab holding
+    /// the session may well be the one in front — the query is raised then
+    /// too, and a message claiming otherwise would be plainly wrong on
+    /// screen.
+    ///
+    /// Empty while no query is up: `confirmationDialog`'s `message:`
+    /// builder is evaluated on every render, including renders in which
+    /// `alreadyOpenRequest` has just been cleared by an answer.
+    var alreadyOpenMessage: String {
+        guard let name = alreadyOpenRequest?.stored.name else { return "" }
+        return String(
+            format: L10n.string(
+                "tabs.alreadyOpen.message %@", "“%@” is already open in a tab."),
+            name)
+    }
+
+    /// A named binding keeps the alert modifier's type-checking small.
+    var externalTerminalErrorPresented: Binding<Bool> {
+        Binding(
+            get: { externalTerminalErrorMessage != nil },
+            set: { isPresented in if !isPresented { externalTerminalErrorMessage = nil } })
+    }
+
+    /// What the window's one forwarding sheet is showing, and what closing
+    /// it means.
+    ///
+    /// The GET is `TunnelSheetPlan`'s answer, so the precedence is a value a
+    /// test can state. The SET only ever receives `nil` (SwiftUI dismissing
+    /// the sheet) and has to undo whichever source put it up: forget the
+    /// session, or refuse the pending question — a dismissal that forgot the
+    /// question would leave the dial parked on a continuation nothing
+    /// resolves.
+    var tunnelSheetBinding: Binding<TunnelSheetItem?> {
+        Binding(
+            get: {
+                TunnelSheetPlan.item(
+                    profilesSession: tunnelProfilesSession,
+                    hostKeyCandidate: tunnelHostKeyBridge.currentCandidate)
+            },
+            set: { newValue in
+                guard newValue == nil else { return }
+                if tunnelProfilesSession != nil {
+                    tunnelProfilesSession = nil
+                } else {
+                    tunnelHostKeyBridge.resolve(trust: false)
+                }
+            })
+    }
+
+    /// Settings "Manage Data" → "Logins…": raises THIS window and opens the
+    /// login-sets sheet that already lives here, instead of letting the
+    /// Settings window present a second copy.
+    ///
+    /// Why the detour. `LoginSetsSheet` does not only edit login sets — via
+    /// `SessionListViewModel.deleteLoginSet`/`applyMerge`/
+    /// `applyLoginSetImport` it rewrites the SESSIONS that reference a set
+    /// (username/authKind/keyPath restored onto them, `loginSetID` cleared).
+    /// A Settings-side copy would need a second `SessionListViewModel` — and
+    /// the view model is window scope by design, so the copy in this window
+    /// would keep serving the pre-rewrite records to the sidebar. That is not
+    /// only a display problem: a sheet in the Settings window is modal to
+    /// THAT window only, so this window's sidebar stays clickable while it is
+    /// open, and one drag onto a group (`updateSession`, which upserts the
+    /// stale record) would put the dangling `loginSetID` straight back on
+    /// disk. A refresh-on-dismiss cannot close that hole, because the damage
+    /// is reachable before the dismissal. Routing here sidesteps all of it:
+    /// one view model, and the sheet is modal to the window whose state it
+    /// edits.
+    ///
+    /// No key-window guard (unlike `tabCommands.showLogins`): Settings is key
+    /// when this fires, which is the whole point. What stands in for it is
+    /// EXISTENCE of the window, nothing more.
+    ///
+    /// It deliberately does not ask whether the window is visible. It is about
+    /// to call `makeKeyAndOrderFront`, which deminiaturizes and unhides a
+    /// window that exists — so "currently on screen" was never the
+    /// precondition for this action succeeding, only "there is a window". The
+    /// earlier `window.isVisible` check made ⌘M (and hiding the app) look like
+    /// a closed window to this code and turned the entry into the silent
+    /// no-op it exists to avoid.
+    func presentLoginSetsFromSettings() {
+        guard let window else { return }
+        window.makeKeyAndOrderFront(nil)
+        loginSetsSheetStartsImport = false
+        showLoginSetsSheet = true
+    }
+
+    /// Settings "Manage Data" → "Server Certificates…": routed for a
+    /// different reason than the other two, since `TrustedCertificateStore`
+    /// is a stateless read-modify-write struct and no state here is derived
+    /// from it.
+    ///
+    /// What is at stake is the trust decision, not the data. These are TOFU
+    /// entries, and revoking one from a window that is NOT modal to the
+    /// browser means the user can be editing trust while a WebDAV connect in
+    /// this window is at (or about to raise) its certificate prompt. There is
+    /// no reason to allow that interleaving, and none to reason about it
+    /// later. Presenting the sheet on the window that owns the connect
+    /// removes the question.
+    ///
+    /// The sheet is also `900×460` against the Settings window's `680×620`
+    /// — a 220pt overhang, far past the 40pt the 720-wide sheets already
+    /// have there. Narrowing it would break it where it is currently right;
+    /// the window width is fixed for the other sections. Routing settles the
+    /// geometry too, but the trust argument is the load-bearing one.
+    func presentServerCertificatesFromSettings() {
+        guard let window else { return }
+        window.makeKeyAndOrderFront(nil)
+        showServerCertificatesSheet = true
+    }
+
+    /// Settings "Manage Data" → "Hidden Imports…": same detour, same reasons
+    /// as `presentLoginSetsFromSettings()` above, one store lower in the
+    /// stack. `HiddenImportsSheet` is handed this window's `fullImportedHosts`
+    /// snapshot and calls back into `refreshImportedHosts()` after every
+    /// unhide, which is what keeps the sidebar's IMPORTED section and the
+    /// Sessions-menu count live WHILE the sheet is open. A Settings-side copy
+    /// would have neither end of that wire, and both lists would drift — in
+    /// both directions, since this window's own "Hide" context menu stays
+    /// reachable behind a sheet that is modal to Settings.
+    func presentHiddenImportsFromSettings() {
+        guard let window else { return }
+        window.makeKeyAndOrderFront(nil)
+        showHiddenImportsSheet = true
+    }
+}

@@ -1,0 +1,158 @@
+# Public source tree: new root entries are private until explicitly included.
+/*
+!/.gitignore
+!/README.md
+!/LICENSE
+!/Package.swift
+!/Package.resolved
+!/VERSION
+!/CHANGELOG.md
+!/SECURITY.md
+!/THIRD_PARTY_NOTICES.md
+!/Sources/
+!/Resources/
+!/Tests/
+!/Vendor/
+!/licenses/
+!/scripts/
+!/docs/
+!/.github/
+!/output/
+
+# Only build/review documentation belongs in the public source tree.
+/docs/*
+!/docs/DEPENDENCY_FORKS.md
+!/docs/WINSCP_FORMAT.md
+!/docs/SPARKLE.md
+!/docs/USER_GUIDE.md
+!/docs/images/
+/docs/images/*
+!/docs/images/workspace-light.png
+!/docs/images/connections-light.png
+!/docs/images/new-connection-light.png
+!/docs/images/tunnels-light.png
+!/docs/images/readme-header.svg
+
+# Workflows are inputs to the source regression tests; templates are not.
+/.github/*
+!/.github/workflows/
+
+# Keep the build/signing, licence generation and source-verification chain.
+/scripts/*
+!/scripts/check-vendor
+!/scripts/dev
+!/scripts/package-app
+!/scripts/sign-app
+!/scripts/third-party-notices
+!/scripts/render-notices-pdf.swift
+!/scripts/render-app-icon.swift
+!/scripts/release
+!/scripts/release-notes
+!/scripts/build-sparkle
+!/scripts/generate-appcast
+!/scripts/application-icon-scope.json
+!/scripts/check-public-tree
+!/scripts/check-release-environment
+!/scripts/verify-appcast.swift
+!/scripts/tests/
+
+.build/
+.swiftpm/
+DerivedData/
+xcuserdata/
+*.xcodeproj
+*.xcworkspace
+.DS_Store
+dist/
+.claude/
+.superpowers/
+
+# Dependency snapshots must be tracked completely, including upstream projects.
+!Vendor/**
+
+# Local diagnostic evidence.
+.hang-evidence/
+/.macscp-signing
+
+# Local editor state, browser traces and Python caches are not release sources.
+/.vscode/
+/.playwright-cli/
+__pycache__/
+*.pyc
+*.pyo
+/tmp/
+
+# Keep only the generated legal PDF required by documentation and packaging.
+/output/*
+!/output/pdf/
+/output/pdf/*
+!/output/pdf/THIRD_PARTY_NOTICES.pdf
+
+# Local credentials and signing material must never be added accidentally.
+# Root-scoped patterns preserve the reviewed fixtures inside Vendor and Tests.
+/.env
+/.env.*
+!/.env.example
+!/.env.template
+/*.p12
+/*.pfx
+/*.keychain
+/*.keychain-db
+# Maintainer-only instructions, presentation site and design work.
+/AGENTS.md
+/CLAUDE.md
+/docs/design/
+/docs/superpowers/
+/docs/BACKLOG.md
+/.github/ISSUE_TEMPLATE/
+/.github/pull_request_template.md
+
+# Local integration infrastructure and interactive diagnostic tooling.
+/docker/
+/scripts/hang-hunt
+/scripts/mutation-probe
+/scripts/make-icon
+/scripts/import-application-icons
+/scripts/tests/test_dev.py
+/scripts/tests/test_application_icon_import.py
+
+# Keep sources, regression tests, manifests/locks, build and signing tools,
+# dependency provenance and mandatory notices available for independent review.
+
+# Website sources and publishing tools are separate from the application repo.
+/website/
+/scripts/prepare-website
+/scripts/website_documents.py
+/scripts/tests/test_website*.py
+/scripts/local/
+/output/screenshots/
+
+# Apply local-artifact exclusions after the vendored-source inclusion as well.
+.DS_Store
+.build/
+.swiftpm/
+DerivedData/
+xcuserdata/
+__pycache__/
+*.pyc
+*.pyo
+.codex/
+.agents/
+.idea/
+.vscode/
+.claude/
+.superpowers/
+.playwright-cli/
+*.trace
+*.har
+*.xcresult/
+*.dSYM/
+*.swp
+*.swo
+*~
+.env
+.env.*
+!.env.example
+!.env.template
+.netrc
+.npmrc

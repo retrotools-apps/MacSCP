@@ -1,0 +1,235 @@
+/// One field the connection form should render for a protocol (M12, extended
+/// in M22). `labelKey` is resolved to a localized string in the App layer
+/// (Core stays bundle-free).
+public struct ConnectionField: Sendable, Equatable, Identifiable {
+    public enum Kind: Sendable, Equatable {
+        case text, number, secret, toggle
+        case picker(OptionSource)
+        /// Exactly one level deep — `LeafField` has no group case.
+        case group([LeafField])
+    }
+
+    public let id: String            // raw value of the backend's field enum
+    public let labelKey: String      // L10n key
+    public let labelDefault: String  // English fallback
+    public let kind: Kind
+    /// Shown only when this holds; nil means always.
+    public let visibleWhen: FieldCondition?
+    /// The form cannot be saved, and a connection cannot be opened, while this
+    /// field is visible and blank (M22/T9, widened in M23).
+    ///
+    /// Data because the login-set editor used to answer it with a `switch`
+    /// over `ConnectionKind` — and that switch is exactly where `.webdav`
+    /// returned "always disabled", making a WebDAV login set unsaveable.
+    ///
+    /// M23 marked SSH's `keyPath` required too. The M22 rationale for leaving
+    /// it optional — "an agent or managed-key login supplies it another way" —
+    /// does not survive `visibleWhen`: the field is shown only under
+    /// private-key auth, so an agent login never reaches the check, and the
+    /// managed-key picker writes `keyPath` before the form is saved. A
+    /// private-key login with no key path was already refused at connect time;
+    /// now it is refused at save time too.
+    ///
+    /// A SECRET may still be blank in edit mode ("keep the stored one") — that
+    /// asymmetry is `firstViolation(in:namespace:requireSecrets:)`'s parameter,
+    /// not a property of the field.
+    public let isRequired: Bool
+
+    /// A parse rule the raw value must satisfy while this field is visible
+    /// (M23). `nil` means any string is acceptable.
+    public let format: FieldFormat?
+
+    /// The localized message to show when this field is blank-but-required or
+    /// violates its `format` (M23). ONE key covers both, because the two are
+    /// the same complaint from the user's side: a blank port and the text
+    /// "abc" both mean "the port must be a number".
+    ///
+    /// Optional in the type, mandatory in practice —
+    /// `everyValidatableFieldDeclaresItsMessage` fails the build for a field
+    /// that can fail validation without declaring one. `firstViolation` falls
+    /// back to a generic key so a slip degrades to a correct-but-generic
+    /// message rather than to silence.
+    public let invalidMessageKey: String?
+
+    /// Whether this field makes a connection DISTINCT, and how its value is
+    /// compared (M23/P3). `nil` — the default — means it takes no part in the
+    /// connection's identity at all.
+    ///
+    /// Data, for the same reason `isRequired` is: `SessionImportPlanner`
+    /// answered this with a `switch` over `ConnectionKind`, which was the last
+    /// compile-forcing site outside `BackendDescriptor`. Declared per FIELD
+    /// rather than as a per-backend list, because identity is NOT "all fields":
+    /// S3's `region` and `usePathStyle` are excluded on purpose — two sessions
+    /// differing only in `usePathStyle` are one connection addressed two ways —
+    /// and the exclusion belongs next to the field it is about, where the next
+    /// person to add a field has to decide.
+    ///
+    /// A SECRET must never carry one. `BackendDescriptorTests`
+    /// (`everyBackendDeclaresANonSecretIdentity`) enforces both halves: at
+    /// least one identifying field per backend, and none of them secret.
+    public let identity: FieldIdentity?
+
+    /// For a `.secret` field: whether its value takes part in a login's
+    /// identity (M24). Meaningless — and never set — on any other kind.
+    ///
+    /// Optional in the type, mandatory in practice, exactly like
+    /// `invalidMessageKey`: `everySecretFieldDeclaresItsRole` fails the build
+    /// for a secret field without one. The readers treat a missing role as
+    /// `.credential`, which is the SAFE direction — the secret then enters the
+    /// identity key, and two logins that differ in it are kept apart rather
+    /// than merged.
+    public let secretRole: SecretRole?
+
+    public var isSecret: Bool { kind == .secret }
+
+    public init(id: String, labelKey: String, labelDefault: String,
+                kind: Kind, visibleWhen: FieldCondition? = nil,
+                isRequired: Bool = false, format: FieldFormat? = nil,
+                invalidMessageKey: String? = nil, identity: FieldIdentity? = nil,
+                secretRole: SecretRole? = nil) {
+        self.id = id; self.labelKey = labelKey; self.labelDefault = labelDefault
+        self.kind = kind; self.visibleWhen = visibleWhen; self.isRequired = isRequired
+        self.format = format; self.invalidMessageKey = invalidMessageKey
+        self.identity = identity; self.secretRole = secretRole
+    }
+}
+
+/// A provider preset that pre-fills fields (M12), e.g. AWS or Hetzner.
+public struct ConnectionPreset: Sendable, Equatable, Identifiable {
+    public let id: String
+    public let nameKey: String
+    public let nameDefault: String
+    /// Field id -> pre-filled value (e.g. "endpoint" -> a template).
+    public let values: [String: String]
+    public init(id: String, nameKey: String, nameDefault: String, values: [String: String]) {
+        self.id = id; self.nameKey = nameKey; self.nameDefault = nameDefault; self.values = values
+    }
+}
+
+/// The form schema a protocol contributes (M12): its fields + provider presets.
+public struct ConnectionFieldSchema: Sendable, Equatable {
+    public let fields: [ConnectionField]
+    public let presets: [ConnectionPreset]
+    public init(fields: [ConnectionField], presets: [ConnectionPreset]) {
+        self.fields = fields; self.presets = presets
+    }
+}
+
+extension ConnectionFieldSchema {
+    /// The fields a form should render for these values. Pure, so the rule is
+    /// provable without a view — the renderer walks this and nothing else.
+    public func visibleFields(in values: FieldValues, namespace: String) -> [ConnectionField] {
+        fields.filter { FieldVisibility.isVisible($0, in: values, namespace: namespace) }
+    }
+
+    /// The visible fields this schema requires a value for that these values
+    /// leave blank (M22/T9) — empty means "saveable". Blank-or-filled is
+    /// decided by the same secret-versus-everything-else split as
+    /// `firstViolation`: see that function's doc comment for why a secret is
+    /// compared verbatim instead of trimmed.
+    public func missingRequiredFields(
+        in values: FieldValues, namespace: String
+    ) -> [ConnectionField] {
+        visibleFields(in: values, namespace: namespace).filter { field in
+            guard field.isRequired else { return false }
+            let raw = values.raw["\(namespace).\(field.id)"] ?? ""
+            let value = field.isSecret
+                ? raw : raw.trimmingCharacters(in: .whitespacesAndNewlines)
+            return value.isEmpty
+        }
+    }
+
+    /// The one secret field currently on screen for these values, or nil when
+    /// this schema shows none.
+    ///
+    /// A QUERY rather than a constant because SSH's answer depends on the
+    /// values: it declares `password` and `passphrase` as two separate fields
+    /// conditioned on the auth kind, and shows NEITHER for an agent login. So
+    /// "which field is the secret right now" and "which Keychain value does
+    /// this login mean right now" are the same question — and the agent
+    /// answer, nil, is what keeps the Keychain from being read for a login
+    /// that has none (M10d).
+    ///
+    /// Secrets never nest: a `.group` is a second login with its own Keychain
+    /// slot (`SSHJumpField.password`), resolved by `LoginResolver.resolveJump`
+    /// and not by anything reading this.
+    public func visibleSecretField(
+        in values: FieldValues, namespace: String
+    ) -> ConnectionField? {
+        visibleFields(in: values, namespace: namespace).first(where: \.isSecret)
+    }
+
+    /// A group's visible leaves. A leaf's condition is evaluated the same way
+    /// as a top-level field's, so a group can show and hide its own members.
+    ///
+    /// Takes the OWNER's namespace and qualifies it with the group's own id
+    /// here, rather than asking the caller for the qualified string. A leaf's
+    /// condition names a SIBLING leaf, and `FieldValues` stores those under
+    /// `owner.group.leaf` — so a caller that built the namespace itself could
+    /// pass the plain owner one and silently key the group's rows off the
+    /// TOP-LEVEL field of the same name (the SSH jump's key path following the
+    /// TARGET's auth kind). Nothing would fail: no leaf carries a condition
+    /// today, so the mistake would pass the whole suite. Doing it in here makes
+    /// it unexpressible instead of merely tested.
+    public static func visibleLeaves(
+        of field: ConnectionField, in values: FieldValues, owner: String
+    ) -> [LeafField] {
+        guard case .group(let leaves) = field.kind else { return [] }
+        let namespace = "\(owner).\(field.id)"
+        return leaves.filter { FieldVisibility.isVisible($0, in: values, namespace: namespace) }
+    }
+
+    /// The first rule these values break, or nil when they break none (M23).
+    ///
+    /// Walks `visibleFields` and nothing else, which is what makes the
+    /// auth-kind branching `connectSSH` used to do by hand disappear: SSH's
+    /// password is required AND only visible under password auth, so an agent
+    /// login is never asked for one. A field that is not on screen has no say.
+    ///
+    /// `requireSecrets` is the connect-versus-save asymmetry, made explicit
+    /// rather than inherited: opening a connection needs an actual secret in
+    /// hand, while an edit-mode save deliberately leaves the secret blank to
+    /// mean "keep the stored one". No default — a caller must decide which it
+    /// is.
+    ///
+    /// Secrets are compared VERBATIM while everything else is trimmed. A
+    /// password of spaces is a legal password, and trimming it would refuse a
+    /// user their own server; a host of spaces is a typo.
+    public func firstViolation(
+        in values: FieldValues, namespace: String, requireSecrets: Bool
+    ) -> (messageKey: String, fieldKey: String)? {
+        for field in visibleFields(in: values, namespace: namespace) {
+            if field.isSecret && !requireSecrets { continue }
+            let key = "\(namespace).\(field.id)"
+            let raw = values.raw[key] ?? ""
+            let value = field.isSecret
+                ? raw : raw.trimmingCharacters(in: .whitespacesAndNewlines)
+
+            let isBlank = field.isRequired && value.isEmpty
+            let isUnparsable = field.format.map { !$0.accepts(value) } ?? false
+            guard isBlank || isUnparsable else { continue }
+            // The `??` is unreachable while
+            // `everyValidatableFieldDeclaresItsMessage` passes; it is here so
+            // a slip degrades to a generic message rather than to silence.
+            return (field.invalidMessageKey ?? "core.connect.fieldRequired", key)
+        }
+        return nil
+    }
+}
+
+extension ConnectionField.Kind {
+    /// The `LeafField.Kind` this maps to, or nil for `.group` — which has no
+    /// leaf equivalent by construction. Returning an Optional rather than a
+    /// stand-in means a caller that forgets the group case fails to compile
+    /// instead of quietly rendering a text field.
+    public var asLeafKind: LeafField.Kind? {
+        switch self {
+        case .text: return .text
+        case .number: return .number
+        case .secret: return .secret
+        case .toggle: return .toggle
+        case .picker(let source): return .picker(source)
+        case .group: return nil
+        }
+    }
+}

@@ -1,0 +1,1378 @@
+import AppKit
+import SwiftUI
+import macSCPCore
+
+struct ConnectionFormView: View {
+    @Bindable var viewModel: ConnectionViewModel
+    /// Full view model (M10b/T3), not an array of its lists: the group
+    /// picker reads its `groups` (`SessionEditorGroupPicker`), and
+    /// the three-way login block needs `loginSets` for its picker AND
+    /// `suggestedSetName(forLabel:)` for the "save as new set" name
+    /// prompt AND — since "Manage logins…" opens the SAME sheet locally
+    /// (mockup section 4C, TOFU-footnote pattern) — a live reference so
+    /// edits made there are immediately visible everywhere else this
+    /// instance is shared (the sidebar, the login picker), unlike
+    /// `KnownHostsSheet`'s throwaway store instance.
+    let sessionList: SessionListViewModel
+    /// The global terminal type (`SettingsStore.terminalType`), which the
+    /// terminal-type override row names as what "Use the global setting"
+    /// currently means. A value rather than the store: the form reads
+    /// nothing else from Settings.
+    let globalTerminalType: TerminalType
+    /// The window's own managed-key store and secret store — the same two
+    /// instances `ContentView.init` resolves and `fillForm`, the two save
+    /// paths and the key-import sheet already read (`ContentView.swift`,
+    /// the `secretStore`/`managedKeyStore` properties).
+    ///
+    /// Injected rather than built here (deferred minor of 2026-09-19,
+    /// cleared 2026-09-27): the Connect button below and the managed-key
+    /// picker's `managedKeyPath(for:)` each built their own
+    /// `ManagedKeyStore(directory: SessionStore.defaultDirectory)`, and the
+    /// button a `KeychainSecretStore()` beside it — so a test that points
+    /// the window at a temporary directory and an in-memory secret store
+    /// still had this form reading the running user's real
+    /// `managed_keys.json` and real Keychain. Both are counted: two
+    /// constructions in this file before this change, none after.
+    ///
+    /// Not defaulted, for the reason `SessionListViewModel.init` no longer
+    /// defaults any of its stores: a default is how the seam goes half
+    /// missing again at the next call site.
+    let managedKeyStore: ManagedKeyStore
+    let secretStore: any SecretStore
+    /// Called right before `connect()`/`validateForEditSave()` whenever the
+    /// form is in Set mode (M10b/T3) for the TARGET login, or the jump is
+    /// enabled and ALSO in Set mode (M10c/T3): fills username/authChoice/
+    /// keyPath/password (target) and/or jumpUsername/jumpAuthChoice/
+    /// jumpKeyPath/jumpPassword (jump) from their respective selected login
+    /// sets, so the existing validators below see current, non-stale data —
+    /// no separate Set-mode validation path needed in `ConnectionViewModel`.
+    /// Returns `false` when a selected set no longer resolves (dangling
+    /// reference — spec §4a): the caller has already surfaced that failure
+    /// via `viewModel.showFailure`, and the button handlers below must NOT
+    /// proceed to connect/validate in that case.
+    var resolveLoginSetForSubmit: () -> Bool = { true }
+    /// Edit mode "Save": persists the edited session (see `newSecret`'s
+    /// empty-means-unchanged rule below), then leaves edit mode only when
+    /// the store and credential write both succeeded.
+    var onSaveEdited: (StoredSession, String?) -> Bool = { _, _ in true }
+    /// NEW-mode "Save": writes the form as a stored session without dialing.
+    /// Offered only while "Save as session" is on — that toggle is what says
+    /// the form is meant to become a session, and it is what reveals the
+    /// name field this save needs. Called after
+    /// `ConnectionViewModel.validateForNewSave()` has already passed, so the
+    /// handler only has to write.
+    var onSaveNew: () -> Void = {}
+    /// Edit mode "Back": discards the edit and returns to the browser/idle
+    /// state without touching the stored session.
+    var onCancelEdit: () -> Void = {}
+    /// Leaves a new form without validation, persistence or a connection.
+    var onCancelNew: () -> Void = {}
+    /// Edit mode "Save & connect": called after `onSaveEdited` with the
+    /// validated session — `ContentView` reconnects via `connectStored`,
+    /// which reloads the secret from the keychain (covers "empty password
+    /// means unchanged" automatically).
+    var onConnectEdited: (StoredSession) -> Void = { _ in }
+    /// Connect-error dialog "Diagnose…" (design §1, the error dialog's door):
+    /// opens the diagnostics panel for this tab.
+    ///
+    /// Named by which door it is, not by its number: the design has three
+    /// doors and the app has four surfaces, because the tab's door has two
+    /// (its toolbar while connected, and its failed-connect surface). Four
+    /// comments once carried four ordinals out of three, which is what an
+    /// enumeration in a comment does the moment a surface is added.
+    ///
+    /// Opening it is ALL this does. The maintainer decided on 2026-09-02 that
+    /// a failed connect never starts a diagnosis by itself — the probes dial
+    /// the user's server, and the SSH one authenticates while doing it — so
+    /// the dialog offers the check and the panel's own button runs it.
+    ///
+    /// Defaulted, like the other callbacks above, so the previews and the
+    /// form's non-`ContentView` call sites need not name it.
+    var onDiagnose: () -> Void = {}
+    /// Reads `tab.reconnectAttempt`'s CURRENT value on demand — a closure,
+    /// not a plain `UUID`, because this view has no reference to `tab`
+    /// itself (only to `tab.connectionViewModel`, passed as `viewModel`)
+    /// and because a plain value captured at VIEW CONSTRUCTION time could
+    /// be stale by the time the user actually taps Connect, however many
+    /// re-renders later that turns out to be. Called exactly once, at the
+    /// TOP of the Connect button's own handler — before `ManagedKeyPassphrase
+    /// .resolve` and before `viewModel.connect()` even starts dialing —
+    /// matching `ContentView.connect(in:stored:)`'s own capture point
+    /// (synchronously, at the very top, before its first `await`) rather
+    /// than the narrower "right before the vulnerable window" point this
+    /// view used before fix round 3. The two connect paths sharing ONE
+    /// capture-timing rule — "claim your token the moment your attempt
+    /// begins, before anything else can run" — is the correct choice
+    /// (not merely the more convenient one): it protects against ANY
+    /// future write to `tab.reconnectAttempt` between attempt-start and
+    /// the hand-off, not only the one window fix round 2 measured, and it
+    /// mirrors the SAME synchronous-lock timing `ContentView.connect(in:
+    /// stored:)` already uses for `tab.isReconnecting = true`.
+    ///
+    /// Declared BEFORE `onConnected` below on purpose: `onConnected` is
+    /// this view's trailing closure at its one call site
+    /// (`ContentView+Detail.swift`), which requires it to stay the LAST
+    /// property in this struct's synthesized memberwise initializer.
+    let currentReconnectAttempt: () -> UUID
+    /// `async` (M9d): the caller resolves the remote home directory before
+    /// building the browser session, so it needs to `await` inside here.
+    /// The `UUID` is the attempt token the Connect button's own handler
+    /// read from `currentReconnectAttempt()` BEFORE dialing (connection-
+    /// liveness plan, Task 6 fix round 3) — handed straight through to
+    /// `ContentView.handleAdHocConnected(_:in:attempt:)`, which compares it
+    /// against `tab.reconnectAttempt` again once the hand-off's own
+    /// `homeDirectoryPath()` await returns. Passed here rather than
+    /// re-read fresh inside `onConnected`'s closure so BOTH connect paths
+    /// agree on which moment defines "this attempt's own token" — see
+    /// `currentReconnectAttempt`'s own doc comment for why capturing
+    /// AFTER the dial (this view's previous shape) was inconsistent with
+    /// `ContentView.connect(in:stored:)`'s own, earlier capture point.
+    let onConnected: (any RemoteFileSystem, UUID) async -> Void
+
+    /// True while `onConnected` runs after a successful connect (M9d final
+    /// review): the connect closure is async now (home-directory lookup), so
+    /// the view model's `.idle` state alone would re-enable the Connect
+    /// button while `tab.session` is still nil — a second click in that
+    /// window would open and LEAK a second SSH connection.
+    @State private var isHandingOff = false
+    /// Failure message currently shown as an alert. Deliberately separate
+    /// from `viewModel.state` so dismissing the alert keeps the `.failed`
+    /// state (and with it the red field highlight) intact.
+    @State private var alertMessage: String?
+    /// The failure the alert above is showing, handed back on dismissal so
+    /// the view model stops asking for it to be raised
+    /// (`ConnectionViewModel.acknowledgeFailure`). `nil` for a failure with
+    /// nothing to acknowledge — see `FormFailureAlert`.
+    @State private var alertFailureID: UUID?
+    /// Drives the TOFU prompt's "Manage known hosts…" footnote (M10a/T2).
+    /// Local `@State` sheet with its own `KnownHostsStore` instance, rather
+    /// than a callback bubbled up to `ContentView` — `ConnectionFormView`
+    /// already knows the store's fixed directory (same one the connector in
+    /// `ContentView.makeTab` uses), so a callback would only add an extra
+    /// closure parameter threaded through `SessionTab`/`ContentView` for no
+    /// behavioral gain. The trust prompt underneath is unaffected either
+    /// way — it's driven by `viewModel.hostKeyPrompt`, not by this sheet.
+    @State private var showKnownHostsSheet = false
+    /// Drives the login-sets management sheet's "Manage logins…" link
+    /// (M10b/T3, mockup section 4C) — opened LOCALLY from the Set-mode
+    /// picker, same pattern as `showKnownHostsSheet` above.
+    @State private var showLoginSetsSheet = false
+    /// Direct editor for the login selected by a set-bound connection. A
+    /// session using a login set has no session-owned password field: the
+    /// set's identifier is the Keychain slot. This affordance makes that
+    /// ownership visible and lets the password be changed without hunting
+    /// through the separate login manager.
+    @State private var loginSetBeingEdited: LoginSet?
+    /// Drives the SSH-keys management sheet's "Manage keys…" link (M18/T5) —
+    /// replaces the M17 `SettingsLink` to the Settings tab with a locally
+    /// opened sheet, same pattern as `showLoginSetsSheet` above.
+    @State private var showSSHKeysSheet = false
+    /// "Resolve…" beside the SSH host field (`HostResolveControl`), and the
+    /// line under it (`fieldFootnote`). One per form, so what one window
+    /// resolves is not offered in another.
+    @State private var hostResolve = HostResolveModel()
+
+    private var isConnecting: Bool { viewModel.state == .connecting }
+
+    private var isEditMode: Bool {
+        if case .edit = viewModel.mode { return true }
+        return false
+    }
+
+    /// What saving would do to a stored session of the same name, or `nil`
+    /// when no stored session carries it. The view decides nothing about
+    /// it: which session that is, whether the form's own session counts,
+    /// what the name even is once saving has trimmed it, and **which of two
+    /// sentences is true on this path** are all `SessionNameConflict`'s and
+    /// `SessionNameCollision`'s, in Core, where tests reach them. The raw
+    /// field text is passed on deliberately — normalizing it here would be
+    /// a second place that decides what a name is.
+    private var nameConflict: SessionNameConflict? {
+        SessionNameConflict.build(
+            name: viewModel.saveName, mode: viewModel.mode, in: sessionList.sessions)
+    }
+
+    /// True while Set mode has nothing selected yet — the three connect/save
+    /// actions stay disabled instead of the removed username/password
+    /// checks, which don't apply once those fields are hidden (spec §5).
+    private var loginSetModeIncomplete: Bool {
+        viewModel.loginMode == .set && viewModel.selectedLoginSetID == nil
+    }
+
+    /// Same as `loginSetModeIncomplete`, for the jump's own login switcher
+    /// (M10c/T3) — the jump's Set mode with nothing picked yet also keeps
+    /// Connect/Save disabled, not just the target's. `jumpSourceMode !=
+    /// .session` guards against a dangling `jumpSelectedLoginSetID` left over
+    /// from a Manual+Set pick before the user switched Source to "Saved
+    /// connection" (F-1 fix, final review): the Set picker isn't even
+    /// rendered in session mode, so it must not be able to disable
+    /// Connect/Save with no visible cause.
+    private var jumpLoginSetModeIncomplete: Bool {
+        viewModel.jumpEnabled && viewModel.jumpSourceMode != .session
+            && viewModel.jumpLoginMode == .set && viewModel.jumpSelectedLoginSetID == nil
+    }
+
+    /// Same idea, for the jump's source switcher (M11a/T3) — session mode
+    /// with nothing picked yet also keeps Connect/Save disabled, mirroring
+    /// `jumpLoginSetModeIncomplete` above. Belt-and-suspenders: `connect()`/
+    /// `validateForEditSave()` already reject this with `.jumpSession`
+    /// (Core VM), this only pre-empts the click.
+    private var jumpSessionModeIncomplete: Bool {
+        viewModel.jumpEnabled && viewModel.jumpSourceMode == .session && viewModel.jumpSessionID == nil
+    }
+
+    /// The field whose validation failed most recently — gets the red outline.
+    private var failedField: ConnectionViewModel.Field? {
+        if case .failed(_, let field) = viewModel.state { return field }
+        return nil
+    }
+
+    /// The namespaced key `SchemaFormView` matches its rows against.
+    ///
+    /// A pass-through since M23: the view model reports the failing field by
+    /// its own key, so this no longer translates an enum case into an
+    /// SSH-namespaced string — which is why S3 and WebDAV rows highlight now
+    /// and did not before. The passphrase-versus-password special case is gone
+    /// too: the validator walks the VISIBLE fields, so it names whichever
+    /// secret row is actually on screen.
+    ///
+    /// The cases this returns nil for are NOT unhighlighted: the session-name
+    /// row and the whole jump block are drawn by hand below and carry their
+    /// own `.errorHighlight`.
+    private var failedFieldID: String? {
+        guard case .schema(let key) = failedField else { return nil }
+        return key
+    }
+
+    /// Fields the generic renderer must skip because this view draws them —
+    /// see `sshJumpSection` for why the jump is the one and only member, and
+    /// what would let it join the others.
+    ///
+    /// The LIST lives in Core (M22/T9) so a Core test can guard it: matched by
+    /// string against top-level ids, a stale entry here silently removes a row
+    /// from the form and nothing fails.
+    private static let customRenderedFields = BackendDescriptor.customRenderedFieldIDs
+
+    /// The stored key of the managed-key picker, watched below.
+    private static let managedKeyKey =
+        "\(SSHField.namespace).\(SSHField.managedKeyID.rawValue)"
+
+    /// The stored key of the auth-kind picker, intercepted below.
+    private static let authKindKey =
+        "\(SSHField.namespace).\(SSHField.authKind.rawValue)"
+
+    /// The stored key of S3's bucket-list toggle, intercepted below.
+    /// Derived from the field enum, like `authKindKey` — a second spelling
+    /// of a field id is exactly what this project's rules about second
+    /// copies are about.
+    private static let s3BucketListKey =
+        "\(S3Field.namespace).\(S3Field.startsAtBucketList.rawValue)"
+
+    /// Sends the auth-kind picker's write through `selectAuthChoice` instead
+    /// of letting it land in `values` (M22/T8 fix round 1).
+    ///
+    /// Switching the auth kind is a COMMAND, not a value change: the view
+    /// model clears the secret so the password typed for `.password` does not
+    /// reappear prefilled in the passphrase row — from where "Save as session"
+    /// or "Save as new login set" would write the user's account password into
+    /// the Keychain as a key passphrase. The hand-written picker routed
+    /// through this; binding the generic picker straight to the field silently
+    /// bypassed it and left `selectAuthChoice` with no production caller at
+    /// all.
+    ///
+    /// TWO fields need it now (counted here, against the arms below): SSH's
+    /// auth kind, and S3's "Start at the bucket list" toggle. Turning that
+    /// toggle on discards the bucket the user typed — a value change cannot
+    /// express that, and a post-hoc `.onChange` fires when `values` already
+    /// holds the new value, so `selectBucketListMode`'s own "did this change?"
+    /// guard could no longer tell. Exactly the shape the auth picker needed.
+    ///
+    /// Returns false for every other field, which is then written normally.
+    /// A value that names no auth kind — the "—" row — is deliberately NOT
+    /// treated as a switch; it is written raw, exactly as before.
+    private func interceptEdit(_ key: String, _ newValue: String) -> Bool {
+        if key == Self.s3BucketListKey {
+            // The same "true"/"false" spelling `FieldValues`'s boolean
+            // subscript and `SchemaFormView.boolBinding` both write, so the
+            // command stores exactly what a plain write would have.
+            viewModel.selectBucketListMode(newValue == "true")
+            return true
+        }
+        guard key == Self.authKindKey,
+              let choice = ConnectionViewModel.AuthChoice(rawValue: newValue)
+        else { return false }
+        viewModel.selectAuthChoice(choice)
+        return true
+    }
+
+    // MARK: - Jump source: saved connection (M11a/T3)
+
+    /// The session currently being edited, or `nil` for a brand-new
+    /// connection — passed to `JumpSessionEligibility.eligible(for:in:)` so
+    /// the picker can never offer the session as its own jump host.
+    private var editingSessionID: UUID? {
+        if case .edit(let sessionID) = viewModel.mode { return sessionID }
+        return nil
+    }
+
+    /// The picker's offered sessions (spec §3): excludes the session being
+    /// edited (self-reference) and any session that itself has a jump
+    /// (chains — one hop is the rule), and (M24/T4) any session that is not
+    /// `.ssh` — a bucket or WebDAV share has no host/port to dial as a
+    /// bastion — sorted like the sidebar.
+    private var eligibleJumpSessions: [StoredSession] {
+        JumpSessionEligibility.eligible(for: editingSessionID, in: sessionList.sessions)
+    }
+
+    /// The read-only summary row below the picker (spec §3): either the
+    /// resolved target (`host:port · user · auth`), or a localized error
+    /// when the reference can't be resolved. `nil` while nothing is
+    /// selected yet — the row simply doesn't render.
+    private enum JumpSessionSummary {
+        case resolved(String)
+        case error(String)
+    }
+
+    /// Resolves `viewModel.jumpSessionID` through
+    /// `SessionListViewModel.resolvedJumpEndpoint(for:)` — the same resolver
+    /// and the same refusals as the connect wiring's `resolvedJump(for:)`
+    /// (`ContentView`), reading no Keychain item: this runs in `body`, on
+    /// every render, and shows no secret (technical backlog of 2026-09-16,
+    /// Task 5 fix round 1). Via a throwaway `StoredSession` whose only
+    /// meaningful content is the jump spec's `sessionID` — nothing else
+    /// about this synthetic session is ever read or persisted. `id` mirrors
+    /// the session actually being edited (so self-reference/chain detection
+    /// works exactly as it would after saving), or a fresh id for a
+    /// brand-new connection, which can never self-reference.
+    private var jumpSessionSummary: JumpSessionSummary? {
+        guard let sessionID = viewModel.jumpSessionID else { return nil }
+        let spec = StoredSession.JumpSpec(host: "", username: "", sessionID: sessionID)
+        let synthetic = StoredSession(
+            id: editingSessionID ?? UUID(), name: "",
+            ssh: StoredSSHConfig(host: "", username: "", jump: spec))
+        do {
+            guard let resolved = try sessionList.resolvedJumpEndpoint(for: synthetic) else { return nil }
+            return .resolved(
+                "\(resolved.host):\(resolved.port) · \(resolved.login.username) · "
+                    + shortAuthLabel(resolved.login.authKind)
+                    + (resolved.tlsTunnel.map {
+                        " · " + String(format: L10n.string("form.jump.session.tlsRoute", "TLS via %@:%@"),
+                                       $0.host, String($0.port))
+                    } ?? ""))
+        } catch LoginResolveError.missingSet {
+            // The referenced session's OWN login set is dangling — same
+            // wording the target/jump login-set pickers already use for
+            // this exact condition. Since M29-P2 those two resolutions
+            // return cases and carry no wording of their own; the shared
+            // text is picked in `ContentView.message(for:)`, for
+            // `SubmitRefusal.targetSetMissing` and `.jumpSetMissing`.
+            return .error(L10n.string(
+                "loginSets.missingSet",
+                "The stored login for this connection was not found. Choose a login or enter credentials."))
+        } catch LoginResolveError.jumpChainNotSupported {
+            return .error(L10n.string(
+                "form.jump.session.chainNotSupported",
+                "The selected jump host connects through another jump host; chains are not supported."))
+        } catch LoginResolveError.jumpSessionNotSSH {
+            // Must NOT fall into the generic `catch` below: that text says
+            // the connection "no longer exists", which would be untrue here
+            // -- the referenced session exists, it just isn't SSH.
+            return .error(L10n.string(
+                "form.jump.session.notSSH",
+                "Only SSH connections can be used as a jump host."))
+        } catch {
+            // `.missingJumpSession` and any other unclassified failure both
+            // read as "the reference is gone" to the user — the same
+            // fallback text either way.
+            return .error(L10n.string(
+                "form.jump.session.missing",
+                "The connection used as jump host no longer exists."))
+        }
+    }
+
+    /// Auth short-form used by the summary row (spec §3: "wie im
+    /// Login-Sets-Sheet") — reuses the SAME three badge keys
+    /// `LoginSetsSheet.badgeStyle(for:)` already localizes, rather than
+    /// duplicating three more strings for the identical PASS/KEY/AGENT text.
+    private func shortAuthLabel(_ kind: StoredSession.AuthKind) -> String {
+        switch kind {
+        case .password: return L10n.string("loginSets.badge.pass", "PASS")
+        case .privateKey: return L10n.string("loginSets.badge.key", "KEY")
+        case .agent: return L10n.string("loginSets.badge.agent", "AGENT")
+        }
+    }
+
+    @ViewBuilder
+    private func jumpSessionSummaryView(_ summary: JumpSessionSummary) -> some View {
+        switch summary {
+        case .resolved(let text):
+            Text(text)
+                .font(.system(size: 12.5))
+                .foregroundStyle(DesignTokens.inkSecondary)
+        case .error(let message):
+            Text(message)
+                .font(.system(size: 12.5))
+                .foregroundStyle(.red)
+        }
+    }
+
+    /// Puts `alert` on screen, or leaves the alert as it is for `nil`.
+    private func present(_ alert: FormFailureAlert?) {
+        guard let alert else { return }
+        alertMessage = alert.message
+        alertFailureID = alert.failureID
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            // While the host-key prompt is pending, the form is hidden
+            // entirely — the trust decision is the only thing on screen.
+            if let prompt = viewModel.hostKeyPrompt {
+                hostKeyPromptView(prompt)
+            } else {
+                // The field area scrolls on its own (dev-build follow-up,
+                // 2026-09-04): on a short window the lower fields used to be
+                // clipped outright with no way to reach them -- the sidebar
+                // already scrolls (SessionSidebar's own List), and the form
+                // gets the same treatment. The footer sits OUTSIDE the
+                // ScrollView, as a sibling, so Connect / Save / Back stay
+                // reachable at any window height; nothing pins a height on
+                // the ScrollView itself, so it takes whatever the window
+                // gives it.
+                ScrollView(.vertical) {
+                    VStack(alignment: .leading, spacing: 16) {
+                        Text(isEditMode
+                            ? L10n.string("connection.editTitle", "Edit session")
+                            : L10n.string("connection.title", "New connection"))
+                            .font(.title2.bold())
+
+                        VStack(alignment: .leading, spacing: 10) {
+                            // Type switcher (M12/T7b): the only row shown regardless of
+                            // `viewModel.kind` — it's what flips the rest of the form
+                            // between the SSH sections below (unchanged from before this
+                            // feature) and the schema-driven S3 section.
+                            let typeLabel = L10n.string("connection.type.label", "Connection type")
+                            FormRow(label: typeLabel) {
+                                Picker(typeLabel, selection: $viewModel.kind) {
+                                    ForEach(ConnectionKind.allCases, id: \.self) { kind in
+                                        let descriptor = BackendDescriptor.descriptor(for: kind)
+                                        Text(L10n.string(descriptor.badgeLabelKey, descriptor.badgeLabelDefault))
+                                            .tag(kind)
+                                    }
+                                }
+                                .pickerStyle(.segmented)
+                                .labelsHidden()
+                                // Connection type is fixed after creation — editing a
+                                // session never changes its protocol.
+                                .disabled(isEditMode)
+                            }
+
+                            backendSection
+
+                            if !isEditMode {
+                                FormRow(label: "") {
+                                    Toggle(
+                                        L10n.string("connection.saveToggle", "Save as session"),
+                                        isOn: $viewModel.shouldSaveSession)
+                                }
+                            }
+
+                            if isEditMode || viewModel.shouldSaveSession {
+                                let saveNameLabel = L10n.string("connection.field.saveName", "Session name")
+                                FormRow(label: saveNameLabel) {
+                                    TextField(
+                                        saveNameLabel, text: $viewModel.saveName,
+                                        prompt: Text(L10n.string("connection.field.saveName.placeholder", "e.g. hetzner-web"))
+                                    )
+                                }
+                                .errorHighlight(failedField == .saveName)
+
+                                // Names the stored session of this name and says what
+                                // saving would do to it — which is not the same on the
+                                // two paths, so the sentence is the conflict's own and
+                                // not spelled here. Drawn like this form's other inline
+                                // message under a field (the jump summary row): a
+                                // label-less `FormRow` so it sits under the field it is
+                                // about, same size, in amber rather than the red this
+                                // form reserves for a refusal — saving onto a stored
+                                // name stays allowed and stays one click away, which is
+                                // why nothing here disables the buttons below.
+                                if let conflict = nameConflict {
+                                    FormRow(label: "") {
+                                        Text(String(
+                                            format: L10n.string(
+                                                conflict.messageKey, conflict.messageDefault),
+                                            conflict.session.name))
+                                            .font(.system(size: 12.5))
+                                            .foregroundStyle(DesignTokens.statusAmber)
+                                    }
+                                }
+
+                                SessionAppearancePicker(appearance: $viewModel.appearance, kind: viewModel.kind)
+
+                                let groupLabel = L10n.string("connection.field.group", "Group")
+                                FormRow(label: groupLabel) {
+                                    SessionEditorGroupPicker(
+                                        viewModel: viewModel,
+                                        sessionList: sessionList, label: groupLabel)
+                                }
+                            }
+                        }
+                        .textFieldStyle(.roundedBorder)
+                        .disabled(isConnecting)
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.trailing, 12)
+                }
+                .scrollIndicators(.visible)
+
+                HStack {
+                    Spacer()
+                    if isConnecting || isHandingOff {
+                        ProgressView()
+                            .controlSize(.small)
+                    }
+                    if isEditMode {
+                        Button(L10n.string("common.back", "Back")) {
+                            onCancelEdit()
+                        }
+                        .buttonStyle(.polished)
+                        .keyboardShortcut(.cancelAction)
+                        Button(L10n.string("common.save", "Save")) {
+                            guard resolveLoginSetForSubmit() else { return }
+                            if let session = viewModel.validateForEditSave() {
+                                _ = onSaveEdited(session, editedSecret)
+                            } else {
+                                present(FormFailureAlertPlan.onChange(
+                                    to: viewModel.state,
+                                    unacknowledgedFailure: viewModel.unacknowledgedFailure))
+                            }
+                        }
+                        .buttonStyle(.polished)
+                        .disabled(loginSetModeIncomplete || jumpLoginSetModeIncomplete || jumpSessionModeIncomplete)
+                        Button(L10n.string("connection.saveAndConnect", "Save & connect")) {
+                            guard resolveLoginSetForSubmit() else { return }
+                            if let session = viewModel.validateForEditSave() {
+                                if onSaveEdited(session, editedSecret) {
+                                    onConnectEdited(session)
+                                }
+                            } else {
+                                present(FormFailureAlertPlan.onChange(
+                                    to: viewModel.state,
+                                    unacknowledgedFailure: viewModel.unacknowledgedFailure))
+                            }
+                        }
+                        .keyboardShortcut(.defaultAction)
+                        .buttonStyle(.polishedProminent)
+                        .disabled(loginSetModeIncomplete || jumpLoginSetModeIncomplete || jumpSessionModeIncomplete)
+                    } else {
+                        Button(L10n.string("common.cancel", "Cancel"), role: .cancel) {
+                            onCancelNew()
+                        }
+                        .keyboardShortcut(.cancelAction)
+                        .buttonStyle(.polished)
+                        // Save without dialing (tab-context-menu fix round).
+                        // Shown only while "Save as session" is on: with the
+                        // toggle off there is no session being described and no
+                        // name field on screen, so a Save button would be an
+                        // offer the form cannot keep. Same submit sequence as
+                        // edit mode's own Save — resolve the login set,
+                        // validate, then hand out — so a refusal highlights the
+                        // offending field instead of failing silently.
+                        if viewModel.shouldSaveSession {
+                            Button(L10n.string("common.save", "Save")) {
+                                guard resolveLoginSetForSubmit() else { return }
+                                if viewModel.validateForNewSave() {
+                                    onSaveNew()
+                                } else {
+                                    present(FormFailureAlertPlan.onChange(
+                                        to: viewModel.state,
+                                        unacknowledgedFailure: viewModel.unacknowledgedFailure))
+                                }
+                            }
+                            .buttonStyle(.polished)
+                            .disabled(isConnecting || isHandingOff || loginSetModeIncomplete
+                                || jumpLoginSetModeIncomplete || jumpSessionModeIncomplete)
+                        }
+                        Button(L10n.string("connection.connect", "Connect")) {
+                            guard resolveLoginSetForSubmit() else { return }
+                            // M17: if this key is a managed key with a stored
+                            // passphrase and none was typed, resolve it from the
+                            // Keychain so the user need not re-enter it. The
+                            // form's own fill also records whether an unreadable
+                            // `managed_keys.json` hid the key (Task 6 fix round
+                            // 1 of the review follow-ups of 2026-09-18).
+                            viewModel.fillManagedKeyPassphrase(
+                                store: managedKeyStore, secrets: secretStore)
+                            // Captured HERE, synchronously, before dialing even
+                            // starts — see `currentReconnectAttempt`'s own doc
+                            // comment for why this timing (not "right before
+                            // the hand-off", this view's shape before fix
+                            // round 3) is the one both connect paths now share.
+                            let myAttempt = currentReconnectAttempt()
+                            Task {
+                                if let fs = await viewModel.connect() {
+                                    isHandingOff = true
+                                    await onConnected(fs, myAttempt)
+                                    isHandingOff = false
+                                }
+                                // No inline `else if case .failed` here (removed,
+                                // connection-liveness plan Task 6 fix round 1):
+                                // this Task can be the ABANDONED half of a
+                                // cancelled connect attempt (see `ConnectionViewModel
+                                // .currentAttempt`'s own doc comment), and by the
+                                // time its `await` above finally returns nil,
+                                // `viewModel.state` may already belong to a
+                                // completely different, later attempt on this
+                                // same tab — reading it here could pop an alert
+                                // for the wrong attempt, or reopen one the user
+                                // already dismissed. The `.onChange(of: viewModel
+                                // .state)` handler below already shows the alert
+                                // for every GENUINE transition into `.failed`,
+                                // including this button's own — it is value-
+                                // driven, so it cannot read a state that has
+                                // since moved on the way this stale re-check did.
+                            }
+                        }
+                        .keyboardShortcut(.defaultAction)
+                        .disabled(isConnecting || isHandingOff || loginSetModeIncomplete || jumpLoginSetModeIncomplete || jumpSessionModeIncomplete)
+                        .buttonStyle(.polishedProminent)
+                    }
+                }
+            }
+        }
+        .padding(24)
+        .frame(minWidth: 500, maxWidth: 760)
+        .alert(
+            L10n.string("connection.error.title", "Connection failed"),
+            isPresented: Binding(
+                get: { alertMessage != nil },
+                // Any way out of the alert — either button — is the person
+                // having seen the text, so the failure is acknowledged here
+                // and the form will not raise it again on its next mount.
+                set: { isPresented in
+                    guard !isPresented else { return }
+                    if let alertFailureID { viewModel.acknowledgeFailure(alertFailureID) }
+                    alertMessage = nil
+                    alertFailureID = nil
+                }
+            )
+        ) {
+            // Ahead of OK, because it is the one thing this dialog can
+            // offer that answers the question it just raised. It dismisses
+            // the alert (any button does) and opens the panel; nothing is
+            // measured until the user presses the panel's own button.
+            Button(L10n.string("diagnostics.menu", "Diagnose…")) { onDiagnose() }
+            Button(L10n.string("common.ok", "OK"), role: .cancel) {}
+        } message: {
+            Text(alertMessage ?? "")
+        }
+        // Opened from the TOFU prompt's footnote below — kept at the outer
+        // `body` level (like the alert above) so it presents over whichever
+        // sub-view (`hostKeyPromptView` or the scrolling form) is currently shown,
+        // and so the prompt underneath stays mounted and functional while
+        // the sheet is up.
+        .sheet(isPresented: $showKnownHostsSheet) {
+            KnownHostsSheet(store: KnownHostsStore(directory: SessionStore.defaultDirectory))
+        }
+        // "Manage logins…" (M10b/T3, mockup section 4C): opens the SAME
+        // sheet locally, sharing `sessionList` (not a fresh store instance
+        // like `showKnownHostsSheet` above) so an edit/delete/merge made
+        // here is immediately reflected in the Set-mode picker and the
+        // sidebar, which read the same observable object.
+        .sheet(isPresented: $showLoginSetsSheet) {
+            LoginSetsSheet(sessionList: sessionList)
+        }
+        .sheet(item: $loginSetBeingEdited) { set in
+            LoginSetEditorView(
+                existing: set,
+                onSave: { updated, secret in
+                    if sessionList.saveLoginSet(updated, secret: secret) {
+                        loginSetBeingEdited = nil
+                    }
+                },
+                onCancel: { loginSetBeingEdited = nil })
+        }
+        // "Manage keys…" (M18/T5): opens the SSH-keys sheet locally, same
+        // reasoning as `showLoginSetsSheet` above — replaces the M17
+        // `SettingsLink` to the now-removed-in-Task-6 Settings tab.
+        .sheet(isPresented: $showSSHKeysSheet) {
+            SSHKeysSheet()
+        }
+        // Surfaces a `.failed` state set from OUTSIDE this view's own button
+        // handlers (M10b/T3: `ContentView.connect(in:stored:)` calls
+        // `viewModel.showFailure` when a stored session's login set is
+        // missing) through the same alert the Connect/Save buttons already
+        // populate inline — one mechanism for both origins.
+        .onChange(of: viewModel.state) { _, newState in
+            present(FormFailureAlertPlan.onChange(
+                to: newState, unacknowledgedFailure: viewModel.unacknowledgedFailure))
+        }
+        // A form that MOUNTS into a failure nobody has read yet raises it
+        // (jump-and-groups plan, Task 1, fix round 1). The change handler
+        // above never sees a change it was not mounted for, and every path
+        // that sends such a failure here mounts the form already failed: a
+        // pre-dial refusal replacing the session overview, a missing
+        // passphrase replacing "Connecting…". Only while the
+        // failure is unacknowledged — see `FormFailureAlertPlan` for why that
+        // keeps a tab switch or "Edit" from raising it again.
+        .onAppear {
+            present(FormFailureAlertPlan.onAppear(
+                state: viewModel.state, unacknowledgedFailure: viewModel.unacknowledgedFailure))
+        }
+        // Picking a managed key fills the key path (M17/T5). The schema can
+        // declare the picker but not its EFFECT: the option ids are key ids,
+        // while everything downstream — connect, save, `SSHCommandBuilder` —
+        // reads `keyPath`. Without this the picker would look like it worked
+        // and change nothing. Choosing the "—" row clears the id and
+        // deliberately leaves the typed path alone.
+        .onChange(of: viewModel.values.raw[Self.managedKeyKey] ?? "") { _, newID in
+            guard !newID.isEmpty,
+                  let key = ManagedKeysLoad.connectableKeys()
+                      .first(where: { $0.id.uuidString == newID })
+            else { return }
+            viewModel.keyPath = managedKeyPath(for: key)
+        }
+    }
+
+    /// The secret the edit-mode Save path should write, or `nil` for "leave
+    /// the stored one alone".
+    ///
+    /// Whichever field the backend's credential schema shows RIGHT NOW — the
+    /// same question `LoginResolver.credentials`,
+    /// `LoginSetEditorView.secret` and `ContentView.maybeCreateNewLoginSet`
+    /// already ask `visibleSecretField`. A hardcoded
+    /// `kind == .s3 ? s3SecretAccessKey : password` answered it until M22's
+    /// final review: a fourth backend with its own secret field would leave
+    /// `viewModel.password` empty, `nil` would go out, and the secret the
+    /// user just typed would be silently discarded — exactly the failure the
+    /// S3 special case was added to prevent.
+    ///
+    /// No visible secret row (an SSH agent login) resolves to `nil` too,
+    /// which is the same "nothing to write" the empty-field case means.
+    private var editedSecret: String? {
+        let descriptor = BackendDescriptor.descriptor(for: viewModel.kind)
+        guard let field = descriptor.credentialSchema.visibleSecretField(
+            in: viewModel.values, namespace: descriptor.fieldNamespace)
+        else { return nil }
+        let secret = viewModel.values.raw["\(descriptor.fieldNamespace).\(field.id)"] ?? ""
+        return secret.isEmpty ? nil : secret
+    }
+
+    /// The connection form for whichever backend is selected (M22/T8): the
+    /// blocks Core declares, in Core's order, plus the two things no schema
+    /// can express yet.
+    ///
+    /// The ORDER is `BackendDescriptor.formBlocks` — connection schema, login
+    /// switcher, then either the credential schema or the login-set picker
+    /// that substitutes it. Hand-placing those per backend is exactly what let
+    /// S3's credential block go missing silently, and no App test could have
+    /// caught it because there is no App test target.
+    @ViewBuilder
+    private var backendSection: some View {
+        let descriptor = BackendDescriptor.descriptor(for: viewModel.kind)
+        ForEach(
+            Array(descriptor.formBlocks(
+                usingLoginSet: viewModel.loginMode == .set).enumerated()),
+            id: \.offset
+        ) { _, block in
+            formBlock(block, kind: descriptor.kind, namespace: descriptor.fieldNamespace)
+        }
+        // Immediately after the credential block — the last one Core emits, and
+        // the one carrying the key-path row these two buttons fill.
+        if viewModel.kind == .ssh { sshKeyFileRow }
+        // Every backend (M22/T9): `ContentView.maybeCreateNewLoginSet` now
+        // asks the descriptor to build the set, so it carries the form's own
+        // kind instead of `LoginSet.init`'s `.ssh` default — the latent bug
+        // that kept this control S3-and-SSH-only.
+        if viewModel.loginMode == .manual {
+            saveAsNewLoginSetRows
+        }
+        if viewModel.kind == .ssh { sshJumpSection }
+    }
+
+    /// What a field's value was UNDERSTOOD as, drawn under the field by
+    /// `SchemaFormView.footnote`. Includes S3 addressing, SSH resolution and
+    /// the distinction between the SSH destination and its outer TLS gateway.
+    ///
+    /// **The SSH host** carries what "Resolve…" beside it found
+    /// (`HostResolveModel.footnote(for:)`): under an offer of addresses, the
+    /// note that the server's host key is confirmed again for the address
+    /// and that the name is not kept; when there is no address, or no answer
+    /// in time, the message saying so.
+    ///
+    /// **The endpoint** prints where the request will actually go. The parse
+    /// behind it accepts spellings that are not URLs as typed — a schemeless
+    /// `minio.lan:9000` means `https://minio.lan:9000` since 2026-09-03 — and
+    /// the addressing style moves the destination again: with virtual-hosted
+    /// addressing and a bucket set, the request goes to
+    /// `<bucket>.<host>`. So the line prints `S3FieldSchema.requestOrigin`,
+    /// the origin the connect path builds, and NOT the endpoint's own origin
+    /// (review 2026-09-04, I-3: printing the latter announced a destination
+    /// the app does not dial). It appears exactly when that origin differs
+    /// from what was typed — the case where the field's text and the
+    /// request's target are two different strings.
+    ///
+    /// **The path-style toggle** says why it is greyed, when it is: an
+    /// IP-literal endpoint is addressed path-style whatever the box says.
+    /// Its forced value comes from `forcedFieldValues` below; this is only
+    /// the sentence.
+    ///
+    /// Every line here names a host, a port and a bucket — `requestOrigin`
+    /// composes an origin — so no access key or secret can reach the screen
+    /// through it even if one were typed into the endpoint field. Measured
+    /// in Core, over a `KEY:SECRET@host` endpoint
+    /// (`noCredentialInTheEndpointReachesTheOriginOrTheCanonicalSpelling`).
+    private func fieldFootnote(_ field: ConnectionField, _ value: String) -> String? {
+        if viewModel.kind == .ssh, viewModel.values[bool: SSHField.tlsEnabled] {
+            if field.id == SSHField.host.rawValue {
+                return L10n.string("connection.tls.targetHelp", "Enter the final SSH host here, not the TLS gateway. Configure the gateway separately below.")
+            }
+            if field.id == SSHField.tlsVerify.rawValue {
+                return L10n.string("connection.tls.verifyHelp", "Unlike an openssl s_client script without verification options, MacSCP checks the certificate and server name by default. Only disable this if you explicitly need that script's behavior.")
+            }
+        }
+        if HostResolveModel.isOffered(for: viewModel.kind), field.id == SSHField.host.rawValue {
+            return HostResolveModel.footnote(for: hostResolve.presentation(forHost: value))
+        }
+        guard viewModel.kind == .s3 else { return nil }
+        switch field.id {
+        case S3Field.endpoint.rawValue:
+            let typed = value.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !typed.isEmpty else { return nil }
+            guard let origin = S3FieldSchema.requestOrigin(viewModel.values) else {
+                return L10n.string(
+                    "connection.s3.endpoint.unreadable",
+                    "Not a server address MacSCP can read.")
+            }
+            guard origin != typed else { return nil }
+            return String(
+                format: L10n.string("connection.s3.endpoint.understood %@", "Connects to %@"),
+                origin)
+        case S3Field.usePathStyle.rawValue:
+            guard S3FieldSchema.pathStyleIsForced(viewModel.values) else { return nil }
+            return L10n.string(
+                "connection.s3.pathStyle.forcedByIP",
+                "An IP address is always addressed path-style.")
+        default:
+            return nil
+        }
+    }
+
+    /// The control drawn beside a field, handed to
+    /// `SchemaFormView.accessory`: "Resolve…" beside the host field of an SSH
+    /// form, in new and edit mode alike, and nothing anywhere else.
+    ///
+    /// Not for S3 or WebDAV (`HostResolveModel.isOffered(for:)`), whose TLS
+    /// certificate is checked against the name. Not for the jump host
+    /// either: its row is drawn by `sshJumpSection`, which this closure never
+    /// reaches — the action covers the target host only.
+    private func fieldAccessory(_ field: ConnectionField) -> AnyView? {
+        guard HostResolveModel.isOffered(for: viewModel.kind),
+              field.id == SSHField.host.rawValue
+        else { return nil }
+        return AnyView(HostResolveControl(model: hostResolve, form: viewModel))
+    }
+
+    /// The values a RULE decides for this form, handed to
+    /// `SchemaFormView.forcedValues`: the field is shown with that value,
+    /// greyed, and cannot be written.
+    ///
+    /// One rule today — `S3FieldSchema.pathStyleIsForced`, asked rather than
+    /// re-derived here, so the form and the config that gets dialled cannot
+    /// disagree about the addressing. The "true"/"false" spelling belongs to
+    /// `FieldValues`, so the text is read back out of one instead of being
+    /// written here a second time.
+    private var forcedFieldValues: [String: String] {
+        guard viewModel.kind == .s3,
+              S3FieldSchema.pathStyleIsForced(viewModel.values)
+        else { return [:] }
+        var forced = FieldValues()
+        forced[bool: S3Field.usePathStyle] = true
+        let key = "\(S3Field.namespace).\(S3Field.usePathStyle.rawValue)"
+        return [S3Field.usePathStyle.rawValue: forced.raw[key] ?? ""]
+    }
+
+    /// Browse-for-a-key-file and "Manage keys…", the two affordances that sit
+    /// beside the schema-rendered `keyPath` row (M17/T5, M18/T5).
+    ///
+    /// A row of its own rather than part of the generic renderer: both open
+    /// App-only UI (an `NSOpenPanel` and a sheet) that no schema vocabulary
+    /// describes. Shown under exactly the condition that makes the key path
+    /// visible — private-key auth, and Manual mode, since a chosen login set
+    /// brings its own key path.
+    @ViewBuilder
+    private var sshKeyFileRow: some View {
+        if viewModel.loginMode == .manual && viewModel.authChoice == .privateKey {
+            FormRow(label: "") {
+                HStack(spacing: 10) {
+                    // Start in ~/.ssh and include hidden files; no path entry
+                    // or managed-key import is needed for an existing key.
+                    Button(L10n.string("connection.field.keyPath.browseHelp", "Choose key file")) {
+                        chooseSSHKey(forJump: false)
+                    }
+                        .buttonStyle(.polished)
+                        .help(L10n.string("connection.field.keyPath.browseHelp", "Choose key file"))
+                    Button(L10n.string("keys.picker.manage", "Manage keys…")) {
+                        showSSHKeysSheet = true
+                    }
+                    .buttonStyle(.plain)
+                    .font(.caption)
+                    .foregroundStyle(DesignTokens.inkTertiary)
+                }
+            }
+        }
+    }
+
+    private func chooseSSHKey(forJump: Bool) {
+        let panel = NSOpenPanel()
+        panel.title = L10n.string("connection.field.keyPath.browseHelp", "Choose key file")
+        panel.canChooseFiles = true
+        panel.canChooseDirectories = false
+        panel.allowsMultipleSelection = false
+        panel.showsHiddenFiles = true
+        panel.directoryURL = SSHKeyFileSelection.initialDirectory(
+            currentPath: forJump ? viewModel.jumpKeyPath : viewModel.keyPath)
+        panel.begin { response in
+            guard response == .OK, let url = panel.url else { return }
+            if forJump {
+                viewModel.jumpKeyPath = url.path(percentEncoded: false)
+            } else {
+                viewModel.keyPath = url.path(percentEncoded: false)
+            }
+        }
+    }
+
+    /// The jump host block (M10c/T3, M11a/T3), still drawn by hand.
+    ///
+    /// The schema declares the jump as a `.group`, and `SchemaFormView` is
+    /// told to skip it (see `SchemaFormView.skipping`): the source switcher,
+    /// the picker over eligible saved connections, the resolved-target summary
+    /// and the jump's own login-set mode have no expression in today's
+    /// vocabulary — `FieldCondition` has no conjunction, `OptionSource` has no
+    /// "saved sessions" case. Rendering the group generically would drop all
+    /// four, including the `.jumpSession` error highlight. The fields it binds
+    /// to are the SAME `values` entries the group declares, so the two halves
+    /// cannot drift.
+    @ViewBuilder
+    private var sshJumpSection: some View {
+                let portLabel = L10n.string("connection.field.port", "Port")
+                let loginModeLabel = L10n.string("form.loginMode.label", "Login")
+                // Jump host block (M10c/T3, mockup section 2): a toggle below
+                // the target's own auth block; enabled, it reuses the SAME
+                // three-way login building blocks above (Set picker with
+                // "Manage logins…", or Manual username/auth/password/key),
+                // just bound to the jump's own fields instead of the
+                // target's — minus "Save as new login set" (spec §3: YAGNI
+                // for the jump).
+                let jumpLabel = L10n.string("form.jump.label", "Jump host")
+                FormRow(label: jumpLabel) {
+                    Toggle(
+                        L10n.string("form.jump.toggle", "Connect through an intermediate host (ProxyJump)"),
+                        isOn: $viewModel.jumpEnabled)
+                }
+
+                if viewModel.jumpEnabled {
+                    // Jump source switcher (M11a/T3, spec §3): sits above the
+                    // host row, deciding whether the block below shows the
+                    // saved-connection picker + read-only summary, or the
+                    // full manual block unchanged from before this feature.
+                    let jumpSourceLabel = L10n.string("form.jump.source.label", "Source")
+                    FormRow(label: jumpSourceLabel) {
+                        Picker(jumpSourceLabel, selection: Binding(
+                            get: { viewModel.jumpSourceMode },
+                            set: { viewModel.selectJumpSourceMode($0) }
+                        )) {
+                            Text(L10n.string("form.jump.source.session", "Saved connection"))
+                                .tag(ConnectionViewModel.JumpSourceMode.session)
+                            Text(L10n.string("form.loginMode.manual", "Manual"))
+                                .tag(ConnectionViewModel.JumpSourceMode.manual)
+                        }
+                        .pickerStyle(.segmented)
+                        .labelsHidden()
+                    }
+
+                    if viewModel.jumpSourceMode == .session {
+                        FormRow(label: "") {
+                            Picker(jumpSourceLabel, selection: $viewModel.jumpSessionID) {
+                                Text(L10n.string("form.jump.session.select", "Select a connection"))
+                                    .tag(UUID?.none)
+                                ForEach(eligibleJumpSessions) { session in
+                                    Text(session.name).tag(UUID?.some(session.id))
+                                }
+                            }
+                            .labelsHidden()
+                        }
+                        .errorHighlight(failedField == .jumpSession)
+
+                        if let summary = jumpSessionSummary {
+                            FormRow(label: "") {
+                                jumpSessionSummaryView(summary)
+                            }
+                        }
+                    } else {
+                        FormRow(label: "") {
+                            TextField(
+                                jumpLabel, text: $viewModel.jumpHost,
+                                prompt: Text(L10n.string("form.jump.host.placeholder", "bastion.example.com")))
+                        }
+                        .errorHighlight(failedField == .jumpHost)
+
+                        FormRow(label: "") {
+                            TextField(portLabel, text: $viewModel.jumpPort, prompt: Text(verbatim: ""))
+                        }
+                        .errorHighlight(failedField == .jumpPort)
+
+                        FormRow(label: loginModeLabel) {
+                            // Through the switcher, not a raw binding (M28
+                            // final review): Set mode's fields are filled
+                            // from the SET, so a switch away from it has a
+                            // secret to drop -- see
+                            // `ConnectionViewModel.selectJumpLoginMode`. The
+                            // source and auth pickers above/below do the same.
+                            Picker(loginModeLabel, selection: Binding(
+                                get: { viewModel.jumpLoginMode },
+                                set: { viewModel.selectJumpLoginMode($0) }
+                            )) {
+                                Text(L10n.string("form.loginMode.set", "Login set"))
+                                    .tag(ConnectionViewModel.LoginMode.set)
+                                Text(L10n.string("form.loginMode.manual", "Manual"))
+                                    .tag(ConnectionViewModel.LoginMode.manual)
+                            }
+                            .pickerStyle(.segmented)
+                            .labelsHidden()
+                        }
+
+                        if viewModel.jumpLoginMode == .set {
+                            FormRow(label: "") {
+                                HStack(spacing: 10) {
+                                    Picker(loginModeLabel, selection: $viewModel.jumpSelectedLoginSetID) {
+                                        Text(L10n.string("form.selectLogin", "Select a login")).tag(UUID?.none)
+                                        // A jump is an SSH hop, so only SSH
+                                        // sets are offered (M28/T6) -- see
+                                        // `JumpLoginSetEligibility` for why,
+                                        // and for why the hard stop is not
+                                        // here.
+                                        ForEach(JumpLoginSetEligibility.eligible(in: sessionList.loginSets)) { set in
+                                            Text("\(set.name) — \(set.username)").tag(UUID?.some(set.id))
+                                        }
+                                    }
+                                    .labelsHidden()
+                                    Button(L10n.string("form.manageLogins", "Manage logins…")) {
+                                        showLoginSetsSheet = true
+                                    }
+                                    .buttonStyle(.plain)
+                                    .font(.caption)
+                                    .foregroundStyle(DesignTokens.inkTertiary)
+                                }
+                            }
+                        } else {
+                            let jumpUsernameLabel = L10n.string("connection.field.username", "Username")
+                            FormRow(label: jumpUsernameLabel) {
+                                TextField(jumpUsernameLabel, text: $viewModel.jumpUsername, prompt: Text(verbatim: ""))
+                            }
+                            .errorHighlight(failedField == .jumpUsername)
+
+                            let jumpAuthMethodLabel = L10n.string("connection.field.authMethod", "Authentication")
+                            FormRow(label: jumpAuthMethodLabel) {
+                                Picker(jumpAuthMethodLabel, selection: Binding(
+                                    get: { viewModel.jumpAuthChoice },
+                                    set: { viewModel.selectJumpAuthChoice($0) }
+                                )) {
+                                    Text(L10n.string("connection.auth.password", "Password"))
+                                        .tag(ConnectionViewModel.AuthChoice.password)
+                                    Text(L10n.string("connection.auth.privateKey", "SSH key"))
+                                        .tag(ConnectionViewModel.AuthChoice.privateKey)
+                                    Text(L10n.string("connection.auth.agent", "Agent"))
+                                        .tag(ConnectionViewModel.AuthChoice.agent)
+                                }
+                                .pickerStyle(.segmented)
+                                .labelsHidden()
+                            }
+
+                            if viewModel.jumpAuthChoice == .password {
+                                let jumpPasswordLabel = L10n.string("connection.auth.password", "Password")
+                                FormRow(label: jumpPasswordLabel) {
+                                    SecureField(
+                                        jumpPasswordLabel, text: $viewModel.jumpPassword,
+                                        prompt: isEditMode
+                                            ? Text(L10n.string("connection.field.password.unchanged", "unchanged"))
+                                            : Text(verbatim: ""))
+                                }
+                                .errorHighlight(failedField == .jumpPassword)
+                            } else if viewModel.jumpAuthChoice == .privateKey {
+                                let jumpKeyPathLabel = L10n.string("connection.field.keyPath", "Key path")
+                                FormRow(label: jumpKeyPathLabel) {
+                                    HStack(spacing: 6) {
+                                        TextField(
+                                            jumpKeyPathLabel, text: $viewModel.jumpKeyPath,
+                                            prompt: Text(L10n.string(
+                                                "connection.field.keyPath.placeholder", "~/.ssh/id_ed25519")))
+                                        Button("…") { chooseSSHKey(forJump: true) }
+                                            .buttonStyle(.polished)
+                                            .help(L10n.string("connection.field.keyPath.browseHelp", "Choose key file"))
+                                    }
+                                }
+                                .errorHighlight(failedField == .jumpKeyPath)
+
+                                let jumpPassphraseLabel = L10n.string(
+                                    "connection.field.passphrase", "Passphrase (optional)")
+                                FormRow(label: jumpPassphraseLabel) {
+                                    SecureField(
+                                        jumpPassphraseLabel, text: $viewModel.jumpPassword,
+                                        prompt: isEditMode
+                                            ? Text(L10n.string("connection.field.password.unchanged", "unchanged"))
+                                            : Text(verbatim: ""))
+                                }
+                                .errorHighlight(failedField == .jumpPassword)
+                            }
+                            // .agent (M10d/T4): same as the target block above —
+                            // no secret/key row for the jump's own agent auth.
+                        }
+                    }
+                }
+
+    }
+
+    /// Turns a schema-declared `OptionSource` into the options a picker shows
+    /// (M22). The ONE thing the App contributes to the generic renderer:
+    /// managed keys live in a store Core cannot see, so the schema names the
+    /// source and this resolves it. Two cases, one switch, one place -- not
+    /// the per-backend dispatcher M22 is removing.
+    ///
+    /// Login sets are NOT one of them: choosing a set substitutes the whole
+    /// credential schema, which `FormBlock.loginSetPicker` places below.
+    private func resolveOptions(_ source: OptionSource) -> [FieldOption] {
+        switch source {
+        case .fixed(let options):
+            // Declared in the schema, catalog keys and all -- nothing to look up.
+            return options
+        case .managedKeys:
+            // Same filter the hand-written SSH key picker uses: only keys
+            // `SSHPrivateKeyLoader` can open (ed25519, RSA, ECDSA) with a
+            // resolvable file are offerable.
+            return ManagedKeysLoad.connectableKeys().map { key in
+                FieldOption(
+                    id: key.id.uuidString, labelKey: "",
+                    labelDefault: "\(key.name) — \(Self.shortFingerprint(key.fingerprint))")
+            }
+        }
+    }
+
+    /// Renders one `FormBlock` (M22/T7). The ORDER comes from Core
+    /// (`BackendDescriptor.formBlocks`), not from this file: hand-placing the
+    /// blocks per backend is exactly what let S3's credential block go missing
+    /// silently, and no App test could have caught it because there is no App
+    /// test target. Dropping a schema now means editing Core, where
+    /// `FormBlockTests` fails.
+    ///
+    /// Binds straight to `viewModel.values` (M22/T8): the transitional
+    /// `s3Values`/`webdavValues` adapters that mapped typed view-model
+    /// properties into a `FieldValues` are gone with the typed storage they
+    /// adapted.
+    @ViewBuilder
+    private func formBlock(
+        _ block: FormBlock, kind: ConnectionKind, namespace: String
+    ) -> some View {
+        switch block {
+        case .schema(let schema):
+            SchemaFormView(
+                schemas: [schema], values: $viewModel.values, namespace: namespace,
+                isEditMode: isEditMode, resolve: resolveOptions,
+                failedFieldID: failedFieldID, skipping: Self.customRenderedFields,
+                interceptEdit: interceptEdit, footnote: fieldFootnote,
+                accessory: fieldAccessory, forcedValues: forcedFieldValues)
+        case .loginModeSwitcher:
+            loginModeSwitcher
+        case .loginSetPicker:
+            loginSetPicker(for: kind)
+        }
+    }
+
+    /// The Manual / login-set switcher (M15), placed by
+    /// `FormBlock.loginModeSwitcher`.
+    private var loginModeSwitcher: some View {
+        let loginModeLabel = L10n.string("form.loginMode.label", "Login")
+        return FormRow(label: loginModeLabel) {
+            Picker(loginModeLabel, selection: $viewModel.loginMode) {
+                Text(L10n.string("form.loginMode.set", "Login set"))
+                    .tag(ConnectionViewModel.LoginMode.set)
+                Text(L10n.string("form.loginMode.manual", "Manual"))
+                    .tag(ConnectionViewModel.LoginMode.manual)
+            }
+            .pickerStyle(.segmented)
+            .labelsHidden()
+        }
+    }
+
+    /// The kind-filtered login-set picker that substitutes the credential
+    /// schema in Set mode, placed by `FormBlock.loginSetPicker`.
+    private func loginSetPicker(for kind: ConnectionKind) -> some View {
+        let loginModeLabel = L10n.string("form.loginMode.label", "Login")
+        return FormRow(label: "") {
+            HStack(spacing: 10) {
+                Picker(loginModeLabel, selection: $viewModel.selectedLoginSetID) {
+                    Text(L10n.string("form.selectLogin", "Select a login")).tag(UUID?.none)
+                    ForEach(sessionList.loginSets.filter { $0.kind == kind }) { set in
+                        Text(Self.loginSetLabel(set)).tag(UUID?.some(set.id))
+                    }
+                }
+                .labelsHidden()
+                if let id = viewModel.selectedLoginSetID,
+                   let set = sessionList.loginSets.first(where: { $0.id == id }) {
+                    Button { loginSetBeingEdited = set } label: {
+                        Image(systemName: "pencil")
+                    }
+                    .buttonStyle(.plain)
+                    .help(L10n.string("loginSets.edit", "Edit…"))
+                    .accessibilityLabel(L10n.string("loginSets.edit", "Edit…"))
+                }
+                Button(L10n.string("form.manageLogins", "Manage logins…")) {
+                    showLoginSetsSheet = true
+                }
+                .buttonStyle(.plain)
+                .font(.caption)
+                .foregroundStyle(DesignTokens.inkTertiary)
+            }
+        }
+    }
+
+    /// "name — identity", where the identity is whichever one the set carries:
+    /// S3 sets hold an access key and an empty user name, everything else the
+    /// reverse. Reading the optional first needs no branch on `kind`.
+    private static func loginSetLabel(_ set: LoginSet) -> String {
+        "\(set.name) — \(set.accessKeyID ?? set.username)"
+    }
+
+    /// "Save as new login set" (M15). Deliberately NOT a `FormBlock`: it is
+    /// session bookkeeping rather than a schema. Shown for every backend since
+    /// M22/T9 -- see `backendSection` for what had to be fixed first.
+    @ViewBuilder
+    private var saveAsNewLoginSetRows: some View {
+        FormRow(label: "") {
+            Toggle(
+                L10n.string("form.saveAsSet", "Save as new login set"),
+                isOn: $viewModel.saveAsNewLoginSet)
+        }
+        if viewModel.saveAsNewLoginSet {
+            let setNameLabel = L10n.string("form.saveAsSet.name", "Login set name")
+            FormRow(label: setNameLabel) {
+                TextField(
+                    setNameLabel, text: $viewModel.newLoginSetName,
+                    prompt: Text(sessionList.suggestedSetName(forLabel: viewModel.username)))
+            }
+        }
+    }
+
+    /// Full-pane trust decision for an unknown host key (M3c). Presentation
+    /// only — the TOFU semantics (explicit consent, mismatch never reaches
+    /// this prompt) live in the validator and stay untouched.
+    @ViewBuilder
+    private func hostKeyPromptView(_ prompt: ConnectionViewModel.HostKeyPrompt) -> some View {
+            Text(String(format: L10n.string(
+                "connection.hostkey.first", "First connection to %@"), prompt.candidate.host))
+                .font(.title2.bold())
+            Text(String(format: L10n.string(
+                "connection.hostkey.fingerprintLabel", "Fingerprint (%@):"), prompt.candidate.keyType))
+                .font(.callout)
+            Text(prompt.candidate.fingerprintSHA256)
+                .font(.system(.callout, design: .monospaced))
+                .textSelection(.enabled)
+                .padding(12)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 8))
+            HStack {
+                Spacer()
+                Button(L10n.string("common.back", "Back")) {
+                    viewModel.resolveHostKeyPrompt(trust: false)
+                }
+                .buttonStyle(.polished)
+                Button(L10n.string("connection.hostkey.trust", "Trust & connect")) {
+                    viewModel.resolveHostKeyPrompt(trust: true)
+                }
+                .keyboardShortcut(.defaultAction)
+                .buttonStyle(.polishedProminent)
+            }
+            // Discreet footnote (M10a/T2, mockup section 4): quick access to
+            // inspect what is already trusted without abandoning the pending
+            // prompt. (This prompt only exists on the UNKNOWN-key path — a
+            // rotated key is a mismatch hard stop and never reaches it.)
+            Button(L10n.string("tofu.manageKnownHosts", "Manage known hosts…")) {
+                showKnownHostsSheet = true
+            }
+            .buttonStyle(.plain)
+            .font(.caption)
+            .foregroundStyle(DesignTokens.inkTertiary)
+            .frame(maxWidth: .infinity, alignment: .trailing)
+    }
+}
+
+private extension ConnectionFormView {
+    /// The private-key file path a managed key resolves to, in the shape
+    /// `keyPath` expects (absolute, not percent-encoded). Empty — i.e. "no
+    /// key" — for a key whose stored `fileName` does not address a file
+    /// inside the key directory; `ManagedKeysLoad.connectableKeys` already
+    /// keeps those out of the picker.
+    ///
+    /// An instance method over the injected `managedKeyStore`, not a
+    /// `static` one over a store built here: the path it produces is
+    /// written into `keyPath` and dialled, so a window pointed at a
+    /// temporary key directory must not be handed a path out of the real
+    /// one. `LoginSetsSheet` keeps its own `static` twin, which has no
+    /// window to take a store from.
+    func managedKeyPath(for key: ManagedKey) -> String {
+        managedKeyStore.privateKeyURL(for: key)?.path(percentEncoded: false) ?? ""
+    }
+
+    /// The first ~12 characters after the `SHA256:` prefix, for a compact
+    /// menu row label (`ManagedKey.fingerprint` is the full base64 digest).
+    static func shortFingerprint(_ fingerprint: String) -> String {
+        guard let range = fingerprint.range(of: "SHA256:") else { return fingerprint }
+        return String(fingerprint[range.upperBound...].prefix(12))
+    }
+}
+
+/// Mockup form row (M5k): fixed 110pt right-aligned label column in
+/// inkSecondary, 10pt gap to the field. The visible label lives here;
+/// the wrapped controls keep their own label parameters for accessibility —
+/// which is why the visible label is hidden from VoiceOver (M6a): without
+/// that, every row is announced twice. The label also dims with the row's
+/// enabled state, matching the system Form behavior the grid replaced.
+///
+/// Internal rather than private (M22/T7): `SchemaFormView` renders its rows
+/// with the same 110pt column and `firstTextBaseline` rhythm every form in
+/// the app follows, and reimplementing them there would drift.
+struct FormRow<Content: View>: View {
+    let label: String
+    @ViewBuilder let content: Content
+    @Environment(\.isEnabled) private var isEnabled
+
+    var body: some View {
+        HStack(alignment: .firstTextBaseline, spacing: 10) {
+            Text(label)
+                .font(.system(size: 12.5))
+                .foregroundStyle(DesignTokens.inkSecondary)
+                .opacity(isEnabled ? 1 : 0.5)
+                .frame(width: 110, alignment: .trailing)
+                .fixedSize(horizontal: false, vertical: true)
+                .accessibilityHidden(true)
+            content
+                .frame(maxWidth: .infinity, alignment: .leading)
+        }
+    }
+}
+
+extension View {
+    /// Red outline for the form row whose validation failed. The stroke
+    /// wraps label AND field, sitting 10pt horizontally / 5pt vertically
+    /// outside the row's bounds so the content keeps breathing room.
+    func errorHighlight(_ active: Bool) -> some View {
+        overlay(
+            RoundedRectangle(cornerRadius: 6)
+                .strokeBorder(Color.red, lineWidth: active ? 1.5 : 0)
+                .padding(.horizontal, -10)
+                .padding(.vertical, -5)
+        )
+        .animation(.easeOut(duration: 0.15), value: active)
+    }
+}

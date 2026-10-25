@@ -1,0 +1,152 @@
+import Foundation
+import MacSCPTestSupport
+import Testing
+import macSCPCore
+
+@testable import MacSCPAppKit
+
+/// A forwarding that stays up while some of its connections could not be
+/// carried says so: "Active · N connections failed" as its state, and the
+/// last failure — translated from its kind — in the tooltip. Once the last
+/// three in a row failed it stops saying "Active" at all and reads the
+/// degraded label instead (maintainer answer, 2026-09-19). With no failure
+/// it renders exactly as it did before the count existed.
+@MainActor @Suite struct TunnelActiveFailuresLabelTests {
+    private static let sentinel = "ZZ-UNRESOLVED-ZZ"
+    private static let countKey = "tunnel.state.activeWithFailures %lld"
+    private static let degradedKey = "tunnel.state.degraded %lld"
+    private static let lastFailureKey = "tunnel.state.lastFailure %@"
+
+    @Test(arguments: [1, TunnelState.failuresBeforeDegraded])
+    func anUnreachableDestinationIsVisibleWithoutWaitingForDegradation(_ count: Int) {
+        let state = TunnelState.active(connections: 0, failedConnections: count,
+            lastFailure: .destinationUnreachable(host: "service.test", port: 8000))
+        let label = TunnelProfilesSheet.stateLabel(state)
+        let expected = String(format: L10n.string(
+            "tunnel.state.destinationUnreachable %@ %@", Self.sentinel), "service.test", "8000")
+        #expect(label == expected)
+        let tooltip = TunnelProfilesSheet.stateTooltip(state)
+        #expect(tooltip.contains(TunnelProfilesSheet.failureLabel(
+            .destinationUnreachable(host: "service.test", port: 8000))))
+        let recovered = TunnelStatePlan.next(state, on: .connectionAccepted)
+        #expect(recovered == .active(connections: 1))
+        #expect(TunnelProfilesSheet.stateLabel(recovered) != label)
+    }
+
+    @Test(arguments: AppLanguage.allCases.filter { $0 != .system })
+    func destinationMessagesExistAndFormatInEveryLanguage(_ language: AppLanguage) {
+        let context = LocalizationContext(language: language)
+        for key in ["tunnel.state.destinationUnreachable %@ %@", "tunnel.failure.destinationUnreachable %@ %@"] {
+            let template = L10n.string(key, Self.sentinel, context: context)
+            #expect(template != Self.sentinel)
+            let rendered = String(format: template, "service.test", "8000")
+            #expect(rendered.contains("service.test:8000"))
+            #expect(!rendered.contains("%@"))
+        }
+    }
+
+    private static let appKitRoot = URL(fileURLWithPath: #filePath)
+        .deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
+        .appendingPathComponent("Sources/MacSCPAppKit")
+
+    @Test func noFailureRendersAsBefore() {
+        let idle = TunnelState.active(connections: 0, failedConnections: 0, lastFailure: nil)
+        #expect(TunnelProfilesSheet.stateLabel(idle) == L10n.string("tunnel.state.active", Self.sentinel))
+        let busy = TunnelState.active(connections: 3)
+        #expect(
+            TunnelProfilesSheet.stateLabel(busy)
+                == String(format: L10n.string("tunnel.state.activeConnections %lld", Self.sentinel), 3))
+        #expect(TunnelProfilesSheet.stateTooltip(idle) == TunnelProfilesSheet.stateLabel(idle))
+        #expect(TunnelProfilesSheet.stateTooltip(busy) == TunnelProfilesSheet.stateLabel(busy))
+    }
+
+    /// Below the threshold that stops it reading healthy — the label above
+    /// it is the degraded one, and the case below pins that.
+    @Test(arguments: [1, TunnelState.failuresBeforeDegraded - 1])
+    func theCountIsTheLabel(_ count: Int) {
+        let template = L10n.string(Self.countKey, Self.sentinel)
+        #expect(template != Self.sentinel)
+        let state = TunnelState.active(
+            connections: 2, failedConnections: count, lastFailure: .channelOpenFailed)
+        #expect(TunnelProfilesSheet.stateLabel(state) == String(format: template, count))
+    }
+
+    /// The plural is real: one failure and two read differently once the
+    /// digits are gone, in whatever language the test process resolves.
+    /// Two, not five, because five is past the threshold and reads the
+    /// degraded label instead — whose own plural forms are held by
+    /// `PluralCatalogTests`, per language, where a category English does
+    /// not distinguish can still be measured.
+    @Test func oneAndTwoAreWordedDifferently() {
+        func words(_ count: Int) -> String {
+            TunnelProfilesSheet.stateLabel(
+                .active(connections: 0, failedConnections: count, lastFailure: .connectFailed)
+            ).filter { !$0.isNumber }
+        }
+        #expect(words(1) != words(2))
+    }
+
+    /// Three connections in a row that the forwarding could not carry, and
+    /// the line stops saying "Active" (maintainer answer, 2026-09-19). The
+    /// threshold is read from Core, never spelled here.
+    @Test(arguments: [
+        TunnelState.failuresBeforeDegraded, TunnelState.failuresBeforeDegraded + 4,
+    ])
+    func aForwardingThatKeepsFailingSaysSo(_ count: Int) {
+        let template = L10n.string(Self.degradedKey, Self.sentinel)
+        #expect(template != Self.sentinel)
+        let state = TunnelState.active(
+            connections: 0, failedConnections: count, lastFailure: .channelOpenFailed)
+        #expect(state.isDegraded)
+        #expect(TunnelProfilesSheet.stateLabel(state) == String(format: template, count))
+        #expect(
+            TunnelProfilesSheet.stateLabel(state)
+                != String(format: L10n.string(Self.countKey, Self.sentinel), count),
+            "the degraded label is the count label again")
+    }
+
+    /// And the tooltip carries it too, with the last failure below it — the
+    /// menu item and the sidebar glyph read this same text.
+    @Test func theTooltipOfAForwardingThatKeepsFailingCarriesBoth() {
+        let state = TunnelState.active(
+            connections: 0, failedConnections: TunnelState.failuresBeforeDegraded,
+            lastFailure: .connectFailed)
+        let tooltip = TunnelProfilesSheet.stateTooltip(state)
+        #expect(tooltip.hasPrefix(TunnelProfilesSheet.stateLabel(state)))
+        #expect(
+            tooltip.contains(
+                String(
+                    format: L10n.string(Self.lastFailureKey, Self.sentinel),
+                    TunnelProfilesSheet.failureLabel(.connectFailed))))
+    }
+
+    /// Below the threshold, where the label still reads "Active". The
+    /// degraded side of the same property is the case above it.
+    @Test func theTooltipCarriesTheTranslatedLastFailure() {
+        let template = L10n.string(Self.lastFailureKey, Self.sentinel)
+        #expect(template != Self.sentinel)
+        let state = TunnelState.active(
+            connections: 1, failedConnections: TunnelState.failuresBeforeDegraded - 1,
+            lastFailure: .connectFailed)
+        let tooltip = TunnelProfilesSheet.stateTooltip(state)
+        #expect(tooltip.hasPrefix(TunnelProfilesSheet.stateLabel(state)))
+        #expect(
+            tooltip.contains(
+                String(format: template, TunnelProfilesSheet.failureLabel(.connectFailed))))
+    }
+
+    /// All four surfaces that show a forwarding's state as a tooltip read
+    /// `stateTooltip`, so the last failure reaches every one of them.
+    /// Spelled per file because the profiles sheet DECLARES the function:
+    /// a bare `stateTooltip(` would find the declaration there and pass.
+    @Test(arguments: [
+        ("TunnelProfilesSheet.swift", ".help(Self.stateTooltip("),
+        ("TunnelAutostartSheet.swift", ".help(TunnelProfilesSheet.stateTooltip("),
+        ("TunnelDockPresence.swift", "toolTip = TunnelProfilesSheet.stateTooltip("),
+        ("SessionSidebar.swift", "TunnelProfilesSheet.stateTooltip("),
+    ])
+    func everyStateSurfaceReadsTheTooltip(_ file: String, _ use: String) throws {
+        let code = try SourceCorpus.code(of: Self.appKitRoot.appendingPathComponent(file))
+        #expect(code.contains(use), "\(file) does not show the state's tooltip")
+    }
+}

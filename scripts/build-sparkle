@@ -1,0 +1,15 @@
+#!/bin/bash
+# Build audited native sources; never fetch a precompiled framework.
+set -euo pipefail
+cd "$(dirname "$0")/.."
+scripts/check-vendor
+BUILD_ARGS=(-project Vendor/sparkle/Sparkle.xcodeproj -configuration Release
+    -derivedDataPath .build/sparkle -disableAutomaticPackageResolution
+    CODE_SIGNING_ALLOWED=NO MACOSX_DEPLOYMENT_TARGET=15.0
+    'ARCHS=arm64 x86_64' ONLY_ACTIVE_ARCH=NO
+    SPARKLE_EMBED_DOWNLOADER_XPC_SERVICE=0
+    SPARKLE_EMBED_INSTALLER_LAUNCHER_XPC_SERVICE=0)
+for scheme in Sparkle ${1:+generate_keys sign_update generate_appcast}; do
+    xcodebuild "${BUILD_ARGS[@]}" -scheme "$scheme" build
+done
+scripts/check-vendor

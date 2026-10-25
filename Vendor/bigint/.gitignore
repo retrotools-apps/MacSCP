@@ -1,0 +1,11 @@
+/Carthage/Build
+/.build
+/Packages
+xcuserdata
+/Package.pins
+/Package.resolved
+.DS_Store
+
+# Keep the complete vendored source snapshot under version control.
+!**
+/.build/

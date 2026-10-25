@@ -1,0 +1,234 @@
+"core.winscp.invalid" = "Nieprawidłowa lub zbyt duża konfiguracja WinSCP.";
+"core.winscp.masterRequired" = "Wymagane jest hasło główne, a plik INI musi być nim chroniony.";
+"core.winscp.wrongMaster" = "Nieprawidłowe hasło główne lub uszkodzony sekret.";
+"core.winscp.unsupported" = "Tej konfiguracji nie można wiernie odwzorować w WinSCP. Bramy TLS, nieobsługiwane protokoły i hasła kluczy prywatnych nie są eksportowane.";
+"core.winscp.missingSecret" = "Eksport wymaga zapisanych sekretów. Nie utworzono eksportu bez sekretów ani niepełnego eksportu.";
+"core.winscp.crypto" = "Operacja kryptograficzna nie powiodła się; nie utworzono eksportu.";
+/* AI-generated Polish translation (M11p) — review by a native speaker before release. */
+
+/* Core-layer user-facing messages — Polish (translation). */
+
+/* TransferFailureKind.message — what a failed transfer's typed cause
+   renders to, one indirection below `TransferQueueViewModel.message(for:)`
+   since 2026-09-25. The audit line writes it for every one of the fourteen
+   causes (`AuditRecorder`); the App's transfer row reads it for eleven and
+   says the other three itself (`TransferFailureLabel`), because
+   `core.error.connectionLost %@` and `core.transfer.failed %@` are the two
+   frames whose argument is a `reason` string rather than a path.
+
+   Counted 2026-09-25: `core.transfer.failed %@` has 2 readers, both in
+   `TransferFailureKind.message` (`protocolError`, `unknown`);
+   `core.error.connectionLost %@` has 2 — that file's `connectionFailed`
+   arm, and `RemoteBrowserViewModel.message(for:path:)`, which fills it
+   with `DialSupport.reason(for:)` and is NOT one of the three the App
+   takes over. What those arguments hold is mostly MacSCP's own English
+   prose, not a server's words; see `TransferFailureLabel`'s doc comment
+   for the measurement. */
+"core.transfer.notFound %@" = "Nie znaleziono pliku: %@";
+"core.error.permissionDenied %@" = "Odmowa dostępu dla: %@";
+"core.error.connectionLost %@" = "Utracono połączenie: %@";
+"core.transfer.failed %@" = "Transfer nieudany: %@";
+"core.transfer.noFreeName" = "Nie znaleziono dostępnej nazwy pliku.";
+"core.transfer.interrupted" = "Utracono połączenie — transfer przerwany.";
+"core.transfer.connectionLost" = "Utracono połączenie.";
+/* TransferRowPaths — a remote path, with the session it lives on. */
+"core.transfer.pathOnSession %1$@ %2$@" = "%1$@ (na %2$@)";
+
+/* RemoteBrowserViewModel.message(for:path:) */
+"core.browse.notFound %@" = "Nie znaleziono ścieżki: %@";
+"core.browse.protocolError %@" = "Błąd protokołu: %@";
+"core.error.unexpected %@" = "Nieoczekiwany błąd: %@";
+
+/* RemoteBrowserViewModel.checksum(of:algorithm:) — the far side has a
+   checksum form but not the specific tool this algorithm needs */
+"core.checksum.unavailable %@" = "%@ jest niedostępny na tym hoście.";
+
+/* RemoteBrowserViewModel.navigate(to:) (M11g/T1) */
+"core.browse.emptyPath" = "Wprowadź ścieżkę, do której chcesz przejść.";
+"core.browse.notADirectory %@" = "To nie jest katalog: %@";
+
+/* ConnectionViewModel form validation */
+"core.connect.portNumeric" = "Port musi być liczbą.";
+"core.connect.passwordEmpty" = "Hasło nie może być puste.";
+"core.connect.keyPathEmpty" = "Wprowadź ścieżkę do klucza SSH.";
+"core.connect.saveNameEmpty" = "Wprowadź nazwę zapisywanej sesji.";
+"core.connect.fieldRequired" = "To pole jest wymagane.";
+
+/* ConnectionViewModel jump-host form validation (M10c/T3) */
+"core.connect.jumpHostEmpty" = "Host pośredniczący nie może być pusty.";
+"core.connect.jumpPortNumeric" = "Port hosta pośredniczącego musi być liczbą.";
+"core.connect.jumpSetRequired" = "Wybierz login dla hosta pośredniczącego.";
+"core.connect.jumpUsernameEmpty" = "Nazwa użytkownika hosta pośredniczącego nie może być pusta.";
+"core.connect.jumpPasswordEmpty" = "Hasło hosta pośredniczącego nie może być puste.";
+"core.connect.jumpKeyPathEmpty" = "Wprowadź ścieżkę do klucza SSH hosta pośredniczącego.";
+
+/* ConnectionViewModel S3 form validation (M12/T7a) */
+"core.connect.s3FieldRequired" = "Uzupełnij wszystkie wymagane pola S3.";
+"core.connect.s3EndpointInvalid" = "Wprowadź punkt końcowy jako adres serwera, np. https://s3.example.com. Nic po nazwie serwera nie może zawierać znaku @ — identyfikator klucza dostępu i tajny klucz dostępu mają własne pola.";
+
+/* S3 blank-bucket/region messages — each names why the field is required
+   rather than pointing at "some S3 field" (v1.3.0 user report) */
+"core.connect.s3BucketRequired" = "Wprowadź bucket — to pierwszy folder, który widzisz. Aby zamiast tego przeglądać wszystkie buckety konta, włącz „Zacznij od listy bucketów”.";
+"core.connect.s3RegionRequired" = "Wprowadź region. Jest częścią podpisu żądania, więc nie może być pusty; większość dostawców kompatybilnych z S3 akceptuje us-east-1.";
+
+/* Przełącznik listy bucketów i jego komunikaty (2026-09-02). */
+"core.connect.s3StartsAtBucketList" = "Zacznij od listy bucketów";
+"core.connect.s3BucketListForbidden" = "Ten klucz nie może wyświetlać listy bucketów. Wyłącz „Zacznij od listy bucketów” i wprowadź bucket.";
+"core.connect.s3BucketListEmpty" = "Ten klucz może wyświetlić listę bucketów, ale konto nie ma żadnego.";
+"core.connect.s3BucketLevelRefused.write" = "MacSCP nie może zapisywać do samego bucketa. Otwórz bucket i umieść w nim plik.";
+"core.connect.s3BucketLevelRefused.delete" = "MacSCP nie może usunąć bucketa. Otwórz bucket, aby usunąć to, co jest w środku.";
+"core.connect.s3BucketLevelRefused.createDirectory" = "MacSCP nie może utworzyć folderu obok bucketów. Otwórz najpierw bucket.";
+"core.connect.s3BucketLevelRefused.deleteTree" = "MacSCP nie może opróżnić bucketa. Otwórz bucket i usuń to, co jest w środku.";
+"core.connect.s3BucketLevelRefused.rename" = "MacSCP nie może zmienić nazwy bucketa. Otwórz bucket, aby zmienić nazwę tego, co jest w środku.";
+"core.connect.s3BucketLevelRefused.presignedURL" = "MacSCP nie może udostępnić linku do samego bucketa. Otwórz bucket i udostępnij plik z jego wnętrza.";
+"core.connect.s3BucketLevelRefused.readStream" = "Bucket nie jest plikiem do pobrania. Otwórz go i wybierz to, co jest w środku.";
+"core.connect.s3CrossBucketRename" = "MacSCP nie może przenieść niczego z jednego bucketa do innego.";
+
+/* ConnectionViewModel WebDAV form validation (M21/T9) */
+"core.connect.webdavFieldRequired" = "Wprowadź adres URL serwera WebDAV bez osadzonych danych logowania.";
+
+/* ConnectionViewModel.failedState(for:) */
+"core.connect.emptyHost" = "Host nie może być pusty.";
+"core.connect.invalidTLSTunnel" = "Podaj prawidłową bramę TLS, port (1–65535) i nazwę hosta SNI.";
+"core.connect.tlsTunnelWithJump" = "Nie można połączyć TLS na hoście docelowym z hostem pośrednim SSH. Skonfiguruj TLS w zapisanym połączeniu hosta pośredniego.";
+"core.tlsProxy.failed %@" = "Tunel TLS nie powiódł się: %@";
+"core.connect.tlsNegotiationFailed" = "Negocjacja TLS nie powiodła się. Sprawdź bramę, nazwę serwera SNI i certyfikat (zaufanie, ważność i nazwę). Weryfikacja jest domyślnie włączona; wyłącz ją świadomie tylko dla zaufanej bramy, aby odtworzyć skrypt bez weryfikacji TLS.";
+"core.connect.emptyUsername" = "Nazwa użytkownika nie może być pusta.";
+"core.connect.hostInvalid" = "Host nie może zawierać spacji, cudzysłowów ani znaków powłoki, takich jak $ ; & | ` ( ), i nie może zaczynać się od -.";
+"core.connect.usernameInvalid" = "Nazwa użytkownika nie może zawierać spacji, cudzysłowów ani znaków powłoki, takich jak $ ; & | ` ( ), i nie może zaczynać się od -.";
+"core.connect.invalidPort %@" = "Nieprawidłowy port: %@.";
+"core.connect.authFailed" = "Uwierzytelnianie nieudane — sprawdź nazwę użytkownika lub hasło.";
+"core.connect.connectionFailed %@" = "Połączenie nieudane: %@";
+"core.connect.sftpUnavailable" = "Ten serwer nie uruchomił SFTP. Być może w ogóle nie oferuje SFTP.";
+"core.connect.keyNotFound %@" = "Nie znaleziono klucza SSH: %@";
+"core.connect.keyPassphraseRequired" = "Klucz SSH jest zaszyfrowany — wprowadź hasło klucza.";
+"core.connect.managedKeyStoreUnreadable" = "Klucz SSH jest zaszyfrowany, a nie udało się odnaleźć jego zapisanego hasła: nie udało się odczytać listy zarządzanych kluczy. Wprowadź hasło klucza lub sprawdź plik ~/Library/Application Support/macSCP/managed_keys.json.";
+"core.connect.keyWrongPassphrase" = "Hasło klucza jest nieprawidłowe.";
+"core.connect.keyTypeNotLoadable %@" = "To jest klucz %@. MacSCP otwiera z pliku klucze ed25519, RSA i ECDSA; ten typ do nich nie należy.";
+/* Czytnik PEM nazywa to, co go zatrzymuje (plan „PEM private keys”, zadanie 3).
+   %1$@ to jedno ze zdań core.connect.pemFeature.* poniżej; %2$@ to wiersz
+   poleceń zbudowany przez SSHKeyConverter — nigdy tekst z katalogu.
+   `ssh-keygen -p` przepisuje plik W MIEJSCU; przycisk konwertuje KOPIĘ — oba
+   człony zdania mówią, co robi co.
+   Wariant .noPath dotyczy błędu, który nie nazywa żadnego pliku: pole ścieżki
+   klucza jest puste, bo klucz PEM należał do hosta pośredniego, a cel loguje
+   się inaczej. Sama nazwa narzędzia nie jest wierszem poleceń — nie przyjmuje
+   ścieżki — więc powyższa reguła tam nie obowiązuje. */
+"core.connect.keyPEMNotReadable %@ %@" = "MacSCP nie może odczytać tego klucza PEM: %1$@. Przekonwertuj go w miejscu w terminalu za pomocą %2$@ (hasło klucza zostaje zachowane), naciśnij „Konwertuj klucz…”, aby MacSCP przekonwertował kopię, albo wczytaj klucz do ssh-agenta i wybierz agenta jako metodę logowania.";
+"core.connect.keyPEMNotReadable.noPath %@" = "MacSCP nie może odczytać tego klucza PEM: %@. Przekonwertuj go za pomocą ssh-keygen -p albo wczytaj go do ssh-agenta i wybierz agenta jako metodę logowania.";
+"core.connect.pemFeature.cipher %@" = "jego szyfrowanie %@ nie jest obsługiwane";
+"core.connect.pemFeature.scheme %@" = "jego schemat hasła %@ nie jest obsługiwany";
+"core.connect.pemFeature.keyType %@" = "jego typ klucza (%@) nie jest typem, z którym MacSCP się łączy";
+"core.connect.pemFeature.putty" = "to plik klucza PuTTY, a nie PEM";
+"core.connect.pemFeature.malformed" = "jego zawartości nie da się przeanalizować";
+"core.connect.keyUnsupportedFormat" = "Tego pliku nie udało się odczytać jako klucza SSH. MacSCP otwiera klucze prywatne w formacie OpenSSH i PEM (ed25519, RSA, ECDSA); plik PEM z nieobsługiwaną funkcją jest zgłaszany osobno.";
+
+/* ConnectionViewModel.failedState(for:) — ssh-agent (M10d/T4) */
+"core.connect.agentSocketUnavailable" = "Brak dostępnego agenta SSH (SSH_AUTH_SOCK).";
+"core.connect.agentNoIdentities" = "Agent SSH nie ma wczytanych żadnych tożsamości.";
+"core.connect.agentNoUsableIdentities" = "Agent SSH nie ma żadnych użytecznych tożsamości (nieobsługiwane typy kluczy).";
+
+/* ConnectionViewModel.failedState(for:) — jump host (M10c/T3) */
+"core.connect.invalidJumpPort %@" = "Nieprawidłowy port hosta pośredniczącego: %@.";
+"core.connect.jumpAuthFailed" = "Uwierzytelnianie na hoście pośredniczącym nieudane — sprawdź nazwę użytkownika lub hasło.";
+"core.connect.jumpTunnelRejected" = "Host pośredniczący odmówił otwarcia tunelu do celu (przekazywanie TCP może być wyłączone).";
+
+/* ConnectionViewModel.failedState(for:) — jump host/username whitelist (M11d final review, C-1) */
+"core.connect.jumpHostInvalid" = "Host pośredniczący może zawierać tylko litery, cyfry oraz . - _ : % (bez - na początku).";
+"core.connect.jumpUsernameInvalid" = "Nazwa użytkownika hosta pośredniczącego może zawierać tylko litery, cyfry oraz . - _ (bez - na początku).";
+
+/* ConnectionViewModel — jump source switcher, session mode (M11a/T3) */
+"core.connect.jumpSessionRequired" = "Wybierz połączenie dla hosta pośredniczącego.";
+
+/* Host-key TOFU prompts — keep full severity in every language. */
+"core.hostkey.mismatch %@ %@ %@" = "OSTRZEŻENIE: Klucz hosta dla %1$@ uległ zmianie! Oczekiwano %2$@, otrzymano %3$@. Możliwy atak typu man-in-the-middle — połączenie przerwane.";
+"core.hostkey.rejected" = "Połączenie przerwane — klucz hosta nie został potwierdzony.";
+
+/* TOFU certyfikatu serwera (M21/T10) — lustrzane odbicie przypadku klucza hosta: ta sama waga, ta sama zasada „bez wyjątków". */
+"core.certificate.mismatch %@ %@ %@" = "OSTRZEŻENIE: Certyfikat dla %1$@ uległ zmianie! Oczekiwano %2$@, otrzymano %3$@. Możliwy atak typu man-in-the-middle — połączenie odrzucone.";
+"core.certificate.rejected" = "Połączenie odrzucone — certyfikat nie został potwierdzony.";
+"core.certificate.trustStoreUnreadable" = "Połączenie odrzucone — nie można było odczytać magazynu zaufanych certyfikatów.";
+
+/* Kontrola przekierowań S3 (2026-08-29) — odmowa wskazuje, dokąd punkt końcowy chciał wysłać żądanie. */
+"core.s3.redirectRefused %@ %@" = "Połączenie odrzucone — punkt końcowy S3 %1$@ przekierował to żądanie do %2$@, czyli na inny serwer. Nic tam nie zostało wysłane. Jeśli ufasz temu serwerowi, wpisz go jako punkt końcowy.";
+
+/* TerminalPanelViewModel */
+"core.terminal.shellEnded %@" = "Powłoka zakończona: %@";
+"core.terminal.openFailed %@" = "Nie udało się otworzyć powłoki: %@";
+
+/* SessionListViewModel */
+"core.session.loadFailed %@" = "Nie udało się wczytać sesji: %@";
+"core.session.saveFailed %@" = "Nie udało się zapisać sesji: %@";
+"core.session.deleteFailed %@" = "Nie udało się usunąć sesji: %@";
+
+/* Session groups (M5f/T2) */
+"core.session.groupSaveFailed %@" = "Nie udało się zapisać grupy: %@";
+"core.session.groupParentMissing" = "wybrany folder już nie istnieje";
+"core.session.groupMoveCycle" = "Nie można przenieść folderu do niego samego ani do jednego z jego podfolderów.";
+
+/* Login sets (M10b/T2) */
+"core.login.loadFailed %@" = "Nie udało się wczytać loginów: %@";
+"core.login.saveFailed %@" = "Nie udało się zapisać loginu: %@";
+"core.login.deleteFailed %@" = "Nie udało się usunąć loginu: %@";
+"core.login.mergeFailed %@" = "Nie udało się scalić loginów: %@";
+"core.login.mergePartial" = "Niektórych sesji nie udało się powiązać z nowym zestawem logowania. Zachowały własne hasło.";
+"core.login.mergeConflictingSecrets" = "przechowują różne dane uwierzytelniające";
+
+/* Session overview (2026-09-04) — the VALUES of enumerated facts. */
+"core.overview.auth.password" = "Hasło";
+"core.overview.auth.privateKey" = "Klucz SSH";
+"core.overview.auth.agent" = "ssh-agent";
+"core.overview.value.yes" = "Tak";
+"core.overview.value.no" = "Nie";
+"core.overview.panes.files" = "Pliki";
+"core.overview.panes.terminal" = "Terminal";
+"core.overview.panes.both" = "Pliki i terminal";
+"core.overview.s3.bucketList" = "Lista bucketów";
+
+/* File type label (Browser Type Column, 2026-09-04) */
+"core.fileType.bucket" = "Bucket";
+"core.fileType.folder" = "Folder";
+"core.fileType.link" = "Link";
+"core.fileType.file" = "Plik";
+
+/* RemoteFSFinding (2026-09-28) — a finding this project NAMED, so the
+   sentence inside the translated frame is translated too. The key is
+   DERIVED from the case (`RemoteFSFinding.messageKey(for:)`), never
+   spelled at a mapper; `LocalizationParityTests
+   .everyRemoteFSFindingHasItsOwnSentence` is what makes a finding added
+   without these entries red. */
+"core.finding.resumeRangeIgnored" = "S3 nie odpowiedział żądanym zakresem bajtów, więc pobieranie nie zostało wznowione";
+"core.finding.sourceChangedSinceInterruption" = "Plik zmienił się na serwerze od czasu przerwanego pobierania, więc do niepełnego pliku nic nie dodano";
+"core.finding.unexpectedStatus %@" = "Serwer odpowiedział statusem %@";
+"core.finding.directoryAlreadyExists" = "Plik lub folder o tej nazwie już istnieje";
+"core.finding.destinationAlreadyExists" = "Miejsce docelowe już istnieje";
+"core.finding.outOfStorage" = "Na serwerze zabrakło miejsca";
+"core.finding.uploadStreamUnavailable" = "Nie udało się utworzyć strumienia wysyłania";
+"core.finding.pathExistsAndIsNotADirectory %@" = "Pod %@ już coś jest i nie jest to folder";
+"core.finding.nonHTTPResponse" = "Odpowiedź serwera nie była odpowiedzią HTTP";
+"core.finding.listingUnparsable" = "Nie udało się odczytać listy folderu przysłanej przez serwer";
+"core.finding.redirectUnreadable" = "Serwer przekierował żądanie w miejsce, którego nie dało się odczytać, więc je odrzucono";
+"core.finding.redirectBodyNotResendable" = "Serwer przekierował wysyłanie, a jego danych nie można wysłać drugi raz, więc przekierowanie odrzucono";
+"core.finding.redirectNotResignable" = "Serwer przekierował żądanie, a nowego celu nie udało się podpisać, więc przekierowanie odrzucono";
+"core.finding.resumeNotSupported" = "Serwer nie potrafi dopisać do istniejącego pliku, więc przesyłania nie można wznowić";
+"core.finding.noSuchBucket" = "To połączenie zaczyna się od listy bucketów, więc ścieżka musi wskazywać bucket";
+"core.finding.uploadPartUnacknowledged %@" = "Serwer nie potwierdził części %@ wysyłania";
+"core.finding.requestBodyUnencodable" = "Wartości w żądaniu nie da się zapisać w formacie, którego wymaga serwer";
+"core.finding.unsafeTransferName" = "Nazwa transferu nie jest bezpieczną nazwą pliku lub folderu";
+"core.finding.transferDestinationSymlink" = "Miejsce docelowe transferu jest dowiązaniem symbolicznym i zostało odrzucone";
+"core.finding.webDAVURLCredentials" = "Adres URL WebDAV zawiera dane logowania; użyj pól nazwy użytkownika i hasła";
+"core.finding.metadataLimitExceeded" = "Metadane serwera przekraczają limit zasobów";
+"core.finding.paginationInvalid" = "Stronicowanie S3 jest nieprawidłowe lub przekracza limit operacji";
+"core.credentials.label" = "MacSCP — zapisane dane logowania";
+"core.credentials.unlockReason" = "Odblokuj zapisane dane logowania MacSCP.";
+"core.credentials.signatureRequired" = "Touch ID wymaga prawidłowo podpisanej aplikacji MacSCP z uprawnieniami do pęku kluczy.";
+"core.credentials.biometricsUnavailable" = "Touch ID jest niedostępny lub nie zarejestrowano odcisku palca.";
+"core.credentials.verificationFailed" = "Nie można zweryfikować kopii danych logowania; wpis źródłowy nie został usunięty.";
+"core.credentials.busy" = "Trwa przenoszenie danych logowania lub inna operacja. Spróbuj ponownie po jej zakończeniu.";
+/* Shared credential vault */
+"core.vault.locked" = "Sejf danych logowania jest zablokowany. Zezwól na dostęp, aby kontynuować.";
+"core.vault.unsupported" = "Format sejfu jest nieprawidłowy lub nieobsługiwany. Nie nadpisano zapisanych danych.";
+"core.vault.alreadyOpen" = "Inna instancja MacSCP korzysta z sejfu. Zamknij ją przed ponownym uruchomieniem MacSCP.";
+"core.s3.urlCredentials" = "Usuń dane logowania z adresu URL S3; użyj pól klucza dostępu i tajnego klucza.";
+"core.s3.multipartCompletionInvalid" = "Serwer S3 nie potwierdził zakończenia przesyłania wieloczęściowego.";
+"serverCopy.failed" = "Kopiowanie na serwerze nie powiodło się lub jest niedostępne. Dane plików nie były przesyłane przez ten Mac.";

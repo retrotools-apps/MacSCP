@@ -1,0 +1,14 @@
+.DS_Store
+/.build
+.swiftpm
+/Packages
+/*.xcodeproj
+xcuserdata/
+Package.resolved
+citadel_host_key_ed25519
+.vscode/launch.json
+.build
+
+# Keep the complete vendored source snapshot under version control.
+!**
+/.build/

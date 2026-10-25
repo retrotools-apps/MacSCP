@@ -1,0 +1,379 @@
+import Foundation
+
+/// Thrown when a session references a login set that no longer exists —
+/// the connect must fail honestly instead of silently guessing (spec §2).
+public enum LoginResolveError: Error, Equatable {
+    case missingSet
+    /// A jump's `sessionID` (M11a) does not match any known session — the
+    /// referenced connection was deleted or never existed.
+    case missingJumpSession
+    /// A jump referencing a saved session either points at a session that
+    /// itself has a jump (chains are not supported — one hop only), or at
+    /// itself (self-reference), which would be an infinite chain.
+    case jumpChainNotSupported
+    /// A jump's `sessionID` points at a session that is not an SSH
+    /// connection. Only SSH tunnels: an object-storage or WebDAV session has
+    /// no host to dial through. `resolveJump`'s own `guard referenced.kind ==
+    /// .ssh` throws this case before it ever reads the referenced session's
+    /// SSH block — there is no fallback host/port offered here, blank or
+    /// otherwise, because that read never happens.
+    ///
+    /// Distinct from `kindMismatch`, which is about a session and its LOGIN
+    /// SET disagreeing. Naming that one here would report the wrong cause.
+    case jumpSessionNotSSH
+    /// A jump's `loginSetID` points at a login set that is not an SSH set.
+    /// A jump is an SSH bastion: the App fills the jump's form fields from
+    /// the resolved login, and `ConnectionViewModel.buildJumpConfig` turns
+    /// those into an `SSHConnectionConfig.Jump` -- a value of host, port,
+    /// username and `SSHConnectionConfig.AuthMethod` and nothing else -- so a
+    /// set of any other kind describes credentials that path cannot use.
+    /// Without this case `resolveJump` would build a `ResolvedLogin` from the
+    /// set's `username`, `authKind` and its own Keychain slot -- for a WebDAV
+    /// set, the share's password -- and the caller would send them to the
+    /// bastion.
+    ///
+    /// Distinct from `jumpSessionNotSSH` above and `kindMismatch` below. The
+    /// former is about the jump's `sessionID`, not its `loginSetID`, and its
+    /// own doc says so. The latter is about a SESSION and its login set
+    /// disagreeing; a `JumpSpec` is not a session and has no `kind` of its
+    /// own to disagree with -- being SSH is intrinsic to a jump, not a
+    /// property compared against the set. Naming either here would report
+    /// the wrong cause.
+    case jumpSetNotSSH
+    /// A session's `kind` (M12) does not match the login set it references
+    /// -- e.g. an SSH session bound to an S3 set. Binding must fail honestly
+    /// rather than resolve credentials shaped for the wrong protocol.
+    case kindMismatch
+}
+
+/// Credentials resolved from a login set: what the connect flow needs to
+/// fill the connection form. `secret` is the set's keychain entry
+/// (password, or key passphrase for .privateKey), nil when absent.
+public struct ResolvedLogin: Equatable, Sendable {
+    public var username: String
+    public var authKind: StoredSession.AuthKind
+    public var keyPath: String?
+    public var secret: String?
+    /// Whether `managed_keys.json` could not be read while `keyPath` lies in
+    /// the managed key directory — so the key's own passphrase slot could not
+    /// be looked up, and `secret` above is whatever the hop's own slot held,
+    /// which may be nothing.
+    ///
+    /// The FACT, not a verdict: it says nothing about whether the key is
+    /// encrypted, nor whether the dial will need a passphrase at all — the
+    /// store that would have said so is the one that could not be read. And
+    /// nothing of the store's contents: this is a `Bool`, and the sentences
+    /// built from it name the file and nothing else.
+    ///
+    /// Carried since 2026-09-24, because "there is no secret" and "the secret
+    /// could not be looked up" are different problems and the user can act on
+    /// only one of them. Set by `preferringManagedKeyPassphrase(_:keys:
+    /// secrets:)` alone — the one function here that reads the key store —
+    /// and `false` on every login the resolver builds from a set or a spec.
+    /// The jump's diagnosis is where it becomes a sentence
+    /// (`DiagnosticJump.missingSecretReason`).
+    public var unreadableStoreHidTheKey: Bool
+
+    public init(
+        username: String, authKind: StoredSession.AuthKind,
+        keyPath: String?, secret: String?, unreadableStoreHidTheKey: Bool = false
+    ) {
+        self.username = username
+        self.authKind = authKind
+        self.keyPath = keyPath
+        self.secret = secret
+        self.unreadableStoreHidTheKey = unreadableStoreHidTheKey
+    }
+}
+
+/// A jump host fully resolved: unlike `ResolvedLogin` alone, this also
+/// carries the host/port to dial, because in "session" mode (M11a) those
+/// come from the referenced session rather than the spec's own fields.
+public struct ResolvedJump: Equatable, Sendable {
+    public var host: String
+    public var port: Int
+    public var login: ResolvedLogin
+    public var tlsTunnel: SSHTLSTunnelConfig?
+
+    public init(host: String, port: Int, login: ResolvedLogin, tlsTunnel: SSHTLSTunnelConfig? = nil) {
+        self.host = host
+        self.port = port
+        self.login = login
+        self.tlsTunnel = tlsTunnel
+    }
+}
+
+public enum LoginResolver {
+    /// Resolves a session's login into the SAME `FieldValues` shape the
+    /// connection form produces (M22/T9): `nil` for a manual session
+    /// (loginSetID == nil — the caller uses the session's own data), the
+    /// set's credentials otherwise. A dangling reference throws.
+    ///
+    /// One function for every protocol. It replaced `resolve` (SSH-shaped)
+    /// and `resolveS3` (S3-shaped), which is what made a WebDAV login set
+    /// impossible to resolve without a third copy — and what makes a fourth
+    /// backend need none at all: the values come from the backend's own
+    /// adapter, and the secret goes into whichever field the backend's
+    /// credential schema says is visible.
+    public static func resolve(
+        session: StoredSession, sets: [LoginSet], secrets: any SecretStore
+    ) throws -> FieldValues? {
+        guard let setID = session.loginSetID else { return nil }
+        guard let set = sets.first(where: { $0.id == setID }) else {
+            throw LoginResolveError.missingSet
+        }
+        // M12: a session must not bind to a set of a different protocol
+        // (e.g. an SSH session referencing an S3 set) -- fail honestly
+        // rather than resolve credentials shaped for the wrong kind.
+        guard set.kind == session.kind else {
+            throw LoginResolveError.kindMismatch
+        }
+        return credentials(of: set, secrets: secrets)
+    }
+
+    /// A set's credential values plus its Keychain secret, keyed by the
+    /// backend's own fields.
+    ///
+    /// The agent short-circuit (M10d: "agent sets carry no secret and no key
+    /// path, the keychain is never read for them") survives here as a
+    /// STRUCTURAL property rather than an `if`: SSH's credential schema shows
+    /// neither `password` nor `passphrase` when the auth kind is `.agent`, so
+    /// `visibleSecretField` returns nil and the `guard` below exits before
+    /// `secrets` is ever touched. `agentSetResolvesWithoutKeychainRead` pins
+    /// it with a store that fails the test on any read.
+    static func credentials(
+        of set: LoginSet, secrets: any SecretStore
+    ) -> FieldValues {
+        let descriptor = BackendDescriptor.descriptor(for: set.kind)
+        var values = descriptor.loginSetValues(set)
+        guard let secretField = descriptor.credentialSchema.visibleSecretField(
+            in: values, namespace: descriptor.fieldNamespace)
+        else { return values }
+        guard let secret = (try? secrets.password(for: set.id)) ?? nil else { return values }
+        values.setRaw("\(descriptor.fieldNamespace).\(secretField.id)", to: secret)
+        return values
+    }
+
+    /// The SSH-shaped login a session's set supplies, or `nil` for a manual
+    /// session (M22/T9). Same guards as `resolve`.
+    ///
+    /// Kept beside the generic resolver for the paths that speak
+    /// username/authKind/keyPath/secret and nothing else: restoring a deleted
+    /// bastion's login onto the sessions that jumped through it, and the
+    /// session export format, whose `ExportedSession` has carried exactly
+    /// those four columns since M9a.
+    public static func sshLogin(
+        session: StoredSession, sets: [LoginSet], secrets: any SecretStore
+    ) throws -> ResolvedLogin? {
+        guard let setID = session.loginSetID else { return nil }
+        guard let set = sets.first(where: { $0.id == setID }) else {
+            throw LoginResolveError.missingSet
+        }
+        guard set.kind == session.kind else {
+            throw LoginResolveError.kindMismatch
+        }
+        return sshLogin(from: set, secrets: secrets)
+    }
+
+    /// The SSH-shaped view of a set, for the JUMP path only (M22/T9).
+    ///
+    /// A jump host is an SSH concept — it has a host, a port and one login,
+    /// and no other backend has anything to say about it — so `resolveJump`
+    /// keeps returning `ResolvedLogin` and this stays a typed read of the
+    /// set's SSH columns rather than a `FieldValues`.
+    ///
+    /// It reads those columns off ANY set it is handed, whatever `kind` says,
+    /// and reaches the set's Keychain slot for a non-agent one. Both callers
+    /// therefore establish that the set is applicable first: `sshLogin(
+    /// session:sets:secrets:)` via `set.kind == session.kind`, `resolveJump(
+    /// spec:sets:secrets:)` via `set.kind == .ssh` (M28/T7). Neither guard
+    /// may be moved in here: they throw DIFFERENT cases, because a session
+    /// disagreeing with its set and a jump bound to a set that cannot serve
+    /// it are different causes.
+    private static func sshLogin(from set: LoginSet, secrets: any SecretStore) -> ResolvedLogin {
+        // Agent sets carry no secret and no key path (M10d) -- the keychain
+        // is never read for them.
+        guard set.authKind != .agent else {
+            return ResolvedLogin(username: set.username, authKind: .agent, keyPath: nil, secret: nil)
+        }
+        let secret = (try? secrets.password(for: set.id)) ?? nil
+        return ResolvedLogin(
+            username: set.username, authKind: set.authKind,
+            keyPath: set.keyPath, secret: secret)
+    }
+
+    /// A jump hop's login carrying the MANAGED key's own passphrase, with the
+    /// slot the hop is bound to used only when the managed store has none
+    /// (maintainer answer of 2026-09-19; the fallback itself came from the
+    /// technical backlog of 2026-09-16, Task 5).
+    ///
+    /// The two `resolveJump` overloads read the one slot the hop is bound to
+    /// — the jump's own, its login set's, or the referenced session's — and
+    /// nothing else. A slot dropped because the managed key's slot holds the
+    /// same passphrase (one passphrase, one place) therefore left a hop added
+    /// after the drop with nothing to authenticate with. Which place that one
+    /// is, is the precedence here: the key's own item (`key.id`) is asked
+    /// first, and the hop's slot answers only when the key does not — an
+    /// unencrypted key, a key with no slot of its own, a path MacSCP does not
+    /// manage, or a `managed_keys.json` that cannot be read at all.
+    ///
+    /// It used to be the other way round, and that was the defect: the
+    /// fallback applied only to an EMPTY hop slot, so a stale value left in
+    /// one went on winning over the key's real passphrase — and could not be
+    /// corrected, because the save guard beside it skipped every write into
+    /// the hop's slot whenever the managed key had a passphrase at all (then
+    /// `SessionSecretPolicy.usesStoredManagedPassphrase`; the guard now
+    /// compares against what a fill put in the field, and both it and the
+    /// probe it used are gone).
+    ///
+    /// `ManagedKeyPassphrase.resolve` is therefore asked with NOTHING typed,
+    /// which is what makes the key win. That argument means a value a person
+    /// just entered, and on this path there is no such value: what the
+    /// overloads hand over is a STORED one. The target's own fill goes on
+    /// passing the real thing (`ConnectionViewModel
+    /// .fillManagedKeyPassphrase(store:secrets:)`), where the person is at
+    /// the form and their keystrokes must win.
+    ///
+    /// Only a private-key login with a non-empty key path is looked at; a
+    /// password or agent hop is returned unchanged, and a key path MacSCP
+    /// does not manage resolves to the slot's own value. Kept apart from
+    /// `resolveJump` so the export, which must not write a managed key's
+    /// passphrase into a jump's `jumpPassword`, can go on reading the slot
+    /// alone.
+    public static func preferringManagedKeyPassphrase(
+        _ login: ResolvedLogin, keys: ManagedKeyStore, secrets: any SecretStore
+    ) -> ResolvedLogin {
+        guard login.authKind == .privateKey else { return login }
+        let keyPath = (login.keyPath ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !keyPath.isEmpty else { return login }
+        // The unreadable-store fact (`Resolution.unreadableStoreHidTheKey`)
+        // used to be dropped here, and a hop then said "no secret" whether
+        // there was none or `managed_keys.json` could not be read — two
+        // problems, one sentence, and only one of them is the user's to fix
+        // by saving a credential. It is carried since 2026-09-24, on
+        // `ResolvedLogin.unreadableStoreHidTheKey`.
+        //
+        // Shared by saved-session jump fills, diagnostics and tunnel
+        // configuration. Diagnostics render the unreadable-store fact;
+        // form fills preserve their own field-level error presentation.
+        let resolution = ManagedKeyPassphrase.resolve(
+            keyPath: keyPath, typed: "", store: keys, secrets: secrets)
+        var result = login
+        // The fact is about the LOOKUP, not about whether the lookup was
+        // needed, so it rides along whatever the passphrase turned out to be
+        // — including the case below, where the hop's own slot already held
+        // one and nothing here changes what the hop dials with.
+        result.unreadableStoreHidTheKey = resolution.unreadableStoreHidTheKey
+        // Nothing from the key — including the unreadable store above, which
+        // answers the (empty) typed value — leaves the hop's own slot exactly
+        // as the overloads read it.
+        guard !resolution.passphrase.isEmpty else { return result }
+        result.secret = resolution.passphrase
+        return result
+    }
+
+    /// Resolves a jump host's login (M10c): unlike `resolve`, this is ALWAYS
+    /// non-nil — a jump either carries its own credentials (manual mode,
+    /// secret read from `spec.secretID`) or a set's. A dangling
+    /// `loginSetID` throws, same as `resolve`; so does a `loginSetID`
+    /// pointing at a set that is not an SSH set (`.jumpSetNotSSH`, M28/T7).
+    ///
+    /// That second guard sits BETWEEN the lookup and `sshLogin(from:)`, so
+    /// an inapplicable set is refused before its Keychain slot is read at
+    /// all — the point being that the set's secret never leaves the machine
+    /// for a bastion it does not belong to. Order matters the same way it
+    /// does in the session overload below: a `loginSetID` naming no set at
+    /// all is still `.missingSet`, since there is no `kind` to judge yet.
+    public static func resolveJump(
+        spec: StoredSession.JumpSpec, sets: [LoginSet], secrets: any SecretStore
+    ) throws -> ResolvedLogin {
+        guard let setID = spec.loginSetID else {
+            // Agent jumps carry no secret and no key path (M10d) -- the
+            // keychain is never read for them, even though `secretID` is
+            // still present on the spec (unused in this mode).
+            guard spec.authKind != .agent else {
+                return ResolvedLogin(username: spec.username, authKind: .agent, keyPath: nil, secret: nil)
+            }
+            let secret = (try? secrets.password(for: spec.secretID)) ?? nil
+            return ResolvedLogin(
+                username: spec.username, authKind: spec.authKind,
+                keyPath: spec.keyPath, secret: secret)
+        }
+        guard let set = sets.first(where: { $0.id == setID }) else {
+            throw LoginResolveError.missingSet
+        }
+        // A jump is an SSH bastion, so only an SSH set can serve one. The
+        // picker stopped OFFERING other kinds in M28/T6
+        // (`JumpLoginSetEligibility.eligible(in:)`); this covers the
+        // bindings already on disk, which no picker filter can reach.
+        guard set.kind == .ssh else {
+            throw LoginResolveError.jumpSetNotSSH
+        }
+        return sshLogin(from: set, secrets: secrets)
+    }
+
+    /// Resolves a jump host fully, including host/port (M11a): when
+    /// `spec.sessionID` is nil this is exactly `resolveJump(spec:sets:
+    /// secrets:)` wrapped with the spec's own host/port (spec §4) —
+    /// including that overload's `.missingSet` and `.jumpSetNotSSH`, which
+    /// travel up through the delegation untouched. When `spec.sessionID` is
+    /// set ("session" mode),
+    /// host/port, TLS transport and login instead come from the REFERENCED session:
+    /// - missing from `sessions` -> `.missingJumpSession`
+    /// - not `.ssh` (a bucket or WebDAV share is not a bastion) ->
+    ///   `.jumpSessionNotSSH`
+    /// - referencing itself, or a session that itself has a jump (chains
+    ///   are not supported — one hop only) -> `.jumpChainNotSupported`
+    /// - otherwise the referenced session's login is resolved through the
+    ///   existing `sshLogin(session:sets:secrets:)`, which already covers
+    ///   its set/manual/agent cases; it returns `nil` for a manual
+    ///   session, in which case the session's own fields plus its keychain
+    ///   secret are used directly (agent sessions read no keychain at all).
+    public static func resolveJump(
+        spec: StoredSession.JumpSpec, sets: [LoginSet], secrets: any SecretStore,
+        sessions: [StoredSession], referencingSessionID: UUID?
+    ) throws -> ResolvedJump {
+        guard let sessionID = spec.sessionID else {
+            let login = try resolveJump(spec: spec, sets: sets, secrets: secrets)
+            return ResolvedJump(host: spec.host, port: spec.port, login: login, tlsTunnel: spec.tlsTunnel)
+        }
+        guard let referenced = sessions.first(where: { $0.id == sessionID }) else {
+            throw LoginResolveError.missingJumpSession
+        }
+        // The kind check comes before the chain check because it is the more
+        // fundamental objection: a bucket is not a bastion whether or not it
+        // also happens to carry a jump. `JumpSessionEligibility` keeps new
+        // configurations from getting here; this covers the ones already on
+        // disk, which no picker filter can reach.
+        guard referenced.kind == .ssh else {
+            throw LoginResolveError.jumpSessionNotSSH
+        }
+        guard sessionID != referencingSessionID, referenced.jump == nil else {
+            throw LoginResolveError.jumpChainNotSupported
+        }
+        // Defensive, and unreachable in practice: a blockless `.ssh` record is
+        // dropped when the store loads (M26), so `sessions` cannot contain one
+        // and the lookup above would already have thrown. `.missingJumpSession`
+        // is the literally correct answer either way -- from the reference's
+        // point of view a dropped record IS gone.
+        guard let ssh = referenced.ssh else {
+            throw LoginResolveError.missingJumpSession
+        }
+
+        let login: ResolvedLogin
+        if let resolved = try sshLogin(session: referenced, sets: sets, secrets: secrets) {
+            login = resolved
+        } else if ssh.authKind == .agent {
+            // Agent sessions carry no secret and never touch the keychain
+            // (M10d rule), manual or not.
+            login = ResolvedLogin(
+                username: ssh.username, authKind: .agent, keyPath: nil, secret: nil)
+        } else {
+            let secret = (try? secrets.password(for: referenced.id)) ?? nil
+            login = ResolvedLogin(
+                username: ssh.username, authKind: ssh.authKind,
+                keyPath: referenced.keyPath, secret: secret)
+        }
+        return ResolvedJump(host: ssh.host, port: ssh.port, login: login, tlsTunnel: ssh.tlsTunnel)
+    }
+}

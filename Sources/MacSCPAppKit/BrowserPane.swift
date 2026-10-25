@@ -1,0 +1,739 @@
+import AppKit
+import SwiftUI
+import UniformTypeIdentifiers
+import macSCPCore
+
+/// A file pane (local or remote): header with a side badge in the brand
+/// color, navigable path, home/root/up/refresh — the AppKit table underneath.
+/// With `onDropURLs` set, the pane becomes a drop target for file URLs
+/// (tint highlight).
+struct BrowserPane: View {
+    @State private var inspectionRequest: FileInspectionRequest?
+    var fileWindows: FileInspectionWindows
+    @State private var showsRemoteSearch = false
+    let title: String
+    let tint: Color
+    let softTint: Color
+    let viewModel: RemoteBrowserViewModel
+    /// Which pane this is (M7b) — passed through to the context menu model
+    /// (the editor entry only ever shows on the remote side).
+    let side: BrowserPaneSide
+    var transferGroupID: UUID? = nil
+    var transferPaneSide: BrowserPaneSide? = nil
+    var isActivePane: Bool = false
+    var onActivatePane: (() -> Void)? = nil
+    var onDropURLs: (([URL]) -> Void)? = nil
+    /// Tries the configured extension rule or default editor. A false result
+    /// means no external editor is configured and selects the built-in editor.
+    var onOpenFile: ((RemoteFileItem) -> Bool)? = nil
+    /// The pane's own file system, forwarded verbatim to `PathBar` for its
+    /// Tab-completion listing (M11g/T2) — see its doc comment for why this
+    /// is injected rather than reached through `viewModel`. Passed as the
+    /// value itself (not a bespoke closure) so `side` stays the single
+    /// source of truth for which pane this is (M11g/T2 review, finding M6).
+    let fileSystem: any RemoteFileSystem
+    var pasteboardWriter: ((RemoteFileItem) -> NSPasteboardWriting?)? = nil
+    var onMenuAction: ((BrowserMenuEntry, [RemoteFileItem]) -> Void)? = nil
+    /// Cross-session transfer targets for the context menu (M8b/T4) —
+    /// forwarded verbatim to `RemoteFileTableView`; see its doc comment.
+    var crossSessionTargets: (() -> [CrossSessionTarget])? = nil
+    /// Protocol-contributed file actions for the context menu (M14/T5) —
+    /// forwarded verbatim to `RemoteFileTableView`; see its doc comment.
+    /// `nil` for the local pane's call site (`ContentView`), since the local
+    /// file system never contributes any.
+    var fileActions: (() -> [FileActionContribution])? = nil
+    /// The OTHER pane of this window — where this pane's "Transfer ▸ To the
+    /// other pane" and its Space key would send (review C-1). Forwarded
+    /// verbatim to `RemoteFileTableView`; see that property's doc comment for
+    /// why it is a closure. `nil` yields `.ordinary`.
+    var destinationScope: (() -> BrowserScope)? = nil
+    /// Which columns the file list shows (M11m/T2) — mirrors
+    /// `SettingsStore.visibleColumns`, app-global like the other display
+    /// settings (`showHiddenFiles` etc.), so both panes always show the
+    /// same set. Forwarded verbatim to `RemoteFileTableView`; its own
+    /// default keeps this optional at every call site that predates M11m.
+    var visibleColumns: Set<FileColumn> = Set(FileColumn.allCases.filter(\.defaultVisible))
+    /// Which digest procedure a checksum request asks for — mirrors
+    /// `SettingsStore.checksumAlgorithm`, app-global like the other display
+    /// settings.
+    var checksumAlgorithm: ChecksumAlgorithm = .preferred
+    /// What this pane has been asked to compute, per file (2026-09-02) —
+    /// the checksum column's only source.
+    ///
+    /// A BINDING, because the value is the session's and not this view's
+    /// (review I2): a digest costs a server-side hash of a whole file, and
+    /// it must outlive every remount of the pane that shows it. There is no
+    /// default, so no call site can quietly get a private one that dies with
+    /// the view.
+    ///
+    /// Written in exactly one place — the pane's one checksum path, below —
+    /// and read in exactly one, the table. Nothing on the listing or refresh
+    /// path touches it, which is what keeps the column empty until the user
+    /// asks; `ChecksumColumnWiringGuardTests` holds both.
+    @Binding var checksumLedger: ChecksumLedger
+    /// Whether this pane's backend can answer the checksum question. The
+    /// remote pane's call site reads the capability
+    /// (`ChecksumAvailability.isOffered(for:)`); the local one asks the
+    /// local file system, which has no descriptor to read. `false` removes
+    /// the menu entry and turns the info sheet's block into the sentence
+    /// that says why — never into a disabled control.
+    var supportsChecksum: Bool = false
+    /// Whether this pane's backend has a permission model the info sheet's
+    /// editor speaks — `PermissionsAvailability.isOffered(for:)` for the
+    /// remote pane, the local file system's own declaration for the local
+    /// one. `false` keeps the menu entry (the sheet is still where size,
+    /// dates and checksum live) but titles it "Info" rather than "Info &
+    /// Permissions", and turns the sheet's permissions block into the
+    /// sentence that says why — never into a disabled grid.
+    var supportsPermissions: Bool = false
+
+    /// What this pane is looking at, for every "is this action possible
+    /// here" question (2026-09-02). Computed rather than injected: both
+    /// halves are already in hand — the connection's own answer, and the
+    /// directory the pane is showing — and a computed value cannot go stale
+    /// against a navigation the way a parameter threaded from `ContentView`
+    /// would. The local pane's `LocalFileSystem` takes the protocol default
+    /// (`false`), so its menus are byte-identical to what they were.
+    private var scope: BrowserScope {
+        BrowserScope(
+            rootIsContainerList: fileSystem.rootIsContainerList,
+            currentPath: viewModel.currentPath)
+    }
+
+    /// The pane's one checksum path: every surface that asks for a digest
+    /// asks here, and this is the only place an answer is remembered
+    /// (2026-09-02, review C1).
+    ///
+    /// It exists because there are two surfaces — the info sheet, for one
+    /// file, and the run started from the context menu, for a selection —
+    /// and they used to ask the view model separately. Only one of the two
+    /// answers was kept, so a digest read in the sheet left the column empty
+    /// for exactly the file it had just been computed for, and asking again
+    /// cost a second hash of the whole file on the far side. One funnel
+    /// makes "asked for" and "remembered" the same event rather than two
+    /// that have to be kept in step.
+    ///
+    /// Remembering here rather than after the run's own cancel filter
+    /// changes nothing about what is kept: the ledger already stores only a
+    /// value with file-content provenance, and the run's filter only ever
+    /// drops a failure caused by a cancel — the two agree exactly on which
+    /// results survive.
+    @MainActor
+    private func computeChecksum(
+        of item: RemoteFileItem, algorithm: ChecksumAlgorithm
+    ) async -> ChecksumRequestResult {
+        let result = await viewModel.checksum(of: item, algorithm: algorithm)
+        checksumLedger.record(result, for: item)
+        return result
+    }
+
+    /// Whether a local-file drop may land here at all: the pane has a drop
+    /// handler AND this listing can receive. The second half is the shared
+    /// destination-side question — see `BrowserScope.acceptsIncomingFiles`,
+    /// which the toolbar buttons and the cross-pane transfer entries ask
+    /// too, and which lists its call sites.
+    private var acceptsDrop: Bool {
+        onDropURLs != nil && scope.acceptsIncomingFiles
+    }
+
+    @State private var isDropTargeted = false
+    @State private var quickNavigationTask: Task<Void, Never>?
+
+    private func navigateQuickly(home: Bool) {
+        quickNavigationTask?.cancel()
+        quickNavigationTask = Task {
+            do {
+                let path: String
+                if home {
+                    path = try await fileSystem.homeDirectoryPath()
+                } else {
+                    path = "/"
+                }
+                guard !Task.isCancelled else { return }
+                if let message = await viewModel.navigate(to: path, preservingPathSpelling: true), !Task.isCancelled {
+                    symlinkNavigationFailure = .init(path: path, message: message)
+                }
+            } catch {
+                guard !Task.isCancelled else { return }
+                symlinkNavigationFailure = .init(path: viewModel.currentPath, message: error.localizedDescription)
+            }
+        }
+    }
+    /// Whether this pane's search bar is showing (M11k/T2) — per-PANE, not
+    /// shared: each `BrowserPane` instance owns its own `RemoteBrowserViewModel`
+    /// (the search state lives there too), so this `@State` bool being local
+    /// to the view is what makes two open panes search independently, by
+    /// construction, with no extra plumbing needed.
+    @State private var isSearchActive = false
+    /// Bumped every time ⌘F fires (`RemoteFileTableView.onOpenSearch`),
+    /// including while the bar is ALREADY open — see `FileSearchBar.focusToken`'s
+    /// doc comment for why the bar needs this instead of relying solely on
+    /// its own `.onAppear`.
+    @State private var searchFocusToken = 0
+    /// Bumped when the search bar closes, so the table reclaims first
+    /// responder (M11k/T2 step 5) — forwarded to `RemoteFileTableView` as
+    /// `focusRequestToken`; see that property's doc comment.
+    @State private var tableFocusToken = 0
+    // Sheet/alert state for the context-menu entries the pane handles
+    // internally (M7b/T3): rename, info, new folder, new file, delete and
+    // the checksum run — six, counted in the pass that writes this — never
+    // reach the external `onMenuAction` callback; see the wrapper below.
+    // This comment said "four" until the count was taken.
+    @State private var renameTarget: RemoteFileItem?
+    @State private var infoTarget: RemoteFileItem?
+    @State private var deleteRequest: [RemoteFileItem]?
+    @State private var showNewFolderSheet = false
+    @State private var showNewFileSheet = false
+    @State private var deleteErrorMessage: String?
+    /// The selection's checksum run, from the moment the menu entry is
+    /// chosen until the sheet is closed. Held here rather than built inside
+    /// the sheet so the run and the sheet have the same lifetime.
+    @State private var checksumBatch: ChecksumBatch?
+    /// Set only when a symlink double-click's `navigate(to:)` call FAILS
+    /// (M11h/T1 review fix — see `onOpenSymlink` below): forwarded to
+    /// `PathBar`, which reuses its existing failure overlay to show the
+    /// result instead of a second, bespoke error surface. Stays `nil` on
+    /// success, so `PathBar` is never touched, never enters its edit state,
+    /// and never steals focus for the (usual, successful) round-trip.
+    @State private var symlinkNavigationFailure: SymlinkNavigationFailure?
+
+    private var commanderEntries: [BrowserMenuEntry] {
+        BrowserContextMenu.entries(for: viewModel.selectedItems, side: side,
+            supportsChecksum: supportsChecksum, scope: scope,
+            destination: destinationScope?() ?? .ordinary)
+    }
+
+    private var singleRegularFile: RemoteFileItem? {
+        guard viewModel.state == .loaded, viewModel.selectedItems.count == 1,
+              let item = viewModel.selectedItems.first, item.kind == .file else { return nil }
+        return item
+    }
+
+    private func openFileForEditing(_ item: RemoteFileItem) {
+        guard item.kind == .file else { return }
+        inspectionRequest = FileInspectionRequest(path: item.path, editing: true)
+    }
+
+    private func openUsingConfiguredEditor(_ item: RemoteFileItem) {
+        guard item.kind == .file else { return }
+        if onOpenFile?(item) != true { openFileForEditing(item) }
+    }
+
+    private func performCommanderAction(_ entry: BrowserMenuEntry) {
+        guard viewModel.state == .loaded, commanderEntries.contains(entry) else { return }
+        let selection = viewModel.selectedItems
+        switch entry {
+        case .openInEditor:
+            if let item = selection.first { openFileForEditing(item) }
+        case .rename: renameTarget = selection.first
+        case .infoAndPermissions: infoTarget = selection.first
+        case .delete: deleteRequest = selection
+        case .newFolder: showNewFolderSheet = true
+        case .newFile: showNewFileSheet = true
+        default: onMenuAction?(entry, selection)
+        }
+    }
+
+    private func commanderButton(_ entry: BrowserMenuEntry, title: String, icon: String,
+                                 showTitles: Bool) -> some View {
+        Button { performCommanderAction(entry) } label: {
+            if showTitles { Label(title, systemImage: icon) }
+            else { Image(systemName: icon).frame(width: 22) }
+        }
+        .disabled(viewModel.state != .loaded || !commanderEntries.contains(entry))
+        .help(title)
+        .accessibilityLabel(title)
+    }
+
+    private func commanderActions(showTitles: Bool) -> some View {
+        HStack(spacing: 6) {
+            if fileSystem is any WindowedFileAccess {
+                Button { if let item = singleRegularFile { inspectionRequest = FileInspectionRequest(path: item.path) } } label: {
+                    if showTitles { Label(L10n.string("filetools.view", "View"), systemImage: "doc.text.magnifyingglass") }
+                    else { Image(systemName: "doc.text.magnifyingglass").frame(width: 22) }
+                }
+                .disabled(singleRegularFile == nil)
+                .help(L10n.string("filetools.view", "View"))
+                Button { if let item = singleRegularFile { openFileForEditing(item) } } label: {
+                    if showTitles { Label(L10n.string("commander.edit", "Edit"), systemImage: "square.and.pencil") }
+                    else { Image(systemName: "square.and.pencil").frame(width: 22) }
+                }.disabled(singleRegularFile == nil)
+                .help(L10n.string("commander.edit", "Edit"))
+            } else {
+                commanderButton(.openInEditor, title: L10n.string("commander.edit", "Edit"),
+                                icon: "square.and.pencil", showTitles: showTitles)
+            }
+            if fileSystem is any RemoteDirectorySearching {
+                Button { showsRemoteSearch = true } label: {
+                    if showTitles { Label(L10n.string("filetools.remoteSearch", "Search remote folder"), systemImage: "folder.badge.magnifyingglass") }
+                    else { Image(systemName: "folder.badge.magnifyingglass").frame(width: 22) }
+                }.disabled(viewModel.state != .loaded)
+                .help(L10n.string("filetools.remoteSearch", "Search remote folder"))
+            }
+            commanderButton(.rename, title: L10n.string("commander.rename", "Rename"),
+                            icon: "pencil.line", showTitles: showTitles)
+            commanderButton(.infoAndPermissions, title: L10n.string("commander.properties", "Properties"),
+                            icon: "info.circle", showTitles: showTitles)
+            Menu {
+                Button(L10n.string("commander.newFolder", "New folder")) { performCommanderAction(.newFolder) }
+                    .disabled(!commanderEntries.contains(.newFolder))
+                Button(L10n.string("commander.newFile", "New file")) { performCommanderAction(.newFile) }
+                    .disabled(!commanderEntries.contains(.newFile))
+            } label: {
+                if showTitles { Label(L10n.string("commander.new", "New"), systemImage: "plus") }
+                else { Image(systemName: "plus").frame(width: 22) }
+            }
+            .disabled(viewModel.state != .loaded)
+            .help(L10n.string("commander.new", "New"))
+            Spacer(minLength: 0)
+            Button {
+                withAnimation(.easeInOut(duration: 0.15)) {
+                    searchFocusToken += 1
+                    isSearchActive = true
+                }
+            } label: { Image(systemName: "magnifyingglass") }
+                .help(L10n.string("commander.find", "Find files"))
+                .accessibilityLabel(L10n.string("commander.find", "Find files"))
+        }
+        .buttonStyle(.borderless)
+        .font(.system(size: 11, weight: .medium))
+        .padding(.horizontal, 10)
+        .padding(.vertical, 8)
+    }
+
+    var body: some View {
+        VStack(spacing: 0) {
+            HStack(spacing: 8) {
+                Text(title.uppercased())
+                    .font(.system(size: 10.5, weight: .semibold))
+                    .tracking(0.9)
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 2)
+                    .background(softTint, in: RoundedRectangle(cornerRadius: 5))
+                    .foregroundStyle(tint)
+
+                PathBar(
+                    viewModel: viewModel,
+                    caseSensitive: side == .remote,
+                    fileSystem: fileSystem,
+                    externalNavigationFailure: $symlinkNavigationFailure)
+
+                Button { navigateQuickly(home: true) } label: {
+                    Image(systemName: "house")
+                }
+                .disabled(viewModel.state == .loading)
+                .help(L10n.string("browser.pane.homeHelp", "Home directory"))
+                .accessibilityLabel(L10n.string("browser.pane.homeHelp", "Home directory"))
+
+                Button { navigateQuickly(home: false) } label: {
+                    Text("/").font(.system(.body, design: .monospaced))
+                }
+                .disabled(viewModel.state == .loading)
+                .help(L10n.string("browser.pane.rootHelp", "Root directory"))
+                .accessibilityLabel(L10n.string("browser.pane.rootHelp", "Root directory"))
+
+                Button {
+                    Task { await viewModel.goUp() }
+                } label: {
+                    Image(systemName: "arrow.up")
+                }
+                .disabled(!viewModel.canGoUp || viewModel.state == .loading)
+                .help(L10n.string("browser.pane.goUpHelp", "Parent directory"))
+
+                Button {
+                    Task { await viewModel.refresh() }
+                } label: {
+                    Image(systemName: "arrow.clockwise")
+                }
+                .disabled(viewModel.state == .loading)
+                .help(L10n.string("browser.pane.refreshHelp", "Refresh"))
+            }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 7)
+            // Raises the whole header row above the LATER siblings in this
+            // `VStack` (the hairline, then the file table `ZStack`) so the
+            // path bar's inline candidates/error overlay paints over them
+            // instead of being painted over (M11g/T2 review, finding C1) —
+            // the counterpart to `PathBar`'s own `.zIndex(1)`, which handles
+            // the same problem one level down against the up/refresh
+            // buttons inside this HStack.
+            .zIndex(1)
+
+            ViewThatFits(in: .horizontal) {
+                commanderActions(showTitles: true)
+                commanderActions(showTitles: false)
+            }
+            .foregroundStyle(DesignTokens.ink)
+            .background(Color(nsColor: .controlBackgroundColor))
+
+            Rectangle()
+                .fill(DesignTokens.hairline)
+                .frame(height: 1)
+
+            // The search bar (M11k/T2): only present while `isSearchActive`
+            // is `true` for THIS pane, so the resting look of an inactive
+            // pane is byte-for-byte unchanged (design requirement, and the
+            // reason `isSearchActive` defaults to `false`).
+            if isSearchActive {
+                FileSearchBar(
+                    viewModel: viewModel,
+                    focusToken: searchFocusToken,
+                    onClose: {
+                        viewModel.clearSearch()
+                        isSearchActive = false
+                        tableFocusToken += 1
+                    }
+                )
+                Rectangle()
+                    .fill(DesignTokens.hairline)
+                    .frame(height: 1)
+            }
+
+            ZStack {
+                RemoteFileTableView(
+                    items: viewModel.items,
+                    selectedPaths: Set(viewModel.selectedItems.map(\.path)),
+                    onOpen: { item in Task { await viewModel.open(item) } },
+                    onSelect: {
+                        onActivatePane?()
+                        viewModel.selectedItems = $0
+                    },
+                    onOpenFile: { openUsingConfiguredEditor($0) },
+                    onViewFile: fileSystem is any WindowedFileAccess ? { inspectionRequest = FileInspectionRequest(path: $0.path) } : nil,
+                    // No capability gate needed here either: the symlink
+                    // marker/double-click is governed by
+                    // `ProtocolCapabilities.supportsSymlinks`, and `item.kind`
+                    // can never be `.symlink` for an S3 session — a
+                    // `ListObjectsV2` response has no such shape to report,
+                    // so nothing constructs one. This reason did NOT expire
+                    // with M13 (the way the one `.infoAndPermissions` below
+                    // once rested on did); it is a property of the listing,
+                    // not of what was implemented yet.
+                    onOpenSymlink: { item in
+                        Task {
+                            // Navigates DIRECTLY (M11h/T1 review fix),
+                            // mirroring `onOpen` two lines above: the success
+                            // path never touches `PathBar`, so it never
+                            // enters its edit state and never steals focus
+                            // for this round-trip — the bug the review
+                            // caught. Only a non-nil (failure) result is
+                            // handed to `PathBar`, which then shows it
+                            // exactly like a failed typed path.
+                            let message = await viewModel.navigate(to: item.path)
+                            if let message {
+                                symlinkNavigationFailure = SymlinkNavigationFailure(
+                                    path: item.path, message: message)
+                            }
+                        }
+                    },
+                    pasteboardWriter: pasteboardWriter,
+                    side: side,
+                    showsParentRow: viewModel.canGoUp,
+                    transferGroupID: transferGroupID,
+                    transferPaneSide: transferPaneSide,
+                    directoryPath: viewModel.currentPath,
+                    transfersEnabled: viewModel.state == .loaded,
+                    onDropURLs: onDropURLs,
+                    onMenuAction: { entry, selection in
+                        switch entry {
+                        case .openInEditor:
+                            if let item = selection.first { openUsingConfiguredEditor(item) }
+                        case .rename: renameTarget = selection.first
+                        // The ENTRY is not gated on
+                        // `ProtocolCapabilities.permissionModel`, and that is
+                        // a decision rather than a wait: the sheet it opens
+                        // is where size, dates and checksum live, and those
+                        // are as true of an object in a bucket as of a file
+                        // over SFTP. What the capability shapes is the
+                        // entry's TITLE (`RemoteFileTableView` drops the
+                        // "& Permissions" where there are none) and the
+                        // sheet's permissions block — `supportsPermissions`,
+                        // handed to the sheet where it is built below, turns
+                        // the editor into the sentence that says this server
+                        // has no file permissions, instead of a grid whose
+                        // Apply the backend would refuse. The decision is
+                        // `PermissionsPresentation`; the wiring per pane is
+                        // `ContentView`'s; `PermissionsSurfaceGuardTests`
+                        // holds both in place.
+                        case .infoAndPermissions: infoTarget = selection.first
+                        case .newFolder: showNewFolderSheet = true
+                        case .newFile: showNewFileSheet = true
+                        case .delete: deleteRequest = selection
+                        case .computeChecksum:
+                            checksumBatch = ChecksumBatch(
+                                selection: selection, algorithm: checksumAlgorithm)
+                        default: onMenuAction?(entry, selection)
+                        }
+                    },
+                    onGoUp: { Task { await viewModel.goUp() } },
+                    onOpenSearch: {
+                        searchFocusToken += 1
+                        isSearchActive = true
+                    },
+                    focusRequestToken: tableFocusToken,
+                    crossSessionTargets: crossSessionTargets,
+                    fileActions: fileActions,
+                    supportsChecksum: supportsChecksum,
+                    supportsPermissions: supportsPermissions,
+                    visibleColumns: visibleColumns,
+                    checksumLedger: checksumLedger,
+                    checksumAlgorithm: checksumAlgorithm,
+                    sortKey: viewModel.sortKey,
+                    sortAscending: viewModel.sortAscending,
+                    onSortChange: { key, ascending in
+                        viewModel.sortKey = key
+                        viewModel.sortAscending = ascending
+                    },
+                    scope: scope,
+                    destinationScope: destinationScope
+                )
+                .allowsHitTesting(viewModel.state == .loaded)
+
+                if viewModel.state == .loading {
+                    ProgressView()
+                }
+
+                if case .failed(let message) = viewModel.state {
+                    VStack(spacing: 8) {
+                        Text(message)
+                            .foregroundStyle(.red)
+                        Button(L10n.string("browser.pane.retry", "Try again")) {
+                            Task { await viewModel.refresh() }
+                        }
+                    }
+                    .padding()
+                    .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 8))
+                }
+            }
+            .overlay(
+                RoundedRectangle(cornerRadius: 6)
+                    .strokeBorder(tint, lineWidth: isDropTargeted && acceptsDrop ? 2.5 : 0)
+                    .padding(2)
+            )
+            .onDrop(of: [.fileURL], isTargeted: $isDropTargeted) { providers in
+                guard let onDropURLs, acceptsDrop else { return false }
+                Task {
+                    var urls: [URL] = []
+                    for provider in providers {
+                        if let url = await provider.macscpFileURL() {
+                            urls.append(url)
+                        }
+                    }
+                    await MainActor.run { onDropURLs(urls) }
+                }
+                return true
+            }
+        }
+        .safeAreaInset(edge: .bottom, spacing: 0) {
+            HStack {
+                Text(String(format: L10n.string("commander.selection", "Selected: %lld · Total: %lld"),
+                            viewModel.selectedItems.count, viewModel.items.count))
+                Spacer()
+                if isActivePane {
+                    Label(L10n.string("commander.active", "Active pane"), systemImage: "keyboard")
+                        .foregroundStyle(tint)
+                        .help(L10n.string("commander.active", "Active pane"))
+                }
+                if viewModel.state == .loading { ProgressView().controlSize(.mini) }
+            }
+            .font(.system(size: 10, design: .monospaced))
+            .foregroundStyle(.secondary)
+            .padding(.horizontal, 12)
+            .padding(.vertical, 6)
+            .background(.bar)
+        }
+        .overlay(alignment: .top) {
+            Rectangle().fill(isActivePane ? tint : .clear).frame(height: 2)
+                .animation(.easeInOut(duration: 0.12), value: isActivePane)
+                .allowsHitTesting(false)
+        }
+        .simultaneousGesture(TapGesture().onEnded { onActivatePane?() })
+        .task { await viewModel.loadIfNeeded() }
+        // The App-layer half of the design's "At error" bullet: the
+        // `browser.local`/`browser.remote` `info` line `viewModel.load()`
+        // already writes (Core) says a listing failed and why; this one,
+        // at `error`, says the SAME failure just became the text on
+        // screen — the banner above. `onChange` fires exactly once per
+        // transition into `.failed` (not once per render, the way a log
+        // call written directly in `body` would), so a pane sitting on a
+        // failure and simply being redrawn writes nothing more.
+        .onDisappear { quickNavigationTask?.cancel() }
+        .onChange(of: viewModel.state) { _, newValue in
+            // The ORIGINAL error (fix round 1, Structural), read from
+            // `viewModel.lastLoadError` rather than hand-formatting
+            // `reason=\(message)` from the already-rendered banner text —
+            // `message` at this point may itself have carried a raw
+            // reason before the Critical fix in `message(for:path:)`, and
+            // the secrecy guard now refuses ANY hand-written `reason=` text
+            // regardless. `lastLoadError` is `nil` only when `load()`
+            // never actually caught anything for the CURRENT `.failed`
+            // state, which does not happen on this path (`state` and
+            // `lastLoadError` are written in the same breath) — a `nil`
+            // here writes no `error` line at all rather than guessing.
+            if case .failed = newValue, let error = viewModel.lastLoadError {
+                // `viewModel.logCategory` captured into a local first —
+                // same reason as the Core-side captures this task adds:
+                // the message argument is `@Sendable @autoclosure` and
+                // `viewModel` is `@MainActor`-isolated.
+                let category = viewModel.logCategory
+                DiagnosticLog.shared.log(.error, "error", category, reason: error)
+            }
+        }
+        .onChange(of: inspectionRequest?.id) { _, _ in
+            guard let request = inspectionRequest else { return }
+            fileWindows.open(source: fileSystem, path: request.path, editing: request.editing)
+            inspectionRequest = nil
+        }
+        .sheet(isPresented: $showsRemoteSearch) {
+            RemoteDirectorySearchSheet(source: fileSystem, path: viewModel.currentPath, fileWindows: fileWindows)
+        }
+        .sheet(item: $renameTarget) { target in
+            NameEntrySheet(
+                title: L10n.string("sheet.rename.title", "Rename"),
+                confirmLabel: L10n.string("sheet.rename.confirm", "Rename"),
+                initialName: target.name,
+                onConfirm: { newName in
+                    let error = await viewModel.rename(target, to: newName)
+                    if error == nil {
+                        // Dismiss immediately; the listing refresh must not
+                        // hold the sheet open (M18a).
+                        let path = RemotePath.join(viewModel.currentPath, newName)
+                        Task { await viewModel.refreshAndSelect(path: path) }
+                    }
+                    return error
+                })
+        }
+        .sheet(isPresented: $showNewFolderSheet) {
+            NameEntrySheet(
+                title: L10n.string("sheet.newFolder.title", "New Folder"),
+                confirmLabel: L10n.string("sheet.newFolder.confirm", "Create"),
+                initialName: L10n.string("sheet.newFolder.defaultName", "untitled folder"),
+                onConfirm: { name in
+                    let error = await viewModel.createFolder(named: name)
+                    if error == nil {
+                        // Dismiss immediately; the listing refresh must not
+                        // hold the sheet open (M18a).
+                        let path = RemotePath.join(viewModel.currentPath, name)
+                        Task { await viewModel.refreshAndSelect(path: path) }
+                    }
+                    return error
+                })
+        }
+        .sheet(isPresented: $showNewFileSheet) {
+            NameEntrySheet(
+                title: L10n.string("sheet.newFile.title", "New File"),
+                confirmLabel: L10n.string("sheet.newFile.confirm", "Create"),
+                initialName: L10n.string("sheet.newFile.defaultName", "untitled.txt"),
+                onConfirm: { name in
+                    let error = await viewModel.createFile(named: name)
+                    if error == nil {
+                        // Dismiss immediately; the listing refresh must not
+                        // hold the sheet open (M18a).
+                        let path = RemotePath.join(viewModel.currentPath, name)
+                        Task { await viewModel.refreshAndSelect(path: path) }
+                    }
+                    return error
+                })
+        }
+        .sheet(item: $infoTarget) { target in
+            InfoPermissionsSheet(
+                item: target,
+                onApply: { perms in await viewModel.applyPermissions(perms, to: target) },
+                onApplyRecursively: { filePerms, dirPerms, progress in
+                    await viewModel.applyPermissionsRecursively(
+                        filePermissions: filePerms, directoryPermissions: dirPerms,
+                        to: target, progress: progress)
+                },
+                checksumAlgorithm: checksumAlgorithm,
+                supportsChecksum: supportsChecksum,
+                onComputeChecksum: {
+                    await computeChecksum(of: target, algorithm: checksumAlgorithm)
+                },
+                supportsPermissions: supportsPermissions,
+                onComputeDirectorySize: {
+                    try await DirectorySizeCalculator.totalBytes(of: target, on: fileSystem)
+                })
+        }
+        .sheet(item: $checksumBatch) { batch in
+            ChecksumBatchSheet(batch: batch) { item in
+                await computeChecksum(of: item, algorithm: batch.algorithm)
+            }
+        }
+        .alert(
+            viewModel.usesTrash ? L10n.string("delete.trash.title", "Move to Trash?") : L10n.string("delete.title", "Delete?"),
+            isPresented: Binding(
+                get: { deleteRequest != nil },
+                set: { if !$0 { deleteRequest = nil } }
+            ),
+            presenting: deleteRequest
+        ) { doomed in
+            Button(L10n.string("common.cancel", "Cancel"), role: .cancel) {}
+            Button(viewModel.usesTrash ? L10n.string("delete.trash.confirm", "Move to Trash") : L10n.string("delete.confirm", "Delete"), role: .destructive) {
+                let items = doomed
+                Task { @MainActor in
+                    deleteErrorMessage = await viewModel.deleteItems(items)
+                }
+            }
+        } message: { doomed in
+            Text(deleteMessage(for: doomed))
+        }
+        .alert(
+            L10n.string("delete.failedTitle", "Delete failed"),
+            isPresented: Binding(
+                get: { deleteErrorMessage != nil },
+                set: { if !$0 { deleteErrorMessage = nil } }
+            )
+        ) {
+            Button(L10n.string("common.ok", "OK"), role: .cancel) {}
+        } message: {
+            Text(deleteErrorMessage ?? "")
+        }
+    }
+
+    private func deleteMessage(for doomed: [RemoteFileItem]) -> String {
+        if viewModel.usesTrash {
+            return L10n.string("delete.trash.message", "The selected items, including folder contents, will be moved to the Mac’s Trash. You can restore them from the Finder. If moving to Trash fails, nothing is permanently deleted.")
+        }
+        let base: String
+        if doomed.count == 1, let only = doomed.first {
+            base = String(format: L10n.string(
+                "delete.message.single", "“%@” will be deleted."), only.name)
+        } else {
+            base = String(format: L10n.string(
+                "delete.message.many", "%lld items will be deleted."), Int64(doomed.count))
+        }
+        let folderHint = doomed.contains { $0.kind == .directory }
+            ? " " + L10n.string(
+                "delete.message.recursive", "Folders are deleted with their entire contents.")
+            : ""
+        return base + folderHint + " " + L10n.string(
+            "delete.message.permanent", "This action cannot be undone.")
+    }
+}
+
+fileprivate extension NSItemProvider {
+    /// Extracts a file URL from the provider (drop payload).
+    ///
+    /// Main-actor isolated so the drop handler — which already runs there —
+    /// does not have to hand the provider to another executor: `NSItemProvider`
+    /// is not `Sendable`, and passing it out of the main actor is the data
+    /// race the compiler objects to. `loadItem` starts its work asynchronously
+    /// and calls back on a queue of its own choosing either way, so the await
+    /// and the completion behave exactly as before; only the thread that
+    /// *starts* the load changes.
+    @MainActor
+    func macscpFileURL() async -> URL? {
+        await withCheckedContinuation { continuation in
+            loadItem(forTypeIdentifier: UTType.fileURL.identifier, options: nil) { item, _ in
+                if let data = item as? Data,
+                   let url = URL(dataRepresentation: data, relativeTo: nil) {
+                    continuation.resume(returning: url)
+                } else if let url = item as? URL {
+                    continuation.resume(returning: url)
+                } else {
+                    continuation.resume(returning: nil)
+                }
+            }
+        }
+    }
+}

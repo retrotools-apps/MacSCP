@@ -1,0 +1,1926 @@
+// `@preconcurrency` because Citadel's SFTP handles are plain classes with no
+// `Sendable` conformance, and the stack underneath is no better: the SSH
+// transport reaches this app through a third-party fork of Apple's
+// swift-nio-ssh that never took Apple's `Sendable` adoption (measured in
+// docs/superpowers/specs/2026-08-20-backlog-dependencies.md). Those
+// annotations belong to packages this project does not own, so there is
+// nothing to conform here — but be clear about what the suppression costs:
+// the compiler stops diagnosing `Sendable` violations involving Citadel's
+// types in this file. Moving an `SFTPFile`, an `SFTPClient` or any other
+// Citadel value across an isolation boundary now compiles in silence,
+// whether or not it is actually safe. Every such crossing in this file
+// therefore has to carry its own argument for why it holds. What changed
+// when the SFTP path moved behind `BoundedSFTPSession` and `BoundedSFTPFile`
+// is the SHAPE of what is left, not the amount of care owed: both of those
+// are `Sendable`, and the crossings they make are argued in their own file,
+// so no crossing of a Citadel SFTP value remains in this one. The suppression
+// still covers everything this class does with the SSH client itself and the
+// NIO stack under it — created, jumped through, stored, closed on every
+// failure arm of the connect path, handed to child channels, and captured by
+// a detached task that outlives the call that made it. No enumeration of
+// those sites is written here on purpose: a list in a comment is a count,
+// and this file's rule is that a count has to be retaken every time it is
+// read.
+//
+// Whether the annotation is still LOAD-BEARING was measured rather than
+// assumed, on 2026-09-02: dropping it and building fails with "capture of
+// 'method' with non-Sendable type 'SSHAuthenticationMethod' in a '@Sendable'
+// closure", from the closure `connect(config:...)` hands to `connectHop`.
+// So this is not a leftover; removing it needs that capture solved first.
+@preconcurrency import Citadel
+import Foundation
+import NIOCore
+import NIOPosix
+import NIOSSH
+import Synchronization
+
+/// SFTP implementation of RemoteFileSystem based on Citadel.
+/// M1: password auth, no host-key verification (TOFU arrives in M3).
+public final class CitadelFileSystem: RemoteFileSystem, @unchecked Sendable {
+    private let client: SSHClient
+    private let sftp: BoundedSFTPSession
+    private let jumpClient: SSHClient?
+    /// I-2's dedicated event-loop group, if `.agent` auth caused one to be
+    /// created — `nil` for password/privateKey connections, which stay on
+    /// the shared `.singleton` default. Owned by THIS instance once a
+    /// connection attempt actually succeeds (see `connectAuthenticated`'s comment on
+    /// why it must not be shut down there): the client's own channel still
+    /// runs on this group's loop, so shutdown is deferred to `disconnect()`.
+    private let dedicatedGroup: MultiThreadedEventLoopGroup?
+    /// Which checksum command form this far side has — asked at most once,
+    /// on the first request that needs it, and kept for the connection's
+    /// life. Not passed to `init`: nothing is known about the far side's
+    /// tools at connect time, and paying a round trip for a capability most
+    /// sessions never use would be a cost every connect carries.
+    private let checksumForm = ChecksumFormMemory()
+    /// Which of this connection's SSH transports closed, and whether MacSCP
+    /// asked for it — see `TransportCloseReporting`. The close hooks below
+    /// capture this monitor and nothing else, so they cannot keep this
+    /// object, or the clients it owns, alive.
+    private let closeMonitor = TransportCloseMonitor()
+
+    private init(
+        client: SSHClient, sftp: BoundedSFTPSession, jumpClient: SSHClient? = nil,
+        dedicatedGroup: MultiThreadedEventLoopGroup? = nil
+    ) {
+        self.client = client
+        self.sftp = sftp
+        self.jumpClient = jumpClient
+        self.dedicatedGroup = dedicatedGroup
+        Self.watchClose(of: client, as: .target, into: closeMonitor)
+        if let jumpClient { Self.watchClose(of: jumpClient, as: .jump, into: closeMonitor) }
+    }
+
+    /// Hooks one SSH client's close into `monitor` (lost-connection cause,
+    /// 2026-09-19).
+    ///
+    /// Citadel's `onDisconnect` is the one close signal it makes public — the
+    /// channel's own `closeFuture` sits behind an internal `session` — and
+    /// it is a single slot. Nothing else sets it on the clients this type
+    /// owns: counted 2026-09-19, `Sources/` holds two calls to Citadel's
+    /// `onDisconnect(perform:)` — the one below, and
+    /// `SSHForwardingConnection.onDisconnect(_:)`'s, on a tunnel's own
+    /// client, which is never one of these. It fires from
+    /// the client's channel `closeFuture`, for every close: one this object
+    /// asked for in `disconnect()`, and one it did not.
+    ///
+    /// Set here, before the connection is handed to anyone, and backed by
+    /// an `isConnected` check afterwards: a channel that closed between the
+    /// connect and this line has already run its close hook with no handler
+    /// in the slot, and the check is what still reports it. The monitor
+    /// drops the second report when both see the same close.
+    ///
+    /// One close this cannot see, measured 2026-09-19 on the Docker rig
+    /// (`TransportCloseRigTests`' doc comment has the numbers): a TARGET
+    /// whose server side goes away behind a jump host. The jump's sshd sends
+    /// only an EOF on the forwarding channel, Citadel opens that channel with
+    /// remote half-closure allowed, and the channel never closes — so no
+    /// report, and the probe sees a timeout rather than a closed connection.
+    ///
+    /// The Citadel crossing this file's opening comment asks to be argued:
+    /// the slot is written once, here, from the task that finished the
+    /// connect, before any other code holds the client; Citadel reads it
+    /// from its own task after the channel closed. The closure captures the
+    /// monitor only — a `Sendable` value that owns no connection.
+    private static func watchClose(
+        of client: SSHClient, as hop: TransportHop, into monitor: TransportCloseMonitor
+    ) {
+        client.onDisconnect { monitor.closed(hop) }
+        if !client.isConnected { monitor.closed(hop) }
+    }
+
+    /// Marks a stage-1 (jump host) failure so the outer retry loop can tell
+    /// it apart from a stage-2 (target) failure WITHOUT disturbing the
+    /// host-key box evaluation — verdicts still flow through `jumpBox`/
+    /// `targetBox` exactly as before; this only wraps the underlying error
+    /// for `mapStageAware` to route correctly.
+    ///
+    /// Internal (not private), like `mapStageAware` itself, so the jump-hop
+    /// mapping is unit-testable without a server.
+    struct JumpStageError: Error {
+        let underlying: Error
+    }
+
+    /// Connects with Trust-on-First-Use host-key verification, optionally
+    /// through one jump host (M10c ProxyJump).
+    ///
+    /// - known & identical → connect silently
+    /// - known & different → `HostKeyError.mismatch` (the decider is NEVER
+    ///   asked) — on EVERY hop, jump or target
+    /// - unknown → `onUnknownHostKey`; on `true` → `upsert` + retry (bounded
+    ///   to one accept per hop), on `false` → `HostKeyError.rejectedByUser`
+    ///   (nothing is stored)
+    ///
+    /// Implementation (phase 2 of the drift strategy): Citadel's host-key hook
+    /// is the synchronous, Promise-based `NIOSSHClientServerAuthenticationDelegate`
+    /// — it cannot call the async decider itself. So the hook rejects
+    /// unknown/differing keys and reports the candidate outward via a box;
+    /// here the decider is consulted and, after `upsert`, the WHOLE attempt
+    /// (both hops) is retried (then the known-identical path takes over
+    /// silently). Without a jump, this is behaviorally unchanged from the
+    /// original single-hop path (one accept-retry, same error mapping):
+    /// `targetBox` is the only box that ever carries a verdict, and exactly
+    /// one accept-retry is allowed.
+    ///
+    /// M10d (`.agent`): per spec, whichever hop(s) use `.agent` get their
+    /// ssh-agent connection established and identities listed EXACTLY ONCE
+    /// here, BEFORE the TOFU retry loop below, reused across every retry,
+    /// and closed on every exit (success or failure). Each hop that needs
+    /// the agent gets its OWN `AgentAuthContext` (independent socket
+    /// connection, same underlying `SSH_AUTH_SOCK` agent process) rather
+    /// than a single shared client — simpler than coordinating concurrent
+    /// access from two hops, with no correctness cost since ssh-agent
+    /// natively serves multiple connections.
+    /// `connectTimeout` is REQUIRED, not defaulted — Citadel's own
+    /// `SSHClient.connect` defaults it to `.seconds(30)`, and that default is
+    /// exactly how this parameter went unpassed for the life of the product:
+    /// nothing here ever noticed a value it never had to supply. A required
+    /// parameter costs every call site (production and test) one argument,
+    /// once, and makes forgetting it impossible thereafter — see
+    /// `CitadelFileSystemConnectTimeoutWiringGuardTests` for the guard that
+    /// keeps it that way.
+    ///
+    /// Module-internal, like every backend's dial: the only way in from
+    /// outside Core is `BackendDescriptor.openConnection`, which is where the
+    /// deciders and the configured connect timeout are supplied. Core's own
+    /// tests import `@testable` and keep this.
+    ///
+    /// Everything up to and including user authentication — agent, jump,
+    /// TOFU, timeout, error mapping, the dedicated group's release — is
+    /// `connectAuthenticated`, which `SSHForwardingConnection.connect` calls
+    /// too. What is this dial's own is the step after it: the SFTP child
+    /// channel a tab reads through.
+    static func connect(
+        config: SSHConnectionConfig,
+        connectTimeout: TimeAmount,
+        knownHosts: KnownHostsStore,
+        onUnknownHostKey: HostKeyDecider
+    ) async throws -> CitadelFileSystem {
+        try await connectAuthenticated(
+            config: config, connectTimeout: connectTimeout, knownHosts: knownHosts,
+            onUnknownHostKey: onUnknownHostKey
+        ) { authenticated, sftpOpenAttempted in
+            sftpOpenAttempted.markAttempted()
+            // Bounded by this dial's own connect timeout: Citadel's open
+            // waits on the server's SFTP version reply with no timer, and a
+            // server without the subsystem never sends one (see
+            // `SFTPStartBound`). The raw client crosses into the two
+            // closures, which this file's opening comment asks to argue
+            // for: both run inside `SFTPStartBound.run`'s task group, which
+            // does not return until both have ended, so neither outlives
+            // this step. The one concurrent use is the close racing the
+            // open, and that is the point: the close is what fails the
+            // future the open waits on (`SFTPStartBound` cites the path).
+            let client = authenticated.client
+            let sftp = try await SFTPStartBound.run(
+                deadline: .nanoseconds(connectTimeout.nanoseconds),
+                sleeper: SFTPStartBound.sleeper,
+                open: { try await BoundedSFTPSession.open(on: client) },
+                closeClient: { try? await client.close() })
+            return CitadelFileSystem(
+                client: authenticated.client, sftp: sftp, jumpClient: authenticated.jumpClient,
+                dedicatedGroup: authenticated.dedicatedGroup)
+        }
+    }
+
+    /// An SSH connection whose user authentication has succeeded, and on
+    /// which nothing has been opened yet — what `connectAuthenticated` hands
+    /// to the step that decides what the connection is for.
+    struct AuthenticatedSSH {
+        let client: SSHClient
+        /// The jump host's client when the target was reached through one.
+        /// Closed by whoever takes ownership of `client`, after it.
+        let jumpClient: SSHClient?
+        /// I-2's dedicated event-loop group, when `.agent` auth created one.
+        /// Both connections still run on it, so the owner releases it after
+        /// closing them — never before.
+        let dedicatedGroup: MultiThreadedEventLoopGroup?
+    }
+
+    /// The one connect path both kinds of connection share: agent contexts,
+    /// the dedicated event-loop group, the TOFU accept-retry loop over both
+    /// hops, user authentication, and the error mapping — then `establish`,
+    /// which turns the authenticated connection into what the caller asked
+    /// for.
+    ///
+    /// **The TOFU hard stop lives here and nowhere else.** A key mismatch on
+    /// either hop is decided inside this function, before `establish` runs
+    /// and without asking the decider, whichever caller dialled.
+    ///
+    /// `establish` runs inside a single attempt, exactly where the SFTP open
+    /// used to be written: whatever it throws closes the client (and the
+    /// jump client) and is mapped like any other connect error. It gets the
+    /// R-1 flag and has to mark it BEFORE it calls `openSFTP`, because that
+    /// flag is what decides which of Citadel's uncancelled timers a failure
+    /// waits out before releasing the dedicated group: `openSFTP`'s
+    /// 15-second one, or — for a step that never opens SFTP, and for every
+    /// failure before `establish` runs — the 10-second login timer. A
+    /// failure never releases the group at once.
+    static func connectAuthenticated<Connection>(
+        config: SSHConnectionConfig,
+        connectTimeout: TimeAmount,
+        knownHosts: KnownHostsStore,
+        onUnknownHostKey: HostKeyDecider,
+        establish: (AuthenticatedSSH, SFTPOpenAttemptFlag) async throws -> Connection
+    ) async throws -> Connection {
+        var jumpAgent: AgentAuthContext?
+        if let jump = config.jump, isAgentAuth(jump.auth) {
+            do {
+                jumpAgent = try await AgentAuthContext.connect()
+            } catch {
+                throw mapStageAware(JumpStageError(underlying: error))
+            }
+        }
+        var targetAgent: AgentAuthContext?
+        if isAgentAuth(config.auth) {
+            do {
+                targetAgent = try await AgentAuthContext.connect()
+            } catch {
+                await jumpAgent?.close()
+                throw mapConnectError(error)
+            }
+        }
+        // I-2: agent-backed signing blocks synchronously on a semaphore
+        // (AgentBackedPrivateKey.signature) while a stalled `ssh-add`/hardware
+        // token round trip completes — on the process-wide default group
+        // (`SSHClient.connect`'s `group:` defaults to
+        // `MultiThreadedEventLoopGroup.singleton`, shared by every open tab)
+        // that would freeze every other tab's traffic for the duration of the
+        // stall. Give agent-authenticated connects their OWN single-threaded
+        // group instead, scoped to this `connectAuthenticated` call's lifetime; the jump
+        // hop's child channel (`SSHClient.jump(to:)`) inherits its parent's
+        // event loop automatically, so this one group covers both hops.
+        let dedicatedGroup: MultiThreadedEventLoopGroup? =
+            (jumpAgent != nil || targetAgent != nil)
+                ? MultiThreadedEventLoopGroup(numberOfThreads: 1) : nil
+        // R-1: tracks whether THIS call ever reached `openSFTP` (through
+        // `BoundedSFTPSession.open(on:)`) on `dedicatedGroup` before failing
+        // — see the flag type's doc comment and the `catch` below for why
+        // that picks which of Citadel's timers a failure waits out.
+        let sftpOpenAttempted = SFTPOpenAttemptFlag()
+        do {
+            let result = try await connectWithTOFURetries(
+                config: config, connectTimeout: connectTimeout, knownHosts: knownHosts,
+                onUnknownHostKey: onUnknownHostKey,
+                jumpAgent: jumpAgent, targetAgent: targetAgent, group: dedicatedGroup,
+                sftpOpenAttempted: sftpOpenAttempted, establish: establish)
+            await jumpAgent?.close()
+            await targetAgent?.close()
+            // NOT shut down here on success: `result`'s own SSHClient (and,
+            // for a jump, the jump client too) still runs its channel on
+            // this group's event loop. `result` now owns `dedicatedGroup`
+            // (`establish` handed it over) and releases it in its own
+            // `disconnect()`.
+            return result
+        } catch {
+            await jumpAgent?.close()
+            await targetAgent?.close()
+            // No connection survived to take ownership — the group
+            // would otherwise leak its thread, so it must be released here,
+            // and never at once: a timer Citadel does not cancel may still
+            // be pending on its loop.
+            //
+            // R-1: when this attempt got as far as calling `openSFTP` on
+            // `dedicatedGroup` (e.g. `openSFTP` itself timed out, or
+            // `SFTPStartBound`'s deadline closed the client), Citadel
+            // scheduled its 15s "no reply" timer the moment `openSFTP` was
+            // called, win or lose (see `disconnect()`'s comment for the
+            // exact citation), so the release outlives that one.
+            //
+            // Otherwise — a host-key rejection, an auth failure, a
+            // cancellation, a transport error during the handshake — the
+            // login timer every hop's handshake schedules
+            // (`citadelLoginTimer`) may still be pending, so the release
+            // outlives that one instead. Where the dial failed before any
+            // handshake began there is nothing to outlive, and the wait only
+            // keeps an idle thread a little longer.
+            if let dedicatedGroup {
+                releaseAfterCitadelTimer(
+                    dedicatedGroup,
+                    outliving: sftpOpenAttempted.attempted
+                        ? citadelOpenSFTPTimer : citadelLoginTimer)
+            }
+            throw error
+        }
+    }
+
+    /// The TOFU accept-retry loop itself, unchanged in shape from before
+    /// M10d — `jumpAgent`/`targetAgent` are just threaded through to
+    /// `attemptConnect` so the SAME already-listed identities are reused
+    /// across every retry (a host-key accept-and-retry reconnects both hops
+    /// from scratch, so trying every identity again from the start on such
+    /// a retry is correct: the previous attempt never got far enough into
+    /// user-auth to consume any of them).
+    private static func connectWithTOFURetries<Connection>(
+        config: SSHConnectionConfig,
+        connectTimeout: TimeAmount,
+        knownHosts: KnownHostsStore,
+        onUnknownHostKey: HostKeyDecider,
+        jumpAgent: AgentAuthContext?,
+        targetAgent: AgentAuthContext?,
+        group: MultiThreadedEventLoopGroup?,
+        sftpOpenAttempted: SFTPOpenAttemptFlag,
+        establish: (AuthenticatedSSH, SFTPOpenAttemptFlag) async throws -> Connection
+    ) async throws -> Connection {
+        var acceptRetries = 0
+        let maxAcceptRetries = config.jump == nil ? 1 : 2  // one accept per hop
+        while true {
+            let jumpBox = TOFUHostKeyValidator.Box()
+            let targetBox = TOFUHostKeyValidator.Box()
+            do {
+                return try await attemptConnect(
+                    config: config, connectTimeout: connectTimeout, knownHosts: knownHosts,
+                    jumpBox: jumpBox, targetBox: targetBox,
+                    jumpAgent: jumpAgent, targetAgent: targetAgent, group: group,
+                    sftpOpenAttempted: sftpOpenAttempted, establish: establish)
+            } catch {
+                // At most ONE hop can carry a verdict per attempt (stage 2
+                // only starts after stage 1 succeeds) — check the jump hop first.
+                switch jumpBox.result ?? targetBox.result {
+                case .mismatch(let host, let expected, let presented):
+                    // Hard stop — no override, the decider is NEVER asked.
+                    throw HostKeyError.mismatch(host: host, expected: expected, presented: presented)
+                case .lookupFailed(let reason):
+                    // Corrupt known_hosts store → hard, typed error instead of a
+                    // silent downgrade to TOFU (fail closed).
+                    throw RemoteFSError.connectionFailed(reason: "known_hosts store unreadable: \(reason)")
+                case .unknown(let candidate):
+                    guard acceptRetries < maxAcceptRetries else { throw mapStageAware(error) }
+                    let accepted = await onUnknownHostKey(candidate)
+                    guard accepted else { throw HostKeyError.rejectedByUser }
+                    // Wrapped, not bare. `upsert` reads, re-encodes and
+                    // writes a file, so an unwritable directory or a corrupt
+                    // store throws a Foundation error here -- and a bare
+                    // `try` sent that straight to `ConnectionViewModel
+                    // .failedState`'s catch-all arm, which stringifies it.
+                    // An `NSError`'s `description` prints its whole
+                    // `userInfo`, a table Foundation fills and MacSCP does
+                    // not control, into a surface built to show the message
+                    // to a person. `localizedDescription` is the localized
+                    // sentence alone -- for a permission refusal it still
+                    // names the file, which is the part worth reading.
+                    //
+                    // No secret is at stake: a remembered host key is public
+                    // material and the path is the store's own. The reason
+                    // is the shape of the text, the same reason
+                    // `WebDAVFileSystem.connect` wraps what `URLSession`
+                    // hands it.
+                    //
+                    // `connectionFailed` mirrors the READ side's verdict for
+                    // `.lookupFailed`: both mean the known-hosts store could
+                    // not do its job, and neither is a question a person can
+                    // answer by retrying.
+                    do {
+                        try knownHosts.upsert(KnownHostKey(
+                            host: candidate.host, port: candidate.port,
+                            keyType: candidate.keyType, publicKeyBase64: candidate.publicKeyBase64))
+                    } catch {
+                        throw RemoteFSError.connectionFailed(
+                            reason: "known_hosts store not writable: \(error.localizedDescription)")
+                    }
+                    acceptRetries += 1
+                    continue  // full reconnect of both hops
+                case .none:
+                    // No host-key verdict → a genuine connection/auth/key error.
+                    throw mapStageAware(error)
+                }
+            }
+        }
+    }
+
+    private static func isAgentAuth(_ auth: SSHConnectionConfig.AuthMethod) -> Bool {
+        if case .agent = auth { return true }
+        return false
+    }
+
+    /// Test hook for how `connectAuthenticated` establishes the ssh-agent
+    /// connection — for a tab's dial and a forwarding's alike.
+    ///
+    /// The brief asks for an injectable factory WITHOUT changing `connect`'s
+    /// public signature, so this is a `@TaskLocal` override rather than a
+    /// new parameter: scoped to the structured task tree that sets it via
+    /// `withValue`, so parallel tests never race on shared mutable state the
+    /// way a plain `static var` would. Defaults to the real
+    /// `SSHAgentClient.connect(socketPath:)`.
+    enum AgentClientFactory {
+        @TaskLocal static var override: (@Sendable (String) async throws -> SSHAgentClient)?
+
+        static var current: @Sendable (String) async throws -> SSHAgentClient {
+            override ?? { socketPath in try await SSHAgentClient.connect(socketPath: socketPath) }
+        }
+    }
+
+    /// The ONE ssh-agent connection + identity list a hop's `.agent` auth
+    /// reuses across every connect attempt (spec §1: listed once, kept open
+    /// for signing, closed exactly once when `connectAuthenticated` returns or
+    /// throws).
+    private struct AgentAuthContext: Sendable {
+        let client: SSHAgentClient
+        let identities: [AgentIdentity]
+
+        static func connect() async throws -> AgentAuthContext {
+            guard let socketPath = ProcessInfo.processInfo.environment["SSH_AUTH_SOCK"],
+                  !socketPath.isEmpty
+            else {
+                throw AgentError.socketUnavailable
+            }
+            let client = try await AgentClientFactory.current(socketPath)
+            do {
+                let identities = try await client.listIdentities()
+                guard !identities.isEmpty else { throw AgentError.noIdentities }
+                return AgentAuthContext(client: client, identities: identities)
+            } catch {
+                await client.close()
+                throw error
+            }
+        }
+
+        func close() async {
+            await client.close()
+        }
+    }
+
+    /// R-1: lets the `establish` step that opens SFTP signal back to
+    /// `connectAuthenticated`'s failure-cleanup path whether Citadel's
+    /// `openSFTP()` was ever invoked on `dedicatedGroup` before the error that
+    /// unwinds the whole call. `openSFTP`
+    /// schedules its internal 15s timer (see `disconnect()`'s comment for the
+    /// exact citation) as soon as it is CALLED, even if it then fails — so
+    /// this must be set the moment the call is made, not on success. Same
+    /// `NSLock`-boxed-reference shape as `TOFUHostKeyValidator.Box` above.
+    ///
+    /// Internal rather than private only because `connectAuthenticated`'s
+    /// `establish` parameter names it.
+    final class SFTPOpenAttemptFlag: @unchecked Sendable {
+        private let lock = NSLock()
+        private var value = false
+
+        func markAttempted() {
+            lock.lock(); defer { lock.unlock() }
+            value = true
+        }
+
+        var attempted: Bool {
+            lock.lock(); defer { lock.unlock() }
+            return value
+        }
+    }
+
+    /// A single connection attempt with the TOFU validators. Throws raw
+    /// errors; `connect` handles the evaluation (decider, mismatch, mapping).
+    /// Without a jump, this is behaviorally unchanged from the pre-M10c
+    /// single-hop path (one accept-retry, same error mapping) — the box is
+    /// evaluated on every attempt, which differs only in the
+    /// `.lookupFailed`-on-retry case (now a fail-closed typed error, strictly
+    /// better than before).
+    private static func attemptConnect<Connection>(
+        config: SSHConnectionConfig,
+        connectTimeout: TimeAmount,
+        knownHosts: KnownHostsStore,
+        jumpBox: TOFUHostKeyValidator.Box,
+        targetBox: TOFUHostKeyValidator.Box,
+        jumpAgent: AgentAuthContext?,
+        targetAgent: AgentAuthContext?,
+        group: MultiThreadedEventLoopGroup?,
+        sftpOpenAttempted: SFTPOpenAttemptFlag,
+        establish: (AuthenticatedSSH, SFTPOpenAttemptFlag) async throws -> Connection
+    ) async throws -> Connection {
+        if let jump = config.jump {
+            // Stage 1 (jump host) — any failure here (auth, key loading,
+            // host-key rejection, transport) is marked as a JumpStageError so
+            // the outer loop / mapStageAware can attribute it to the jump hop.
+            let jumpClient: SSHClient
+            do {
+                let jumpValidator = TOFUHostKeyValidator(
+                    host: jump.host, port: jump.port, knownHosts: knownHosts, box: jumpBox)
+                jumpClient = try await connectHop(
+                    auth: jump.auth, username: jump.username, agent: jumpAgent, box: jumpBox
+                ) { method in
+                    // I-2: `group` is the dedicated event-loop group `connectAuthenticated`
+                    // creates whenever either hop uses `.agent`; the target
+                    // hop's `jump(to:)` call below inherits THIS group's loop
+                    // via the jump client's own channel, so passing it only
+                    // here still covers both hops.
+                    try await connectWithRegisteredAlgorithms(
+                        host: jump.host,
+                        port: jump.port,
+                        method: method,
+                        validator: jumpValidator,
+                        group: group,
+                        connectTimeout: connectTimeout,
+                        tlsTunnel: jump.tlsTunnel
+                    )
+                }
+            } catch {
+                throw JumpStageError(underlying: error)
+            }
+            // Stage 2 (target, reached through the jump channel) — every
+            // failure from here on closes the jump client before propagating.
+            do {
+                let targetValidator = TOFUHostKeyValidator(
+                    host: config.host, port: config.port, knownHosts: knownHosts, box: targetBox)
+                let client = try await connectHop(
+                    auth: config.auth, username: config.username, agent: targetAgent, box: targetBox
+                ) { method in
+                    let settings = SSHClientSettings(
+                        host: config.host,
+                        port: config.port,
+                        authenticationMethod: { method },
+                        hostKeyValidator: .custom(targetValidator)
+                    )
+                    return try await jumpClient.jump(to: settings)
+                }
+                do {
+                    return try await establish(
+                        AuthenticatedSSH(client: client, jumpClient: jumpClient, dedicatedGroup: group),
+                        sftpOpenAttempted)
+                } catch {
+                    try? await client.close()
+                    throw error
+                }
+            } catch {
+                try? await jumpClient.close()
+                throw error
+            }
+        }
+
+        let validator = TOFUHostKeyValidator(
+            host: config.host, port: config.port, knownHosts: knownHosts, box: targetBox)
+        let client = try await connectHop(
+            auth: config.auth, username: config.username, agent: targetAgent, box: targetBox
+        ) { method in
+            // I-2: see the jump-hop call above — same dedicated group.
+            try await connectWithRegisteredAlgorithms(
+                host: config.host,
+                port: config.port,
+                method: method,
+                validator: validator,
+                group: group,
+                connectTimeout: connectTimeout,
+                tlsTunnel: config.tlsTunnel
+            )
+        }
+        do {
+            return try await establish(
+                AuthenticatedSSH(client: client, jumpClient: nil, dedicatedGroup: group),
+                sftpOpenAttempted)
+        } catch {
+            try? await client.close()
+            throw error
+        }
+    }
+
+    /// The one place in this file where a hop is dialed.
+    ///
+    /// Both hops funnel through here so that registering MacSCP's custom
+    /// host-key algorithms cannot come apart from the dial. NIOSSH builds
+    /// its key-exchange offer out of that process-global registry, so a dial
+    /// that ran without it would simply stop negotiating RSA — and nothing
+    /// in the ungated suite can observe a key-exchange offer, which is why
+    /// the property is held by a source-scanning guard
+    /// (`CitadelFileSystemHostKeyAlgorithmWiringGuardTests`) over a funnel
+    /// rather than by a test over two call sites.
+    private static func connectWithRegisteredAlgorithms(
+        host: String,
+        port: Int,
+        method: SSHAuthenticationMethod,
+        validator: TOFUHostKeyValidator,
+        group: MultiThreadedEventLoopGroup?,
+        connectTimeout: TimeAmount,
+        tlsTunnel: SSHTLSTunnelConfig? = nil
+    ) async throws -> SSHClient {
+        HostKeyAlgorithms.registerOnce()
+        let handlers: [any ChannelHandler]
+        if let tlsTunnel {
+            handlers = try SSHTLSTransport.handlers(for: tlsTunnel)
+        } else {
+            handlers = []
+        }
+        return try await SSHClient.connect(
+            host: tlsTunnel?.host ?? host,
+            port: tlsTunnel?.port ?? port,
+            authenticationMethod: method,
+            hostKeyValidator: .custom(validator),
+            reconnect: .never,
+            group: group ?? .singleton,
+            channelHandlers: handlers,
+            connectTimeout: connectTimeout
+        )
+    }
+
+    /// Builds the `SSHAuthenticationMethod` for ONE connect attempt and
+    /// drives that attempt via `connectOnce`.
+    ///
+    /// For password/privateKey this is exactly the pre-M10d behavior: a
+    /// FRESH auth method built for this one call (M10c lesson —
+    /// `SSHAuthenticationMethod` consumes its offer list, so it must never
+    /// be reused across attempts).
+    ///
+    /// For `.agent` it is NOT a single call: Citadel's
+    /// `SSHAuthenticationMethod.custom(_:)` forwards to the wrapped
+    /// `NIOSSHClientUserAuthenticationDelegate` exactly ONCE per connection
+    /// attempt (see `AgentAuthDelegate`'s doc comment for the exact
+    /// vendored-source citation) — offering N identities in sequence
+    /// therefore means N separate `connectOnce` calls, each wrapping a
+    /// FRESH `SSHAuthenticationMethod.custom(...)` around the SAME
+    /// `AgentAuthDelegate` instance so its internal cursor advances to the
+    /// next not-yet-tried identity. A host-key verdict captured in `box`
+    /// during any of those calls stops the loop immediately and rethrows:
+    /// it would recur identically for every remaining identity (host-key
+    /// validation happens before user-auth) and must be handled by the TOFU
+    /// retry loop in `connect`, not masked as if it were an identity
+    /// rejection.
+    private static func connectHop(
+        auth: SSHConnectionConfig.AuthMethod,
+        username: String,
+        agent: AgentAuthContext?,
+        box: TOFUHostKeyValidator.Box,
+        connectOnce: (SSHAuthenticationMethod) async throws -> SSHClient
+    ) async throws -> SSHClient {
+        switch auth {
+        case .password(let password):
+            return try await connectOnce(.passwordBased(username: username, password: password))
+        case .privateKey(let keyPath, let passphrase):
+            let method = try SSHPrivateKeyLoader.authentication(
+                username: username, keyPath: keyPath, passphrase: passphrase)
+            return try await connectOnce(method)
+        case .agent:
+            guard let agent else {
+                // `connectAuthenticated` always establishes an `AgentAuthContext` for
+                // every hop whose `auth` is `.agent` before attemptConnect
+                // ever runs — reaching this means that invariant broke.
+                throw AgentError.noIdentities
+            }
+            // M-1: pre-filter to the types `AgentPrivateKeyFactory` actually
+            // offers. `AgentAuthDelegate` already skips an unsupported
+            // identity internally, but only mid-loop inside a single
+            // `nextAuthenticationType` call — the OUTER reconnect loop below
+            // would still spend a whole extra `connectOnce` round trip (fresh
+            // TCP + SSH handshake) on nothing once the real identities are
+            // exhausted, if its bound stayed `agent.identities.count`
+            // instead of the filtered count.
+            let offerableIdentities = agent.identities.filter {
+                AgentPrivateKeyFactory.supports(keyType: $0.keyType)
+            }
+            // M11e/T1 point 3: the agent DID answer with identities (an empty
+            // agent already threw `.noIdentities` back in
+            // `AgentAuthContext.connect()`), but none of them survived the
+            // `supports` filter above -- a distinct, typed condition from "no
+            // identities at all" so the two can be localized differently.
+            guard !offerableIdentities.isEmpty else {
+                throw AgentError.noUsableIdentities
+            }
+            let delegate = AgentAuthDelegate(
+                username: username, identities: offerableIdentities, client: agent.client)
+            // M-3: bound the number of per-identity reconnects at
+            // MaxAuthTries parity (OpenSSH's own default is 6) — without a
+            // cap, an agent holding many identities could drive unbounded
+            // reconnects against the server (each one its own visible failed
+            // login, see the M10d design spec §4a).
+            let attempts = min(offerableIdentities.count, 6)
+            // M-2: an outright auth rejection (the server tried the offered
+            // identity and said no) must never be masked by a LATER, unrelated
+            // failure from trying yet another identity (e.g. a transient
+            // transport hiccup). The assignment below runs unconditionally on
+            // EVERY rejection seen, so it holds the LAST one, not the first.
+            // M11e/T1 point 4: `attempts` is now always >= 1 (the guard
+            // above rules out the empty-after-filtering case), and every
+            // loop iteration below either returns on success or rethrows
+            // immediately for any error that isn't
+            // `allAuthenticationOptionsFailed` (I-1) -- so the only way to
+            // reach the `throw` after the loop is for EVERY iteration to
+            // have gone through this assignment. `lastError` is therefore
+            // unconditionally the last auth rejection seen; a second
+            // "authRejectionError" tracking the identical value was
+            // redundant and has been removed.
+            var lastError: Error = AgentError.noIdentities
+            for _ in 0..<attempts {
+                do {
+                    return try await connectOnce(.custom(delegate))
+                } catch {
+                    if box.result != nil { throw error }
+                    // I-1: retry another identity ONLY when the server
+                    // actually rejected the one we offered
+                    // (allAuthenticationOptionsFailed). Any other error --
+                    // connect timeout, DNS failure, a transport hiccup -- is
+                    // not an auth rejection and would just be repeated up to
+                    // `attempts` times (times the outer TOFU loop) for
+                    // nothing; rethrow it immediately instead.
+                    guard case SSHClientError.allAuthenticationOptionsFailed = error else {
+                        throw error
+                    }
+                    lastError = error
+                }
+            }
+            throw lastError
+        }
+    }
+
+    /// Translates raw connection errors into typed errors (auth/key/generic).
+    /// Whatever stays generic carries `connectFailureText(for:)` as its
+    /// reason — see that helper for the text rule and its one exception.
+    /// Internal (not private) so the mapping is unit-testable without a server.
+    static func mapConnectError(_ error: Error) -> Error {
+        switch error {
+        case let error as SSHKeyError:
+            return error
+        case let error as HostKeyError:
+            return error
+        case let error as RemoteFSError:
+            return error
+        case let error as SFTPStartError:
+            // A tab's SFTP start that got no answer (`SFTPStartBound`): its
+            // own condition, not a transport failure to reduce to text.
+            return error
+        case let error as AgentError:
+            // `.socketUnavailable`/`.noIdentities` are their OWN honest,
+            // localized conditions (spec §2/§5) — never stringified into a
+            // generic connectionFailed. T4 maps these to localized text.
+            return error
+        case let error as SSHClientError:
+            // Auth errors surface via Citadel as allAuthenticationOptionsFailed
+            // (verified against the Docker test server with a wrong password).
+            switch error {
+            case .allAuthenticationOptionsFailed:
+                return RemoteFSError.authenticationFailed
+            default:
+                return RemoteFSError.connectionFailed(reason: connectFailureText(for: error))
+            }
+        default:
+            return RemoteFSError.connectionFailed(reason: connectFailureText(for: error))
+        }
+    }
+
+    /// The text a connect-time `connectionFailed(reason:)` carries when it is
+    /// built out of a foreign error: `localizedDescription`, never
+    /// `String(describing:)` or a bare `\(error)` — the rule `mapSFTPError`
+    /// has followed since the diagnostic-log plan's Task 3 fix round 1 and
+    /// the one `DialSupport.reason(for:)`'s doc comment states: describing an
+    /// arbitrary error prints its stored properties, and a transport error
+    /// is exactly the kind of value that carries the configuration it was
+    /// dialling with. Defense in depth at the construction site: the
+    /// browser banner and the diagnostic log already drop this text
+    /// (`DialSupport.reason(for:)`), but the connect form
+    /// (`ConnectionViewModel.failedState`), the CLI (`CLIErrorMapping`)
+    /// and the transfer queue (`TransferQueueViewModel.message(for:)`)
+    /// still render it, and any future consumer could. For NIO's own
+    /// `IOError` — the refused-dial shape a person
+    /// actually reads in the connect form — nothing changes: its
+    /// `description` IS its `localizedDescription`.
+    ///
+    /// One typed exception, and it narrows rather than widens: a
+    /// `NIOSSHError` is rendered as its `type` alone. `localizedDescription`
+    /// on it is Foundation's generic sentence (the type adopts neither
+    /// `LocalizedError` nor a description Foundation reads), and
+    /// `ConnectionViewModel.failedState` recognises a jump host refusing the
+    /// tunnel by the name `channelSetupRejected` in this very text — a plain
+    /// `localizedDescription` would have switched that message off in
+    /// silence. `ErrorType` is a closed enumeration whose description is the
+    /// case name; the `diagnostics` the full description appends (`Reason:
+    /// <code> <the server's own text>`) is the part that is dropped.
+    /// `CitadelConnectErrorMappingTests` pins both halves.
+    static func connectFailureText(for error: Error) -> String {
+        if let sshError = error as? NIOSSHError {
+            return "NIOSSHError.\(sshError.type)"
+        }
+        if let tlsDescription = SSHTLSTransport.failureDescription(for: error) {
+            return tlsDescription
+        }
+        return error.localizedDescription
+    }
+
+    /// Like `mapConnectError`, but attributes stage-1 (jump) failures
+    /// distinctly: `allAuthenticationOptionsFailed` becomes
+    /// `.jumpAuthenticationFailed` (not `.authenticationFailed`, so the form
+    /// highlights the jump credentials, not the target's) and an `SSHKeyError`
+    /// from loading the JUMP key is passed through unwrapped — it already
+    /// carries its own context (e.g. `fileNotFound(path:)`). Everything that
+    /// isn't a `JumpStageError` (i.e. every target-hop failure) goes through
+    /// the existing `mapConnectError` unchanged.
+    /// Internal (not private) so the mapping is unit-testable without a server.
+    static func mapStageAware(_ error: Error) -> Error {
+        guard let jumpStageError = error as? JumpStageError else {
+            return mapConnectError(error)
+        }
+        switch jumpStageError.underlying {
+        case let keyError as SSHKeyError:
+            return keyError
+        case let agentError as AgentError:
+            // Same discipline as mapConnectError: typed, never stringified.
+            // The jump context is implicit (T4 already knows which segment
+            // — target or jump — it is mapping) so no wrapping is needed
+            // here beyond keeping the type intact.
+            return agentError
+        case let clientError as SSHClientError:
+            switch clientError {
+            case .allAuthenticationOptionsFailed:
+                return RemoteFSError.jumpAuthenticationFailed
+            default:
+                return RemoteFSError.connectionFailed(
+                    reason: "jump host: \(connectFailureText(for: clientError))")
+            }
+        default:
+            // Typed security errors (host-key verdicts, key-loading failures)
+            // must never be downgraded to a resumable generic failure — only
+            // reduce to text what's left after `mapConnectError` has had a
+            // chance to recognize a typed error underneath.
+            let mapped = mapConnectError(jumpStageError.underlying)
+            if mapped is HostKeyError || mapped is SSHKeyError {
+                return mapped
+            }
+            return RemoteFSError.connectionFailed(
+                reason: "jump host: \(connectFailureText(for: jumpStageError.underlying))")
+        }
+    }
+
+    /// Times `body` with a `ContinuousClock` and writes exactly one
+    /// `.debug` line to the diagnostic log — `sftp <op> path=<path> ms=<ms>
+    /// ok` on success, `sftp <op> path=<path> ms=<ms> failed
+    /// reason=<DialSupport.reason(for: error)>` if it throws (the error is
+    /// rethrown unchanged either way).
+    ///
+    /// The ONE place every `RemoteFileSystem` operation this type
+    /// implements funnels its timing/outcome line through — eleven public
+    /// methods (`list`, `stat`, `readStream`, `write`, `delete`,
+    /// `createDirectory`, `rename`, `setPermissions`, `deleteTree`,
+    /// `homeDirectoryPath`, `disconnect`; counted 2026-09-05 by
+    /// `grep -c "public func " Sources/macSCPCore/SSH/CitadelFileSystem.swift`
+    /// filtered to the `RemoteFileSystem` protocol's own eleven methods —
+    /// the design/brief's own count of "12" was written before this count
+    /// and is corrected here), each wrapping its EXISTING body (unchanged
+    /// behavior, unchanged error mapping) in a call to this helper rather
+    /// than hand-writing its own pair of log lines. `disconnect()` does not
+    /// throw, so its call never reaches the failure branch — passed through
+    /// `measured` anyway so it is the same one shape as the other ten, not
+    /// a twelfth, differently-written line.
+    ///
+    /// Fix round 1 (Important): the failure line used to interpolate the
+    /// wrapped body's error DIRECTLY (`reason=\(error)`, i.e.
+    /// `String(describing: error)`) — for every method here that error is
+    /// already the MAPPED `RemoteFSError` (the body's own `catch` runs
+    /// `mapSFTPError` first), and `mapSFTPError`'s own `default:` arms build
+    /// `.protocolError`/`.connectionFailed` out of `String(describing:)` on
+    /// the RAW Citadel/NIO value underneath — exactly the shape
+    /// `DialSupport.reason(for:)`'s own doc comment names as unsafe.
+    /// `DiagnosticLog.log(_:_:_:reason:)` is the fix: it converts `error`
+    /// through `DialSupport.reason(for:)` itself, so this call passes the
+    /// error straight through instead of formatting a `reason=` string by
+    /// hand.
+    private func measured<T>(
+        _ op: String, path: String, _ body: () async throws -> T
+    ) async rethrows -> T {
+        let clock = ContinuousClock()
+        let start = clock.now
+        do {
+            let result = try await body()
+            let ms = Int(start.duration(to: clock.now).milliseconds.rounded())
+            DiagnosticLog.shared.log(.debug, "sftp", "sftp \(op) path=\(path) ms=\(ms) ok")
+            return result
+        } catch {
+            let ms = Int(start.duration(to: clock.now).milliseconds.rounded())
+            DiagnosticLog.shared.log(
+                .debug, "sftp", "sftp \(op) path=\(path) ms=\(ms) failed", reason: error)
+            throw error
+        }
+    }
+
+    public func list(path: String) async throws -> [RemoteFileItem] {
+        try await measured("list", path: path) {
+            do {
+                let names = try await sftp.listDirectory(atPath: path)
+                return names
+                    .flatMap { $0.components }
+                    .filter { $0.filename != "." && $0.filename != ".." }
+                    .map { component in
+                        SFTPAttributeMapper.item(
+                            name: component.filename,
+                            directory: path,
+                            size: component.attributes.size,
+                            permissions: component.attributes.permissions,
+                            modifiedAt: component.attributes.accessModificationTime?.modificationTime,
+                            longname: component.longname,
+                            uidgid: component.attributes.uidgid.map {
+                                (userId: $0.userId, groupId: $0.groupId)
+                            }
+                        )
+                    }
+            } catch {
+                throw Self.mapSFTPError(error, path: path)
+            }
+        }
+    }
+
+    public func stat(path: String) async throws -> RemoteFileItem {
+        try await measured("stat", path: path) {
+            do {
+                let attributes = try await sftp.getAttributes(at: path)
+                let name = path == "/" ? "/" : String(path.split(separator: "/").last ?? "")
+                return SFTPAttributeMapper.item(
+                    name: name,
+                    directory: RemotePath.parent(of: path),
+                    size: attributes.size,
+                    permissions: attributes.permissions,
+                    modifiedAt: attributes.accessModificationTime?.modificationTime,
+                    // getAttributes (single stat) carries no longname — only
+                    // the numeric uidgid fallback applies here (M11m design:
+                    // the LIST view shows names, a single stat shows the
+                    // number).
+                    uidgid: attributes.uidgid.map { (userId: $0.userId, groupId: $0.groupId) }
+                )
+            } catch {
+                throw Self.mapSFTPError(error, path: path)
+            }
+        }
+    }
+
+    /// True for errors that mean "the SSH connection/channel is gone" —
+    /// `ConnectionLossShapes.matches(_:)`, which is where the shapes are
+    /// written and why.
+    ///
+    /// Private again (fix round 1 of the lost-connection cause work, review
+    /// Minor 9): it was widened to internal so
+    /// `LivenessProbeFailure.classify(_:)` could read the same
+    /// shapes, which pointed a Sessions-layer type at a concrete backend.
+    /// The shapes moved to `ConnectionLossShapes` in this layer instead, and
+    /// both callers read that.
+    private static func isConnectionLoss(_ error: Error) -> Bool {
+        ConnectionLossShapes.matches(error)
+    }
+
+    /// Translates Citadel's raw SFTP status errors into typed RemoteFSError.
+    /// The server responds with SSH_FXP_STATUS; Citadel throws that as
+    /// SFTPMessage.Status with an errorCode (SFTPStatusCode).
+    /// Connection-loss shapes map to `connectionFailed` FIRST so the transfer
+    /// queue (M5d) classifies the item `.interrupted` (resumable) instead of
+    /// `.failed`.
+    /// Internal (not private) so the mapping is unit-testable without a server.
+    ///
+    /// `localizedDescription`, not `String(describing:)` (fix round 1,
+    /// Important): `error`/`status` here are raw NIO/Citadel values, and
+    /// `String(describing:)` on an arbitrary error prints its stored
+    /// properties — `DialSupport.reason(for:)`'s own doc comment names
+    /// exactly this as unsafe. The `.protocolError`/`.connectionFailed`
+    /// text built here is dropped again, unread, wherever it is displayed
+    /// or logged (`RemoteBrowserViewModel.message(for:path:)`,
+    /// `DiagnosticLog.log(_:_:_:reason:)`, both routed through
+    /// `DialSupport.reason(for:)`) — this change is defense in depth at the
+    /// construction site itself, not the only place the leak is closed.
+    static func mapSFTPError(_ error: Error, path: String) -> Error {
+        if error is CancellationError { return error }
+        if let sftp = error as? SFTPError, case .resourceLimitExceeded = sftp {
+            return RemoteFSError.finding(.metadataLimitExceeded)
+        }
+        if isConnectionLoss(error) {
+            return RemoteFSError.connectionFailed(reason: error.localizedDescription)
+        }
+        guard let status = error as? SFTPMessage.Status else {
+            return RemoteFSError.protocolError(reason: error.localizedDescription)
+        }
+        switch status.errorCode {
+        case .noSuchFile: return RemoteFSError.notFound(path: path)
+        case .permissionDenied: return RemoteFSError.permissionDenied(path: path)
+        default: return RemoteFSError.protocolError(reason: status.localizedDescription)
+        }
+    }
+
+    public func readStream(
+        path: String, fromOffset offset: UInt64
+    ) async throws -> AsyncThrowingStream<Data, Error> {
+        // `measured` times the OPEN only — the function returns a stream
+        // immediately, before a single byte is actually read, so wrapping
+        // it here logs "how long did opening this file for read take",
+        // consistent with `write` below timing the whole call (which really
+        // does await every chunk before returning).
+        let handle: SFTPReadHandle = try await measured("readStream", path: path) {
+            do {
+                return SFTPReadHandle(try await sftp.openFile(filePath: path, flags: .read))
+            } catch {
+                throw Self.mapSFTPError(error, path: path)
+            }
+        }
+        // Pull-based (unfolding): the consumer sets the pace. Starting at
+        // `offset` beyond EOF: the first read returns 0 readable bytes, so
+        // the stream ends immediately (empty), no error.
+        //
+        // The closure below is the ONLY owner of `handle`, and that is what
+        // closes the SFTP file on the paths the closure never sees — see
+        // `SFTPReadHandle`. Nothing here may capture the file handle
+        // directly: a second owner would keep the box alive past the
+        // stream, or release it while the stream still reads.
+        //
+        // `handle` is a `Sendable` box captured by a `@Sendable` closure — it
+        // was `@unchecked` while it carried Citadel's own file handle, and
+        // the argument below is why that was sound then and why the box is
+        // still the only reader now.
+        // Why there is no race: `openFile` hands back a fresh handle per call,
+        // this method neither stores it nor returns it, so the `unfolding:`
+        // closure is the only code that can reach this one. Two concurrent
+        // `readStream` calls get two separate handles and two separate
+        // streams; they never share state. Within one stream the closure runs
+        // only when a consumer pulls, and an `AsyncSequence` has a single
+        // consumer pulling sequentially — the same confinement that carries
+        // `currentOffset` below: one reader advances it, and the read offset
+        // it carries is what makes the chunks contiguous in the first place.
+        //
+        // `nonisolated(unsafe)` states exactly that and nothing more. The
+        // counter is read and written only by the `unfolding:` closure, in
+        // lockstep with that single sequential loop, and never leaves this
+        // method. What would break it: a consumer that split the returned
+        // stream across concurrent readers — which already violates the
+        // `AsyncSequence` single-consumer contract and would hand back
+        // overlapping chunks long before the annotation mattered.
+        nonisolated(unsafe) var currentOffset = offset
+        return AsyncThrowingStream(unfolding: {
+            do {
+                let buffer = try await handle.read(
+                    from: currentOffset, length: UInt32(TransferChunk.size))
+                guard buffer.readableBytes > 0 else {
+                    // The other site where a close's own outcome could
+                    // have meant something — see the comment on `write`'s
+                    // completion close below for what changed here and why
+                    // swallowing it is accepted.
+                    _ = await handle.closeBounded()
+                    return nil
+                }
+                currentOffset += UInt64(buffer.readableBytes)
+                return Data(buffer.readableBytesView)
+            } catch is CancellationError {
+                // Cooperative cancellation (M5c/T2): an in-flight read request
+                // throws `CancellationError` on task cancellation — pass it
+                // through unchanged, do NOT map it to protocolError, otherwise
+                // the item would end `.failed` instead of `.cancelled`. The
+                // channel stays usable (handle.closeBounded).
+                _ = await handle.closeBounded()
+                throw CancellationError()
+            } catch {
+                _ = await handle.closeBounded()
+                throw Self.mapSFTPError(error, path: path)
+            }
+        })
+    }
+
+    public func write(
+        path: String, mode: WriteMode, contents: AsyncThrowingStream<Data, Error>
+    ) async throws {
+        // `measured` wraps the WHOLE call here, not just the open (unlike
+        // `readStream` above): every chunk is awaited inside this function's
+        // own body (the `for try await chunk in contents` loop below), so
+        // "how long did the sftp write take" really is this function's
+        // total duration, not just a setup cost.
+        try await measured("write", path: path) {
+        // SSH_FXF_APPEND (SFTPOpenFileFlags.append) forces the server to
+        // append every write to the file's current end regardless of the
+        // offset the client sends — but not every server implementation
+        // honors that consistently, so belt-and-suspenders: also pre-stat
+        // the file's size and start our own offset counter there.
+        let flags: SFTPOpenFileFlags
+        switch mode {
+        case .overwrite: flags = [.create, .write, .truncate]
+        case .append: flags = [.create, .write, .append]
+        }
+        let file: BoundedSFTPFile
+        do {
+            file = try await sftp.openFile(filePath: path, flags: flags)
+        } catch {
+            throw Self.mapSFTPError(error, path: path)
+        }
+        do {
+            var offset: UInt64 = 0
+            if mode == .append {
+                offset = try await file.readAttributes().size ?? 0
+            }
+            for try await chunk in contents {
+                try await file.write(ByteBuffer(bytes: chunk), at: offset)
+                offset += UInt64(chunk.count)
+            }
+            // The close of a write that completed. Two sites in this file
+            // changed from an unbounded close to `closeBounded()` where the
+            // close's own outcome could have meant something: this one, and
+            // `readStream`'s EOF arm above — not "the one place", which
+            // this comment claimed until it was checked against the base
+            // commit it was describing (`391b6aa`).
+            //
+            // The read side's change is not only a like-for-like swap: at
+            // `391b6aa`, `readStream`'s EOF arm was a bare
+            // `try await handle.close()`, and Citadel's `close()` THROWS on
+            // a non-`ok` CLOSE status — that throw propagated straight out
+            // of the `unfolding:` closure, UNMAPPED, past `mapSFTPError`
+            // and past the `RemoteFSError` contract every other error on
+            // this stream goes through. `closeBounded()` (see
+            // `BoundedSFTPFile`) swallows it instead. That is a real
+            // change in behavior, stated here rather than left silent.
+            //
+            // Here specifically: its `false` is NOT an error to the caller,
+            // following `disconnect()`, which discards the session's
+            // `false` and goes on to close the connection. Three reasons,
+            // in order of weight: every chunk above was individually
+            // awaited and acknowledged before this line was reached, so an
+            // abandoned close says nothing about whether the bytes
+            // arrived; a `false` here means the peer has stopped
+            // answering, which the next operation on this connection
+            // reports anyway; and reporting a completed upload as failed
+            // is the worse of the two wrong answers.
+            //
+            // What this gives up, said plainly rather than left for a
+            // reader to find: `try await file.close()` used to propagate a
+            // non-`ok` close STATUS from the server — a server that only
+            // reports a full disk when the handle is closed would have
+            // failed the write here, and now does not. `closeBounded()`
+            // swallows that error the way the session's close already does.
+            // Nothing else in the product catches it either: `copyFile`
+            // ends on a `Task.checkCancellation()`, not on a size or
+            // checksum comparison, and the checksum capability
+            // (`RemoteChecksumProvider.remoteChecksum`) is something a
+            // user asks for on a file, not a step every transfer runs.
+            // That is a real, narrow loss, recorded here so it is a
+            // decision and not an accident.
+            _ = await file.closeBounded()
+        } catch is CancellationError {
+            // Cooperative cancellation (M5c/T2): normally the counting stream
+            // from copyFile runs out SILENTLY on cancellation (it ends,
+            // doesn't throw) — then copyFile's post-check takes over. But if
+            // an in-flight write request itself throws `CancellationError` on
+            // task cancellation, pass it through unchanged here (do NOT map
+            // to protocolError), otherwise the item would end `.failed`
+            // instead of `.cancelled`. Channel stays usable.
+            _ = await file.closeBounded()
+            throw CancellationError()
+        } catch {
+            _ = await file.closeBounded()
+            throw Self.mapSFTPError(error, path: path)
+        }
+        }
+    }
+
+    /// Deletes a FILE at `path` via SFTP `remove` (SSH_FXP_REMOVE). Throws
+    /// `notFound` if nothing exists there; a directory at `path` is reported
+    /// as `protocolError` by the server-side status mapping (SFTP has no
+    /// generic "is a directory" status code).
+    public func delete(path: String) async throws {
+        try await measured("delete", path: path) {
+            do {
+                try await sftp.remove(at: path)
+            } catch {
+                throw Self.mapSFTPError(error, path: path)
+            }
+        }
+    }
+
+    /// Creates ONLY the last level (parents must already exist — the
+    /// recursion in T3 runs top-down). Idempotent: if the path already exists
+    /// as a directory (even in a race between two clients), the call returns
+    /// silently. If a file exists there, throws
+    /// `.finding(.pathExistsAndIsNotADirectory(path:))` — the same finding
+    /// `LocalFileSystem.createDirectory` throws for the same condition.
+    public func createDirectory(at path: String) async throws {
+        try await measured("createDirectory", path: path) {
+            do {
+                try await sftp.createDirectory(atPath: path)
+            } catch {
+                // mkdir can fail even though the directory (already or by
+                // now) exists — verify via stat instead of blindly passing
+                // the error on.
+                if let existing = try? await sftp.getAttributes(at: path) {
+                    switch SFTPAttributeMapper.kind(fromPermissions: existing.permissions) {
+                    case .directory:
+                        return
+                    default:
+                        // REUSES Local's finding rather than getting one of
+                        // its own: this is the word-for-word twin of
+                        // `LocalFileSystem.createDirectory`'s collision
+                        // throw, and a reader must not meet one sentence
+                        // over SFTP and a different one locally. A finding
+                        // of its own would have needed a second way of
+                        // saying the same thing, which
+                        // `everyRemoteFSFindingHasItsOwnSentence` forbids.
+                        throw RemoteFSError.finding(
+                            .pathExistsAndIsNotADirectory(path: path))
+                    }
+                }
+                throw Self.mapSFTPError(error, path: path)
+            }
+        }
+    }
+
+    /// Renames/moves to the FULL destination path. The explicit existence
+    /// probe keeps the no-silent-overwrite contract server-independent
+    /// (SFTP rename semantics differ between servers).
+    ///
+    /// The probe is SFTP stat (SSH_FXP_STAT), which follows symlinks —
+    /// Citadel exposes no lstat. So a DANGLING symlink already at `to` is
+    /// invisible to this check and falls through to the server's own
+    /// duplicate-name handling in `sftp.rename` instead of our stable
+    /// `protocolError` (residual, accepted — matches the Local backend's
+    /// best effort, not its exact guarantee).
+    ///
+    /// The probe is three-valued, like `S3FileSystem.rename`'s and the
+    /// `RemoteBrowserViewModel` create probes (M18a): only SSH_FX_NO_SUCH_FILE
+    /// — i.e. `mapSFTPError`'s `.notFound` — means the destination is
+    /// definitely free. Any other stat failure (permission denied, a protocol
+    /// error, a dropped connection) leaves existence UNKNOWN and is surfaced
+    /// as that error, naming `to`. A `try?` here would collapse all of them
+    /// into "nothing is there" and report whatever the server then says about
+    /// the SOURCE instead. No data is at stake (SSH_FXP_RENAME does not
+    /// overwrite) — the point is a truthful message and one probe contract
+    /// across all backends.
+    public func rename(from: String, to: String) async throws {
+        // `path` names both endpoints (`from -> to`) — the one method here
+        // that acts on two paths, so the single `path:` field this helper
+        // formats is given both rather than dropping one of them.
+        try await measured("rename", path: "\(from) -> \(to)") {
+            var destinationExists = true
+            do {
+                _ = try await sftp.getAttributes(at: to)
+            } catch {
+                let mapped = Self.mapSFTPError(error, path: to)
+                guard let fsError = mapped as? RemoteFSError, case .notFound = fsError else {
+                    throw mapped
+                }
+                destinationExists = false
+            }
+            if destinationExists {
+                throw RemoteFSError.protocolError(reason: "destination already exists: \(to)")
+            }
+            do {
+                try await sftp.rename(at: from, to: to)
+            } catch {
+                throw Self.mapSFTPError(error, path: from)
+            }
+        }
+    }
+
+    /// Sets only the low 12 permission bits via SFTP setstat.
+    public func setPermissions(path: String, permissions: UInt32) async throws {
+        try await measured("setPermissions", path: path) {
+            var attributes = SFTPFileAttributes()
+            attributes.permissions = permissions & 0o7777
+            do {
+                try await sftp.setAttributes(at: path, to: attributes)
+            } catch {
+                throw Self.mapSFTPError(error, path: path)
+            }
+        }
+    }
+
+    /// Recursive delete via bottom-up walk: SFTP has no recursive remove.
+    /// Files and symlinks go through `remove` (a symlink is removed as the
+    /// link itself — never followed, the walk descends only into REAL
+    /// directories per the listed entry kind); directories are emptied
+    /// first, then removed with rmdir. Cooperatively cancellable per entry;
+    /// a partially deleted tree can result not only from cancellation but
+    /// also from a mid-walk error (e.g. permissionDenied on a child, or a
+    /// rmdir race against a concurrent writer) — both are documented,
+    /// accepted best-effort behavior, matching Local.
+    ///
+    /// GUARANTEE: a top-level symlink argument is NEVER followed. SFTP stat
+    /// follows symlinks and Citadel exposes no lstat, so the top level's
+    /// kind is instead derived from the PARENT's listing (SSH_FXP_READDIR
+    /// reports entries unresolved, exactly like every child encountered
+    /// deeper in the walk). Only "/" (no parent to list) or a parent we
+    /// cannot list falls back to SFTP stat.
+    ///
+    /// A trailing slash defeats the parent-listing match below (the listing
+    /// never contains an entry whose path ends in "/") and falls through to
+    /// the stat fallback, which FOLLOWS the symlink and destroys the
+    /// TARGET's contents (proven live in the M7a final review) — so it is
+    /// stripped up front, before the kind lookup or anything else.
+    public func deleteTree(at path: String) async throws {
+        try Task.checkCancellation()
+        let path = path.count > 1 && path.hasSuffix("/") ? String(path.dropLast()) : path
+        // Wraps the WHOLE recursive walk — every `list`/`delete` it issues
+        // along the way logs its own line too (both are public methods,
+        // instrumented above), so a directory removal shows as one
+        // `deleteTree` line bracketing the many per-entry lines underneath.
+        try await measured("deleteTree", path: path) {
+            try await deleteTree(at: path, kind: try await topLevelKind(of: path))
+        }
+    }
+
+    /// Derives `path`'s kind WITHOUT ever following a symlink at `path`
+    /// itself. SFTP stat follows symlinks and Citadel exposes no lstat, so
+    /// the primary source of truth is the PARENT's listing (SSH_FXP_READDIR,
+    /// which reports entries unresolved — same guarantee every child in the
+    /// walk relies on). `path` is assumed already normalized (no trailing
+    /// slash) by the caller.
+    ///
+    /// Branches:
+    /// - `parent == path` (i.e. `path` is "/", the root — it has no parent
+    ///   to list): fall back to stat. There is no symlink-following risk
+    ///   here, "/" can never itself be a symlink.
+    /// - Parent listing succeeds AND contains an entry at `path`: use that
+    ///   entry's kind directly — the exact, unresolved, ground-truth answer.
+    ///   This is the common case and the only one for anything reachable in
+    ///   a normal walk.
+    /// - Parent listing succeeds but does NOT contain `path` (e.g. a
+    ///   non-normalized form like "/a//b" that the listing's exact-path
+    ///   match can't see, or a race where the entry vanished between listing
+    ///   and lookup): fall back to stat, but do not trust a `.directory`
+    ///   verdict blindly — stat would happily follow a symlink the parent
+    ///   listing simply didn't recognize the path as, and reporting
+    ///   `.directory` for that would let a symlink argument slip through as
+    ///   "is a directory" and get walked into. So: if stat throws (most
+    ///   commonly `notFound` — the entry is genuinely gone), propagate that
+    ///   error naturally; if stat succeeds and reports `.directory`, that is
+    ///   precisely the unverifiable case — throw `protocolError` instead of
+    ///   trusting it. Non-directory stat results (`.file`/`.symlink`) are
+    ///   safe to trust as-is: `deleteTree(at:kind:)` sends anything that
+    ///   isn't `.directory` straight to `delete`, which removes a symlink AS
+    ///   the link (never follows), so there is no walk-into-target risk.
+    /// - Parent listing fails outright (e.g. permission denied on the
+    ///   parent): fall back to stat, same reasoning as above.
+    private func topLevelKind(of path: String) async throws -> RemoteFileKind {
+        let parent = RemotePath.parent(of: path)
+        guard parent != path else {
+            // Root: no parent to list, and "/" cannot be a symlink.
+            return try await stat(path: path).kind
+        }
+        if let siblings = try? await list(path: parent),
+           let entry = siblings.first(where: { $0.path == path }) {
+            return entry.kind
+        }
+        let statKind = try await stat(path: path).kind
+        guard statKind == .directory else {
+            // .file / .symlink is safe to trust: deleteTree(at:kind:) routes
+            // anything but .directory straight to `delete`, which removes a
+            // symlink as the link itself, never following it.
+            return statKind
+        }
+        // The parent listing did not vouch for this path, yet stat (which
+        // follows symlinks) reports a directory — this is exactly the
+        // shape of a symlink slipping through on a non-normalized path.
+        // Refuse to walk into it.
+        throw RemoteFSError.protocolError(reason: "cannot verify entry kind for: \(path)")
+    }
+
+    private func deleteTree(at path: String, kind: RemoteFileKind) async throws {
+        try Task.checkCancellation()
+        guard kind == .directory else {
+            try await delete(path: path)
+            return
+        }
+        // Reuse `list` (the file has no separate mapping helper besides its
+        // inline flatMap/filter/map over SFTPAttributeMapper) instead of
+        // re-deriving RemoteFileItems from `sftp.listDirectory` here.
+        for child in try await list(path: path) {
+            try Task.checkCancellation()
+            try await deleteTree(at: child.path, kind: child.kind)
+        }
+        do {
+            try await sftp.rmdir(at: path)
+        } catch {
+            throw Self.mapSFTPError(error, path: path)
+        }
+    }
+
+    /// Resolves the login home directory via SFTP `realpath(".")`
+    /// (SSH_FXP_REALPATH) — the canonical way an SFTP client discovers the
+    /// server's landing directory, same idea as `pwd` right after login.
+    public func homeDirectoryPath() async throws -> String {
+        try await measured("homeDirectoryPath", path: ".") {
+            do {
+                return try await sftp.getRealPath(atPath: ".")
+            } catch {
+                throw Self.mapSFTPError(error, path: ".")
+            }
+        }
+    }
+
+    /// How long `disconnect()` waits for the SFTP child channel to close
+    /// before abandoning that wait and closing the parent connection(s)
+    /// anyway.
+    ///
+    /// Derived, not spelled a second time: the number and the whole argument
+    /// for it live on `BoundedSFTPSession.closeBoundSeconds`, beside the
+    /// close it bounds. This alias exists so that
+    /// `LivenessProbeDropIntegrationTests` can keep deriving its own bound
+    /// from the name it already knows.
+    static let sftpCloseBoundSeconds = BoundedSFTPSession.closeBoundSeconds
+
+    public func disconnect() async {
+        // First, before anything closes: every close that follows is one
+        // MacSCP asked for, and `TransportCloseReporting` says so.
+        closeMonitor.markCloseRequested()
+        // Close the SFTP child channel explicitly (its own closeFuture),
+        // rather than relying solely on the parent SSH channel's close to
+        // cascade to it, before closing the parent connection(s) and (I-2)
+        // releasing the dedicated event-loop group they ran on.
+        //
+        // Bounded, and abandoned when the bound wins (see
+        // `BoundedSFTPSession.closeBoundSeconds` for the measurement behind
+        // both the need and the number): that close is a round trip, so
+        // against a peer that has stopped answering it does not return at
+        // all. Abandoning it is the whole reason this works — the two lines
+        // below then still run, and closing the parent connection is what
+        // actually ends the session. Measured through the real give-up path
+        // against a peer still frozen: the whole lap came back in
+        // 5.050603459 s, i.e. this bound plus 0.05 s for everything else
+        // teardown does, those two closes included.
+        //
+        // The bound is not optional here in the sense of "we remembered to
+        // pass it": `sftp` is a `BoundedSFTPSession`, so the unbounded close
+        // is not an expression this module can write. What that type does
+        // and does not guarantee is set out in its own doc comment — read it
+        // before trusting this line further than it goes.
+        //
+        // The Citadel value crossing an isolation boundary here — this
+        // file's opening comment asks every such crossing to argue for
+        // itself: `closeBounded()` captures the raw client in an
+        // unstructured task that may outlive this call. Nothing races it.
+        // `disconnect()` is the last thing a session does with this object
+        // (the App layer's teardown order runs `cancelAll` and the terminal
+        // `shutdown` ahead of it), so no other caller is inside `sftp` while
+        // this runs, and the abandoned task's only remaining act is the one
+        // close it was handed.
+        // `measured` here uses "-" for `path` — `disconnect()` acts on the
+        // whole connection, not on one entry — and never reaches its own
+        // failure branch (every close below is `try?`), so this line is
+        // always `ok`; wrapped anyway so it is the same one shape as the
+        // other ten methods rather than a lone hand-written line.
+        await measured("disconnect", path: "-") {
+            await sftp.closeBounded()
+            try? await client.close()
+            try? await jumpClient?.close()
+        }
+        // Report what this call just did, before returning (fix round 1 of
+        // the lost-connection cause work, review Minor 8). Citadel delivers
+        // its own close on a task of its own, which can land after this
+        // function has returned and after the UI's teardown has stopped
+        // listening — so the app's own closes would be the ones most likely
+        // to go unreported. The monitor drops whichever of the two reports
+        // arrives second, and both say the same thing: `by=app`, because
+        // `markCloseRequested()` ran at the top of this function.
+        closeMonitor.closed(.target)
+        if jumpClient != nil { closeMonitor.closed(.jump) }
+        // I-2/R-1: release the dedicated event-loop group this connection
+        // took ownership of at construction time (see `connectAuthenticated`) — but not
+        // immediately. Citadel's `SFTPClient.openSFTP` schedules an internal
+        // 15-second "no reply" timeout task on the connection's event loop
+        // unconditionally when it's CALLED, and never cancels it once
+        // `openSFTP` succeeds
+        // (`Citadel/Sources/Citadel/SFTP/Client/SFTPClient.swift:535`).
+        // Shutting `dedicatedGroup` down right here, before that timer fires,
+        // used to race it: measured at 5 NIO "Cannot schedule tasks on an
+        // EventLoop that has already shut down" ERRORs per 5 successful agent
+        // sessions (routine quick browse-and-disconnect, well under 15s) —
+        // currently a logged error, but NIO documents this becoming a forced
+        // crash on future versions. The timer lives entirely inside vendored
+        // Citadel and cannot be cancelled from here, so outlive it instead of
+        // racing it: detached from this call, past the 15s mark, so nothing
+        // here adds those 16 seconds to the caller's own wait.
+        //
+        // This comment used to put that as "so `disconnect()` itself still
+        // returns immediately". It did not, and the claim was measured
+        // false: against a peer that stops answering, the SFTP close
+        // above was entered and never left inside bounds of 120 s and 30 s
+        // (`.superpowers/sdd/frozen-peer-measurement.md`). The detachment
+        // was never what made `disconnect()` prompt — it only kept this
+        // 16-second sleep out of the caller's way. What bounds the call is
+        // `BoundedSFTPSession.closeBoundSeconds`.
+        if let dedicatedGroup {
+            Self.releaseAfterCitadelTimer(dedicatedGroup, outliving: Self.citadelOpenSFTPTimer)
+        }
+    }
+
+    /// Citadel's `openSFTP` "no reply" timer: scheduled on the connection's
+    /// event loop the moment `openSFTP` is called, never cancelled
+    /// (`Citadel/Sources/Citadel/SFTP/Client/SFTPClient.swift:535`).
+    static let citadelOpenSFTPTimer: Duration = .seconds(15)
+
+    /// Citadel's login timeout: `ClientHandshakeHandler.init` schedules it on
+    /// the connection's event loop once per hop, and never cancels it
+    /// (`Citadel/Sources/Citadel/ClientSession.swift:76-83`, created with
+    /// `.seconds(10)` at `:170-173`). Shorter than `citadelOpenSFTPTimer`, so
+    /// a tab's release, which outlives that one, outlives this one too.
+    static let citadelLoginTimer: Duration = .seconds(10)
+
+    /// Test seam: sees every call of `releaseAfterCitadelTimer` made inside
+    /// the structured task tree that binds it — the group handed over and
+    /// the timer it is to outlive.
+    ///
+    /// A `@TaskLocal` for the reason `AgentClientFactory` gives: parallel
+    /// tests never share it. It only observes: the delayed release runs as
+    /// it would without it, so a test that binds it leaks no thread and
+    /// changes nothing it measures.
+    enum GroupReleaseObserver {
+        @TaskLocal static var observe:
+            (@Sendable (MultiThreadedEventLoopGroup, Duration) -> Void)?
+    }
+
+    /// Shuts `group` down one second after `timer` has elapsed, detached from
+    /// the caller, so a timer Citadel left pending on the group's event loop
+    /// fires on a live loop instead of being cut off by the shutdown — and so
+    /// the caller does not spend that wait itself.
+    ///
+    /// A tab's `disconnect()` waits out `citadelOpenSFTPTimer` (sixteen
+    /// seconds, the number both of the tab's release sites spelled before
+    /// 2026-09-17); a forwarding's `disconnect()`, which never follows an
+    /// `openSFTP`, waits out `citadelLoginTimer`. A failed dial,
+    /// `connectAuthenticated`'s clean-up for tabs and forwardings alike,
+    /// waits out the first when it got as far as `openSFTP` and the second
+    /// otherwise. Those three are the only callers, and nothing else in
+    /// this file or `SSHForwardingConnection.swift` shuts a dedicated group
+    /// down (`DialGroupReleaseGuardTests`).
+    static func releaseAfterCitadelTimer(
+        _ group: MultiThreadedEventLoopGroup, outliving timer: Duration
+    ) {
+        GroupReleaseObserver.observe?(group, timer)
+        Task.detached {
+            try? await Task.sleep(for: timer + .seconds(1))
+            try? await group.shutdownGracefully()
+        }
+    }
+}
+
+/// Sole owner of one `BoundedSFTPFile` opened for reading, so that the
+/// handle is closed on the server whenever the read stream built around it
+/// goes away.
+///
+/// `AsyncThrowingStream(unfolding:)` has no termination hook, and the paths
+/// that abandon a read stream never run its closure again. A destination
+/// write that throws drops the stream where it stands. Task cancellation is
+/// worse than it looks: the stream releases its closure the moment the task
+/// is cancelled and answers `nil` on the next pull WITHOUT calling it, so the
+/// cancellation arm inside the closure only ever runs for a read that was
+/// already suspended when the cancel landed — and Citadel's read is not
+/// cancellation-aware, so in practice it does not run at all. Either way the
+/// closure is simply released, and with it the last reference to an open
+/// handle that the server keeps until the connection falls.
+///
+/// Binding the close to that release is what covers those paths without
+/// giving up the pull-based shape the stream is chosen for. The close is
+/// fire-and-forget by necessity — `deinit` cannot await — and unconditional,
+/// because Citadel's `close()` under `BoundedSFTPFile` invalidates the handle
+/// before it sends anything: a second close is a silent no-op, so the eager
+/// close on the paths the closure DOES see (EOF, a read error, a cancelled
+/// in-flight read) stays exactly as it was and this only catches the rest.
+///
+/// Plainly `Sendable` since `BoundedSFTPFile` took over the Citadel handle:
+/// this box carries a `Sendable` value now, so it no longer needs the
+/// `@unchecked` escape hatch it was written with, and the compiler checks
+/// what that annotation used to assert by hand. The reasoning it asserted is
+/// not gone, it moved: `BoundedSFTPFile`'s own doc comment carries the
+/// ownership argument, and the part that is this box's alone still holds —
+/// `openFile` returns a fresh handle per call, the box is created and
+/// captured in `readStream` and nowhere else, and an `AsyncSequence` has a
+/// single consumer pulling sequentially, so one task at a time reaches the
+/// handle and `deinit` runs only once that task has released the closure. A
+/// read in flight holds the closure alive for its own duration, so the
+/// deinit close can never overlap a read.
+private final class SFTPReadHandle: Sendable {
+    private let file: BoundedSFTPFile
+
+    init(_ file: BoundedSFTPFile) {
+        self.file = file
+    }
+
+    func read(from offset: UInt64, length: UInt32) async throws -> ByteBuffer {
+        try await file.read(from: offset, length: length)
+    }
+
+    /// Named for the property, not for the operation: there is no unbounded
+    /// close to distinguish it from any more, and a `close()` here would
+    /// read like one at all three call sites in `readStream`. Not
+    /// `@discardableResult`, for the reason `BoundedSFTPFile.closeBounded`
+    /// gives: the answer is dropped at every site in this file, and each of
+    /// those drops should be written down.
+    func closeBounded() async -> Bool {
+        await file.closeBounded()
+    }
+
+    deinit {
+        // Only the handle escapes into the task, never `self` — resurrecting
+        // the box in its own deinit would be undefined, and the handle is a
+        // separate object whose life the task legitimately extends until the
+        // close has been sent.
+        //
+        // What the bounded type changed here, and only this: the call is now
+        // `closeBounded()`, so this detached task cannot sit on a frozen peer
+        // forever. It still leaks a task in the sense the backlog entry
+        // recorded — nothing awaits it, nothing observes its answer — and
+        // that question is exactly as open as it was; the bound shortens the
+        // leak's life from unbounded to `closeBoundSeconds`, it does not
+        // answer it.
+        let file = self.file
+        Task { _ = await file.closeBounded() }
+    }
+}
+
+extension CitadelFileSystem: TransportCloseReporting {
+    public func onTransportClose(_ handler: @escaping @Sendable (TransportCloseEvent) -> Void) {
+        closeMonitor.setHandler(handler)
+    }
+
+    public func stopReportingTransportClose() {
+        closeMonitor.stopReporting()
+    }
+}
+
+extension CitadelFileSystem: RemoteShellProvider {
+    /// Shell channel over the SAME connection as SFTP (multiplexed, like WinSCP).
+    public func openShell(
+        terminal: String, cols: Int, rows: Int
+    ) async throws -> any RemoteShell {
+        try await CitadelShell.open(
+            client: client, terminal: terminal, cols: cols, rows: rows)
+    }
+}
+
+extension CitadelFileSystem: WindowedFileAccess {
+    public func openWindowedFile(path: String) async throws -> any ByteWindowReader {
+        do {
+            return SFTPByteWindowReader(file: try await sftp.openFile(filePath: path, flags: .read))
+        } catch {
+            throw Self.mapSFTPError(error, path: path)
+        }
+    }
+}
+
+extension CitadelFileSystem: RemoteDirectorySearching {
+    public func searchDirectory(path: String, query: String, mode: RemoteDirectorySearchMode) async throws -> [String] {
+        try Task.checkCancellation()
+        let command = try RemoteDirectorySearchCommand(path: path, query: query, mode: mode)
+        let output = try await fileToolOutput(command.text, limit: RemoteDirectorySearchCommand.outputLimit)
+        return try RemoteDirectorySearchCommand.results(output, mode: mode)
+    }
+
+    private func fileToolOutput(_ command: String, limit: Int) async throws -> Data {
+        try Task.checkCancellation()
+        var collected = Data()
+        var consumed = false
+        var consumerError: (any Error)?
+        do {
+            // withExec closes its own channel on success, error and consumer
+            // cancellation. Never leave an abandoned grep attached to the tab.
+            try await client.withExec(command) { inbound, _ in
+                do {
+                    for try await chunk in inbound {
+                        try Task.checkCancellation()
+                        guard case .stdout(let buffer) = chunk else { continue }
+                        guard buffer.readableBytes <= limit - collected.count else {
+                            throw FileToolError.resultsTooLarge
+                        }
+                        collected.append(contentsOf: buffer.readableBytesView)
+                    }
+                    consumed = true
+                } catch { consumerError = error; throw error }
+            }
+        } catch {
+            // Citadel's withExec closes twice on a failed close and can mask
+            // our consumer's error with alreadyClosed. Preserve that error.
+            if let consumerError { throw consumerError }
+            // A short command can close its channel before withExec's own
+            // close. Only tolerate this after EOF; the result parsers still
+            // require a complete valid reply, never a partial answer.
+            guard consumed, error as? ChannelError == .alreadyClosed else {
+                throw error
+            }
+        }
+        try Task.checkCancellation()
+        return collected
+    }
+}
+
+extension CitadelFileSystem: FileWindowSearching {
+    public func searchWindow(path: String, query: Data, direction: FileSearchDirection,
+                             relativeTo match: UInt64?) async throws -> FileSearchWindow? {
+        let command = try RemoteFileSearchCommand(path: path, query: query, direction: direction, relativeTo: match, watchesConnection: true)
+        let output: Data
+        do { output = try await fileToolOutput(command.text, limit: RemoteFileSearchCommand.outputLimit) }
+        catch let failure as SSHClient.CommandFailed where failure.exitCode == 127 { throw FileToolError.searchUnavailable }
+        let result = try RemoteFileSearchCommand.result(output)
+        if let result, !result.data.starts(with: query) { throw FileToolError.changed }
+        return result
+    }
+}
+
+private actor SFTPByteWindowReader: ByteWindowReader {
+    private var file: BoundedSFTPFile?
+    init(file: BoundedSFTPFile) { self.file = file }
+    func read(offset: UInt64, count: Int) async throws -> Data {
+        try FileWindow.validate(offset: offset, count: count)
+        try Task.checkCancellation()
+        guard let file else { throw FileToolError.closed }
+        if count == 0 { return Data() }
+        let buffer = try await file.read(from: offset, length: UInt32(count))
+        guard buffer.readableBytes <= count else { throw FileToolError.oversizedResponse }
+        return Data(buffer.readableBytesView)
+    }
+    func close() async {
+        guard let current = file else { return }
+        file = nil
+        _ = await current.closeBounded()
+    }
+}
+
+extension CitadelFileSystem: ServerInformationProvider {
+    public func serverInformation(includePublic: Bool, includeSystem: Bool, directory: String) async throws -> ServerNetworkAddresses {
+        let answer = await DetachedProbe.run(timeout: .seconds(12)) { [client] in
+            try? await client.collectingStandardOutput(
+                of: ServerNetworkAddresses.command(includePublic: includePublic, includeSystem: includeSystem, directory: directory), limit: 16_384)
+        }
+        try Task.checkCancellation()
+        guard let output = answer.value ?? nil else {
+            throw RemoteFSError.protocolError(reason: "Server network probe unavailable or timed out")
+        }
+        let parsed = ServerNetworkAddresses.parse(output.standardOutput)
+        if output.exitStatus == 0, parsed.hasInformation { return parsed }
+        let windows = await DetachedProbe.run(timeout: .seconds(15)) { [client] in
+            try? await client.collectingStandardOutput(
+                of: ServerNetworkAddresses.windowsCommand(includePublic: includePublic,
+                    includeSystem: includeSystem, directory: directory), limit: 16_384)
+        }
+        try Task.checkCancellation()
+        if let output = windows.value ?? nil, output.exitStatus == 0 {
+            return ServerNetworkAddresses.parse(output.standardOutput)
+        }
+        if output.exitStatus == 0 { return parsed }
+        throw RemoteFSError.protocolError(reason: "Server information commands are unavailable")
+    }
+}
+
+extension CitadelFileSystem: ChecksumCommandChannel {
+    /// Runs `line` as an SSH `exec` request on the SAME connection SFTP and
+    /// the terminal use — a third kind of child channel beside them — and
+    /// returns its STANDARD OUTPUT.
+    ///
+    /// Standard error is dropped, never merged. `ChecksumOutputReader`
+    /// refuses output of more than one line, so on any far side that writes
+    /// a word of its own — a banner, a shell complaining about a locale —
+    /// merging the two streams would report "no checksum" for every file.
+    ///
+    /// `CitadelShell` is the other command path on this connection and was
+    /// read before this was written: it is not the one to reuse here. It
+    /// opens a PTY, which is exactly what makes it wrong for a value — a PTY
+    /// merges standard error into standard output at the terminal, echoes
+    /// what is written to it, and carries no exit status, so its output is
+    /// the shell's screen rather than a command's answer.
+    ///
+    /// A non-zero exit throws, which is what makes the presence probe's
+    /// answer a simple "did this throw".
+    ///
+    /// The collecting itself — standard output only, bounded, the exit status
+    /// read off Citadel's `CommandFailed` — is `SSHClient
+    /// .collectingStandardOutput(of:limit:onStandardOutput:)` below, shared with the
+    /// diagnosis's exec probes on a jump host
+    /// (`SSHForwardingConnection.standardOutput(of:into:)`). What stays here is
+    /// what is the checksum's own: the bound, the error an overrun is
+    /// reported as, and a non-zero exit turned into a throw.
+    ///
+    /// What the bound above this does NOT do, said plainly because
+    /// `BoundedClose` abandons rather than stops: when `ChecksumBounds`
+    /// elapses, the caller is released but the far side keeps hashing, and
+    /// this exec channel stays open until the connection closes. That is one
+    /// idle child channel per abandoned request, on a connection that is
+    /// already in trouble — the same trade `BoundedSFTPSession.closeBounded`
+    /// makes, and the reason the run bound is minutes rather than seconds.
+    func standardOutput(of line: ChecksumCommandLine) async throws -> String {
+        let output: RemoteCommandOutput
+        do {
+            output = try await client.collectingStandardOutput(
+                of: line.text, limit: Self.maxStandardOutputBytes)
+        } catch is RemoteCommandOutputTooLarge {
+            throw RemoteFSError.protocolError(
+                reason: "checksum output past \(Self.maxStandardOutputBytes) bytes")
+        }
+        guard output.exitStatus == 0 else {
+            // Translated here, at the one place this file's exec plumbing
+            // meets `RemoteChecksumRun`'s channel-agnostic classifier
+            // (`ChecksumCommandExitFailure`'s own doc comment) — everything
+            // above this channel stays free of Citadel's error types.
+            throw ChecksumCommandExitFailure(exitCode: output.exitStatus)
+        }
+        return output.standardOutput
+    }
+}
+
+/// What one `exec` request answered: its standard output, and the exit
+/// status the far side reported — `0` when it reported none.
+struct RemoteCommandOutput: Sendable, Equatable {
+    let standardOutput: String
+    let exitStatus: Int
+}
+
+/// Standard output ran past the bound the caller set. Nothing of it is kept.
+struct RemoteCommandOutputTooLarge: Error, Equatable {
+    let limit: Int
+}
+
+extension SSHClient {
+    /// Runs `command` as one SSH `exec` request — a child channel of its own,
+    /// beside whatever else this connection carries — and collects its
+    /// STANDARD OUTPUT and exit status.
+    ///
+    /// Shared exec plumbing for checksum reads, diagnostic jump-host probes
+    /// and address discovery on an already connected server.
+    ///
+    /// **Standard error is dropped, never merged.** Callers parse what
+    /// comes back: a checksum reader refuses more than one line, and a far
+    /// side that writes a word of its own — a banner, a shell complaining
+    /// about a locale, `command not found` — would otherwise turn every answer
+    /// into an unreadable one. Citadel offers this as `executeCommand(_:
+    /// mergeStreams:)`, whose default is not to merge; the stream API is used
+    /// instead so that the separation is a `case` in plain sight rather than
+    /// a defaulted argument nobody has to pass. The exit status is what
+    /// survives of a failure — POSIX shells report "not found" as 127
+    /// whatever their wording.
+    ///
+    /// **A non-zero exit does not throw here.** Citadel finishes the stream
+    /// with `CommandFailed` once the channel closes on one, AFTER every chunk
+    /// of output — so the output is kept and handed back beside the status. A
+    /// `ping` that heard nothing exits 1 and still prints its statistics.
+    ///
+    /// Throws `RemoteCommandOutputTooLarge` once standard output would pass
+    /// `limit` bytes, and whatever the channel throws otherwise — the far
+    /// side refusing the channel or the `exec` request, a transport that
+    /// dropped.
+    ///
+    /// `onStandardOutput` is handed each chunk of standard output as it is
+    /// kept, before the command ends — for a caller whose deadline may
+    /// abandon this call and that still wants what arrived until then (the
+    /// jump-host probes' `JumpProbeTranscript`). A chunk past `limit` is not
+    /// handed over, as it is not kept.
+    func collectingStandardOutput(
+        of command: String, limit: Int,
+        onStandardOutput: (@Sendable (ByteBuffer) -> Void)? = nil
+    ) async throws -> RemoteCommandOutput {
+        var collected = ByteBuffer()
+        var exitStatus = 0
+        do {
+            for try await chunk in try await executeCommandStream(command) {
+                switch chunk {
+                case .stderr:
+                    continue
+                case .stdout(let buffer):
+                    guard collected.readableBytes + buffer.readableBytes <= limit else {
+                        throw RemoteCommandOutputTooLarge(limit: limit)
+                    }
+                    collected.writeImmutableBuffer(buffer)
+                    onStandardOutput?(buffer)
+                }
+            }
+        } catch let failure as SSHClient.CommandFailed {
+            exitStatus = failure.exitCode
+        }
+        return RemoteCommandOutput(
+            standardOutput: String(buffer: collected), exitStatus: exitStatus)
+    }
+}
+
+extension CitadelFileSystem {
+    func performServerCopyCommand(_ command: String) async throws {
+        // withExec closes this child channel on completion AND cancellation;
+        // the owning file connection remains open. No payload is collected.
+        let completed = Mutex(false)
+        let failure = Mutex<(any Error)?>(nil)
+        do {
+            try await client.withExec(command) { inbound, _ in
+                do {
+                    for try await _ in inbound { try Task.checkCancellation() }
+                    try Task.checkCancellation()
+                    completed.withLock { $0 = true }
+                } catch {
+                    failure.withLock { $0 = error }
+                    throw error
+                }
+            }
+        } catch {
+            // Citadel closes after the server has already closed an exec
+            // channel, and can mask the stream's original error with this one.
+            if let original = failure.withLock({ $0 }) { throw original }
+            guard completed.withLock({ $0 }), error as? ChannelError == .alreadyClosed else { throw error }
+        }
+    }
+}
+
+extension CitadelFileSystem: RemoteChecksumProvider {
+    /// The narrow capability, wired to this connection: the channel above and
+    /// the form this connection was found to have. Everything decidable
+    /// happens in `RemoteChecksumRun`.
+    public func remoteChecksum(
+        forFileAt path: String, algorithm: ChecksumAlgorithm
+    ) async throws -> RemoteChecksumOutcome {
+        try await RemoteChecksumRun.checksum(
+            forFileAt: path, algorithm: algorithm,
+            over: self, rememberedIn: checksumForm, bounds: .standard)
+    }
+}

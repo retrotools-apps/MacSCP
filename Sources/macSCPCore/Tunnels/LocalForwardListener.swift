@@ -1,0 +1,507 @@
+import Foundation
+import NIOCore
+import NIOPosix
+
+/// What can go wrong while a tunnel is being carried — transport only.
+///
+/// Deliberately narrow: a missing secret and an unknown host key are NOT
+/// cases here. Those already have typed errors of their own
+/// (`SecretSourceFailure`, `HostKeyError`, `StoredSessionConnectionError
+/// .secretRequired`) and `TunnelRunner.needsAPerson` maps them to
+/// `TunnelState.needsConfirmation`, which is a different answer from
+/// `.failed` and must stay distinguishable.
+///
+/// The three refusals a stored session earns BEFORE any of that — not SSH,
+/// bound to a login set, dialling through a jump host — are not cases here
+/// either: since 2026-09-16 they are `TunnelRefusal`, thrown by
+/// `TunnelConnection.connect`, and the App's "the session no longer exists"
+/// is `TunnelRefusal.sessionMissing`. Until then they were `.connectFailed`
+/// with `TunnelCarriers.refusal(for:)`'s sentence, which a typed
+/// `TunnelState.failed` could not tell apart from a real connect failure
+/// without reading the prose.
+///
+/// `TunnelFailureKind.init(_:)` maps each case to the kind a state carries;
+/// the four `reason:` payloads stay in the log and are not carried there.
+///
+/// Every `reason` is a MAPPED sentence — `DialSupport.reason(for:)`, never
+/// `String(describing:)` — for the reason that function's own doc comment
+/// gives: describing an arbitrary error prints its stored properties, and a
+/// transport error is exactly the kind of value that carries the
+/// configuration it was dialling with.
+public enum TunnelFailure: Error, Sendable, Equatable {
+    /// The local port a forward wants is taken. The port is carried because
+    /// it is the one thing the user needs in order to free it.
+    case portInUse(port: Int)
+    /// The bind address is not an address of this machine
+    /// (`EADDRNOTAVAIL`). The address is carried because it is the one
+    /// thing the user has to correct. Measured 2026-09-18: a bind to
+    /// `192.0.2.1` or `2001:db8::1` throws NIO's `IOError` with errno 49,
+    /// "Can't assign requested address".
+    case bindAddressUnavailable(address: String)
+    /// The system refused the bind itself (`EACCES`). Measured 2026-09-18
+    /// on macOS 26.6.2, not root: `127.0.0.1` port 80 and `::1` port 82
+    /// throw NIO's `IOError` with errno 13, "Permission denied", while
+    /// `0.0.0.0` port 81 binds. Not measured on macOS 15. The port is
+    /// carried because it is what the user changes.
+    case bindPermissionDenied(port: Int)
+    /// Any other failure to bind the local listener — an errno the two
+    /// cases above do not name, an error that is not an errno at all, or a
+    /// bound socket that reports no port.
+    case bindFailed(reason: String)
+    /// The channel through the SSH server could not be opened: the server
+    /// refuses forwarding (`AllowTcpForwarding no`), or the destination
+    /// behind it is unreachable.
+    case channelOpenFailed(reason: String)
+    /// SSH is connected, but the server could not connect to this destination
+    /// (RFC 4254 connect-failed). This does not prove the port is closed:
+    /// DNS resolution, routing and firewall failures share the same code.
+    case destinationUnreachable(host: String, port: Int)
+    /// A connection this machine makes on a tunnel's behalf failed — the
+    /// remote-forward direction, where an inbound channel from the server is
+    /// connected to a local address.
+    case connectFailed(reason: String)
+    /// The channel through the server WAS opened, and gluing the two sides
+    /// together then failed — installing the pump or starting the reads, or
+    /// a negotiated forward's own hand-over failing on a live connection. A
+    /// negotiated forward whose reply did not reach the client is NOT this:
+    /// that client is gone (`ForwardReplyUndelivered`), and the accept path
+    /// closes the pair unreported.
+    ///
+    /// Distinct from `channelOpenFailed` because the two need different
+    /// clean-up and say different things about the far side: after this one
+    /// there is an open channel on the server to close, and the server is
+    /// demonstrably willing to forward.
+    case pumpFailed(reason: String)
+    /// `start` was called on a listener that has already been started. One
+    /// listener binds once; see `LocalForwardListener.start`.
+    case alreadyStarted
+    /// A remote forward asked the server to choose its port (`0`), which
+    /// this client refuses — see `SSHForwardingConnection.withRemotePortForward`.
+    case remotePortZeroRefused
+    /// The server refused a remote forward's `tcpip-forward` request — the
+    /// port is taken on the server, or the bind address is not allowed.
+    ///
+    /// `reason` is `DialSupport.reason(for:)` of the transport's error and
+    /// reaches the log only. `needsGatewayPorts` is true when the bind
+    /// address is not loopback, which the server allows only with its
+    /// `GatewayPorts` setting: the one thing the user can act on, so it is
+    /// carried as a fact rather than only as a clause in the sentence.
+    case remoteBindRefused(reason: String, needsGatewayPorts: Bool)
+    /// The server did not answer a remote forward's request within the
+    /// bound `RemoteForward.start` waits.
+    case remoteForwardUnanswered
+}
+
+/// What decides where an accepted connection is forwarded to.
+///
+/// The seam exists because the two local listeners differ in exactly one
+/// place: a local forward (`-L`) knows the destination before it binds, and a
+/// dynamic forward (`-D`) learns it from the connection itself. Everything
+/// else — the bootstrap, the pair tracking, the pump, the teardown — is the
+/// same code, so `SOCKS5Listener` is this enum's `.negotiated` arm rather
+/// than a second `ServerBootstrap`.
+enum ForwardDestination: Sendable {
+    /// Every connection goes to the same place.
+    case fixed(host: String, remotePort: Int)
+    /// The connection names its own destination. The closure runs on the
+    /// accepted channel, before the factory, and answers a negotiation the
+    /// accept path then drives to its end.
+    case negotiated(@Sendable (Channel) async throws -> any ForwardNegotiation)
+}
+
+/// One connection's negotiation, in the three moments the accept path has to
+/// tell it about.
+///
+/// A protocol rather than a single closure returning `(host, port)`: the
+/// negotiated arm has to be told how the attempt ENDED as well as what it
+/// asked for — a SOCKS5 client is owed a reply frame either way — and those
+/// two moments are on the far side of an `await` from the first.
+protocol ForwardNegotiation: Sendable {
+    /// Where the connection asked to go, as the SSH server will reach it.
+    var host: String { get }
+    var port: Int { get }
+    /// The channel through the server is open and the pump is installed.
+    /// Called before reading starts, so nothing can arrive between the
+    /// negotiation's last word and the pump's first.
+    ///
+    /// Throws `ForwardReplyUndelivered` when the reply could not reach the
+    /// client — the client's failure, which the accept path does not
+    /// report. Any other error is a step of the tunnel's own that failed,
+    /// and is reported.
+    func confirm(on channel: Channel) async throws
+    /// The channel through the server could not be opened. Best effort: the
+    /// connection may already be gone.
+    func reject(_ failure: TunnelFailure, on channel: Channel) async
+}
+
+/// A negotiation's reply did not reach the client: the reply write failed,
+/// or the connection was already closed before it could be written.
+///
+/// A type of its own because it is the one failure of `confirm` that is
+/// the CLIENT's (maintainer's ruling, 2026-09-16): a client that named a
+/// destination and was gone before the answer. The accept path closes the
+/// pair and does not report it. Every other error `confirm` throws — the
+/// negotiation's own hand-over failing on a live connection — is the
+/// tunnel's, and is reported like a failed pump install.
+struct ForwardReplyUndelivered: Error {}
+
+/// The listening half of a local forward (`-L`): a loopback (by default)
+/// `ServerBootstrap`, and for every connection it accepts, one channel
+/// through the SSH server plus a `BytePump` between the two.
+///
+/// The channel through the server arrives from a closure rather than from a
+/// connection this type holds. That keeps the SSH client private to
+/// `SSHForwardingConnection` — the production factory is one call to
+/// `openDirectTCPIP` — and it is what lets the whole accept path be measured
+/// on loopback with no server at all.
+public final class LocalForwardListener: @unchecked Sendable {
+    /// Opens one channel to `host:port` **as the far side reaches it**.
+    ///
+    /// Contract, because it cannot be enforced by the type: the channel
+    /// comes back with `autoRead` off. Nothing is pumping it yet, and a
+    /// channel that reads before its pump is installed drops what it read.
+    /// `SSHForwardingConnection.openDirectTCPIP` satisfies this.
+    public typealias DirectTCPIPFactory = @Sendable (String, Int) async throws -> Channel
+
+    private let group: any EventLoopGroup
+    private let open = OpenForwards()
+
+    /// The port the listener actually bound, once it has — the answer for a
+    /// forward configured on port 0, and `nil` before `start` and after
+    /// `stop`.
+    public var boundPort: Int? { open.boundPort }
+
+    /// `MultiThreadedEventLoopGroup.singleton` by default: the listener never
+    /// shuts its group down (it does not own it), and the process-wide
+    /// singleton is the group NIO intends for exactly that.
+    public init(group: any EventLoopGroup = MultiThreadedEventLoopGroup.singleton) {
+        self.group = group
+    }
+
+    /// Binds `bind:localPort` and returns the port actually bound.
+    ///
+    /// **One listener binds once.** A second `start` — including one after
+    /// `stop()` — throws `TunnelFailure.alreadyStarted`. Task 5's reconnect
+    /// builds a fresh SSH connection per attempt and builds a fresh listener
+    /// with it; that is the documented contract rather than an accident of
+    /// this implementation.
+    ///
+    /// - Parameters:
+    ///   - localPort: `0` asks the kernel for an ephemeral port; the answer
+    ///     is the return value and `boundPort`.
+    ///   - host, remotePort: the destination as the SSH SERVER reaches it,
+    ///     handed to the factory unchanged.
+    ///   - onFailure: called for each accepted connection whose channel
+    ///     through the server could not be opened. Per connection, not per
+    ///     tunnel: the listener stays up, since the next connection may well
+    ///     succeed.
+    @discardableResult
+    public func start(
+        bind: String, localPort: Int, host: String, remotePort: Int,
+        directTCPIPFactory: @escaping DirectTCPIPFactory,
+        observer: TunnelConnectionObserver? = nil,
+        onFailure: (@Sendable (TunnelFailure) -> Void)? = nil
+    ) async throws -> Int {
+        try await start(
+            bind: bind, localPort: localPort,
+            destination: .fixed(host: host, remotePort: remotePort),
+            directTCPIPFactory: directTCPIPFactory, observer: observer, onFailure: onFailure)
+    }
+
+    /// Binds `bind:localPort` for a `destination` that may be per-connection.
+    ///
+    /// Module-internal: `SOCKS5Listener` is the one caller, and the public
+    /// face of a dynamic forward is that type rather than an argument here.
+    @discardableResult
+    func start(
+        bind: String, localPort: Int, destination: ForwardDestination,
+        directTCPIPFactory: @escaping DirectTCPIPFactory,
+        observer: TunnelConnectionObserver? = nil,
+        onFailure: (@Sendable (TunnelFailure) -> Void)? = nil
+    ) async throws -> Int {
+        let open = self.open
+        // One listener binds once, successfully or not. `stop()` is final:
+        // it marks the state stopped so that a connection accepted during
+        // the teardown closes itself, and nothing resets that — a listener
+        // restarted after `stop()` would bind a port and then silently drop
+        // every connection on it. Refusing here is the alternative to a
+        // reset, chosen because it is the contract the caller already wants:
+        // a reconnect builds its own connection, so it builds its own
+        // listener too.
+        guard open.claimStart() else { throw TunnelFailure.alreadyStarted }
+        let bootstrap = ServerBootstrap(group: group)
+            // Lets the listener rebind a port whose previous connections are
+            // still in TIME_WAIT. It does NOT let two listeners hold the same
+            // address and port at once — that needs `SO_REUSEPORT`, which is
+            // not set here — so the second bind of a live port still fails
+            // with `EADDRINUSE`, which is what `portInUse` is mapped from.
+            .serverChannelOption(ChannelOptions.socketOption(.so_reuseaddr), value: 1)
+            .childChannelOption(ChannelOptions.autoRead, value: false)
+            .childChannelOption(ChannelOptions.allowRemoteHalfClosure, value: true)
+            .childChannelInitializer { channel in
+                Self.accepted(
+                    channel, destination: destination,
+                    directTCPIPFactory: directTCPIPFactory, observer: observer,
+                    onFailure: onFailure, open: open)
+                return channel.eventLoop.makeSucceededVoidFuture()
+            }
+
+        let server: Channel
+        do {
+            server = try await bootstrap.bind(host: bind, port: localPort).get()
+        } catch {
+            throw Self.bindFailure(error, bind: bind, port: localPort)
+        }
+        guard let port = server.localAddress?.port else {
+            server.close(promise: nil)
+            throw TunnelFailure.bindFailed(reason: "the bound socket reports no port")
+        }
+        open.bound(server, port: port)
+        return port
+    }
+
+    /// Closes the server socket and every pair still open, and returns only
+    /// once each of them has actually closed. Final: this listener cannot be
+    /// started again (see `start`).
+    ///
+    /// A connection accepted while this runs, whose channel through the
+    /// server is still being opened, is closed by the accept path itself
+    /// when it finds the listener stopped — that one is not waited for here,
+    /// since nothing yet holds it.
+    public func stop() async {
+        let (server, channels) = open.drain()
+        if let server {
+            server.close(promise: nil)
+            try? await server.closeFuture.get()
+        }
+        for channel in channels {
+            channel.close(promise: nil)
+        }
+        for channel in channels {
+            try? await channel.closeFuture.get()
+        }
+    }
+
+    /// One accepted connection: find out where it is going, open the channel
+    /// through the server, glue the two together, then let both start
+    /// reading.
+    ///
+    /// `static` and taking everything it needs as arguments so the
+    /// bootstrap's child initializer captures the shared state and not the
+    /// listener — the listener is then free of the retain cycle that
+    /// `listener → server channel → pipeline → closure → listener` would
+    /// otherwise be.
+    private static func accepted(
+        _ channel: Channel, destination: ForwardDestination,
+        directTCPIPFactory: @escaping DirectTCPIPFactory,
+        observer: TunnelConnectionObserver?,
+        onFailure: (@Sendable (TunnelFailure) -> Void)?,
+        open: OpenForwards
+    ) {
+        guard open.track(channel) else {
+            channel.close(promise: nil)
+            return
+        }
+        Task {
+            let negotiation: (any ForwardNegotiation)?
+            let host: String
+            let remotePort: Int
+            switch destination {
+            case .fixed(let fixedHost, let fixedPort):
+                negotiation = nil
+                host = fixedHost
+                remotePort = fixedPort
+            case .negotiated(let negotiate):
+                do {
+                    let negotiated = try await negotiate(channel)
+                    negotiation = negotiated
+                    host = negotiated.host
+                    remotePort = negotiated.port
+                } catch {
+                    // A conversation that never named a destination is the
+                    // CLIENT's failure, not the tunnel's — a browser pointed
+                    // at the SOCKS port, a client offering only
+                    // username/password. The negotiation has already said so
+                    // in its own protocol and is closing; `onFailure` is not
+                    // called, because a tunnel that refuses one bad client is
+                    // working exactly as intended.
+                    channel.close(promise: nil)
+                    return
+                }
+            }
+            // Held outside the `do` so the catch can close it: once the
+            // factory has answered, there is a channel open ON THE SERVER,
+            // and a pump that then fails to install would otherwise leave it
+            // there until `stop()`.
+            var opened: Channel?
+            do {
+                let throughTheServer = try await directTCPIPFactory(host, remotePort)
+                opened = throughTheServer
+                guard open.track(throughTheServer) else {
+                    throughTheServer.close(promise: nil)
+                    channel.close(promise: nil)
+                    return
+                }
+                // Installing IS starting: each handler turns its own
+                // channel's `autoRead` on and issues the first read from
+                // that channel's own lifecycle, never from this task.
+                //
+                // The one exception is the SERVER side of a NEGOTIATED
+                // forward, and it is an ordering exception rather than a
+                // registration one. `confirm` writes the negotiation's reply
+                // on the accepted channel, and a SOCKS5 client reads the
+                // first ten bytes after its CONNECT as that reply — so a
+                // target that greets first (sshd, SMTP, IMAP, MySQL) must not
+                // have its banner pumped across before it. The gate holds
+                // that side's first read until the reply is out; a fixed
+                // forward has no reply to be overtaken and passes none.
+                let remoteReadGate = negotiation == nil ? nil : BytePumpReadGate()
+                try await BytePump.install(
+                    local: channel, remote: throughTheServer, observer: observer,
+                    remoteReadGate: remoteReadGate).get()
+                try await negotiation?.confirm(on: channel)
+                remoteReadGate?.open()
+            } catch is ForwardReplyUndelivered {
+                // The channel through the server is open and the pump is
+                // installed: the tunnel did its part. What failed is the
+                // reply reaching the ACCEPTED socket — a client that named a
+                // destination and was gone before the answer. That is the
+                // client's failure, like one that never named a destination
+                // above, so `onFailure` is not called and nothing is
+                // counted; no `reject` either, since the reply that failed
+                // is the one it would write to.
+                //
+                // Only THIS error, not everything `confirm` throws: the
+                // negotiation's own hand-over failing on a live connection
+                // (`SOCKS5HandshakeHandler.succeed`'s `removeHandler`) is the
+                // tunnel's failure, and goes to the catch below with a
+                // failed pump install — reported as `pumpFailed`.
+                opened?.close(promise: nil)
+                channel.close(promise: nil)
+            } catch {
+                let failure = Self.acceptFailure(error, afterOpen: opened != nil)
+                await negotiation?.reject(failure, on: channel)
+                opened?.close(promise: nil)
+                channel.close(promise: nil)
+                onFailure?(failure)
+            }
+        }
+    }
+
+    /// What to report for a failure on the accept path.
+    ///
+    /// A `TunnelFailure` travels through UNCHANGED, so the factory's own
+    /// sentence — the only one that says why the server refused — reaches
+    /// the caller as the CASE it was raised as, not merely as text. This
+    /// comment used to argue the point differently, and that argument is now
+    /// out of date: `DialSupport.reason(for:)` gained a `TunnelFailure` arm
+    /// on 2026-09-06 (Task 5, round 2) which passes those `reason:` payloads
+    /// straight through, so mapping one would no longer destroy its
+    /// sentence. It would still destroy its CASE — `portInUse` carries a
+    /// port, and `pumpFailed` and `channelOpenFailed` mean different things
+    /// to the accept path — and a value that is already a `TunnelFailure` has
+    /// nothing to gain from a round trip through text. Only a foreign error
+    /// is mapped.
+    ///
+    /// `afterOpen` decides the case, not the error: everything up to the
+    /// factory's answer is `channelOpenFailed`, everything after it is
+    /// `pumpFailed`. A `TunnelFailure` the factory itself raised keeps its
+    /// own case regardless — it knows better than this function does.
+    private static func acceptFailure(_ error: any Error, afterOpen: Bool) -> TunnelFailure {
+        if let failure = error as? TunnelFailure { return failure }
+        let reason = DialSupport.reason(for: error)
+        return afterOpen ? .pumpFailed(reason: reason) : .channelOpenFailed(reason: reason)
+    }
+
+    /// What to report for a bind that failed: the three errnos a person
+    /// can act on as cases of their own, anything else as `bindFailed`.
+    ///
+    /// Module-internal rather than private so a test can hand it an errno no
+    /// loopback bind produces on demand.
+    static func bindFailure(_ error: any Error, bind: String, port: Int) -> TunnelFailure {
+        if let ioError = error as? IOError {
+            switch ioError.errnoCode {
+            case EADDRINUSE: return .portInUse(port: port)
+            case EADDRNOTAVAIL: return .bindAddressUnavailable(address: bind)
+            case EACCES: return .bindPermissionDenied(port: port)
+            default: break
+            }
+        }
+        return .bindFailed(reason: DialSupport.reason(for: error))
+    }
+}
+
+/// The listener's mutable state: the server channel, the channels of every
+/// pair currently open, and whether the listener has been stopped.
+///
+/// A type of its own rather than fields on the listener because the accept
+/// closure needs it and must not need the listener. `NSLock` rather than an
+/// actor for the reason `BytePumpCounters` gives: the mutations happen inside
+/// close callbacks on event loops, where there is no `await`.
+private final class OpenForwards: @unchecked Sendable {
+    private let lock = NSLock()
+    private var server: Channel?
+    private var port: Int?
+    private var channels: [ObjectIdentifier: Channel] = [:]
+    private var started = false
+    private var stopped = false
+
+    var boundPort: Int? {
+        lock.lock()
+        defer { lock.unlock() }
+        return port
+    }
+
+    /// Takes this listener's one and only start. `false` on every call
+    /// after the first, whether or not that first one went on to bind
+    /// successfully — a listener is a single use, and a caller that wants to
+    /// try again wants a new one.
+    func claimStart() -> Bool {
+        lock.lock()
+        defer { lock.unlock() }
+        guard !started else { return false }
+        started = true
+        return true
+    }
+
+    func bound(_ channel: Channel, port: Int) {
+        lock.lock()
+        server = channel
+        self.port = port
+        lock.unlock()
+    }
+
+    /// Remembers a channel so `stop()` can close it, and arranges for it to
+    /// be forgotten again when it closes on its own. `false` means the
+    /// listener has already been stopped and the caller should close what it
+    /// has.
+    func track(_ channel: Channel) -> Bool {
+        lock.lock()
+        let accepted = !stopped
+        if accepted { channels[ObjectIdentifier(channel)] = channel }
+        lock.unlock()
+        guard accepted else { return false }
+        channel.closeFuture.whenComplete { [self] _ in forget(channel) }
+        return true
+    }
+
+    private func forget(_ channel: Channel) {
+        lock.lock()
+        channels[ObjectIdentifier(channel)] = nil
+        lock.unlock()
+    }
+
+    /// Hands out everything to close and marks the listener stopped, in one
+    /// step: a connection accepted after this returns finds `track` refusing
+    /// and closes itself.
+    func drain() -> (server: Channel?, channels: [Channel]) {
+        lock.lock()
+        defer { lock.unlock() }
+        stopped = true
+        let taken = (server, Array(channels.values))
+        server = nil
+        port = nil
+        channels.removeAll()
+        return taken
+    }
+}

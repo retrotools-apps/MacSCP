@@ -1,0 +1,185 @@
+#!/usr/bin/env python3
+"""Verify vendored sources and the explicit official Apple dependency exemption."""
+import argparse
+import hashlib
+import json
+from pathlib import Path
+import re
+import sys
+
+
+ROOT = Path(__file__).resolve().parent.parent
+VENDOR = ROOT / "Vendor"
+INVENTORY = VENDOR / "checksums.json"
+APPLE_IDENTITIES = frozenset({
+    "swift-asn1", "swift-atomics", "swift-collections",
+    "swift-crypto", "swift-log", "swift-nio", "swift-system", "swift-nio-ssl",
+})
+
+
+def native_pins():
+    pins = json.loads((VENDOR / "native-dependencies.json").read_text())["pins"]
+    allowed = {
+        "sparkle": "https://github.com/sparkle-project/Sparkle",
+        "sparkle-argument-parser": "https://github.com/apple/swift-argument-parser",
+    }
+    for pin in pins:
+        if pin["identity"] not in allowed or pin["location"] != allowed[pin["identity"]]:
+            fail("unapproved native dependency origin")
+        root = VENDOR / pin["identity"]
+        project = (root / pin["project"]).resolve()
+        if not project.is_relative_to(root.resolve()):
+            fail("native source project escapes its snapshot")
+        if project.suffix == ".pbxproj" and re.search(r"repositoryURL\s*=", project.read_text()):
+            fail("native project contains an unpinned remote package")
+    return pins
+
+
+def apple_pins():
+    pins = json.loads((VENDOR / "Package.resolved").read_text())["pins"]
+    return {p["identity"]: p for p in pins if p["identity"] in APPLE_IDENTITIES}
+
+
+def check_apple_lock():
+    trusted = apple_pins()
+    for identity, pin in trusted.items():
+        if pin.get("location") != f"https://github.com/apple/{identity}.git":
+            fail(f"untrusted Apple provenance: {identity}")
+    if trusted:
+        locked = json.loads((ROOT / "Package.resolved").read_text())["pins"]
+        if {p["identity"]: p for p in locked} != trusted or len(locked) != len(trusted):
+            fail("Apple dependency lock differs from recorded provenance")
+
+
+def fail(message):
+    raise ValueError(message)
+
+
+def uncomment(source):
+    # Keep strings intact so URL literals and path spellings remain inspectable.
+    token = re.compile(r'"(?:\\.|[^"\\])*"|//[^\n]*|/\*.*?\*/', re.S)
+    return token.sub(lambda match: match[0] if match[0].startswith('"') else " ", source)
+
+
+def check_manifests(packages):
+    manifests = [ROOT / "Package.swift"]
+    for package in packages:
+        manifests += sorted((VENDOR / package).glob("Package*.swift"))
+    for path in manifests:
+        code = uncomment(path.read_text())
+        if re.search(r"\.binaryTarget\s*\(", code):
+            fail(f"binary target forbidden: {path.relative_to(ROOT)}")
+        for dependency in re.finditer(r"\.package\s*\((.*?)\)", code, re.S):
+            remote = re.fullmatch(r'\s*url:\s*"([^"]+)"\s*,\s*exact:\s*"([^"]+)"\s*,?\s*', dependency[1])
+            if remote is not None:
+                if not any(remote[1] == pin["location"] and remote[2] == pin["state"]["version"]
+                           for pin in apple_pins().values()):
+                    fail(f"remote dependency is not an approved exact Apple version: {path.relative_to(ROOT)}")
+                continue
+            local = re.fullmatch(r'\s*path:\s*"([^"\\]+)"\s*,?\s*', dependency[1])
+            if local is None:
+                fail(f"dependency must use a literal local path: {path.relative_to(ROOT)}")
+            destination = (path.parent / local[1]).resolve()
+            if destination.parent != VENDOR.resolve() or destination.name not in packages:
+                fail(f"dependency escapes the recorded Vendor packages: {path.relative_to(ROOT)}")
+        if re.search(r"\.plugin\s*\(", code) and path.parent == ROOT:
+            fail("root build plugins are forbidden by the local-source policy")
+
+
+def inventory():
+    result = {}
+    for path in sorted(VENDOR.rglob("*")):
+        relative = str(path.relative_to(VENDOR))
+        if ".build" in path.relative_to(VENDOR).parts:
+            continue  # SwiftPM/Xcode may create disposable nested build caches.
+        if ".git" in path.relative_to(VENDOR).parts:
+            fail(f"nested Git metadata forbidden: {relative}")
+        if path == INVENTORY or (path.is_dir() and not path.is_symlink()):
+            continue
+        if path.is_symlink():
+            if not path.resolve().is_relative_to(VENDOR.resolve()):
+                fail(f"symlink escapes Vendor: {relative}")
+            result[relative] = {"symlink": str(path.readlink())}
+        else:
+            result[relative] = {
+                "sha256": hashlib.sha256(path.read_bytes()).hexdigest(),
+                "executable": bool(path.stat().st_mode & 0o111),
+            }
+    return result
+
+
+def check_graph(graph, packages):
+    if Path(graph["path"]).resolve() != ROOT.resolve():
+        fail("dependency graph does not describe this repository")
+    seen = set()
+    trusted = apple_pins()
+    remaining = list(graph["dependencies"])
+    while remaining:
+        node = remaining.pop()
+        identity = node["identity"]
+        if identity in trusted:
+            pin = trusted[identity]
+            if node["url"] != pin["location"] or node.get("version") != pin["state"]["version"]:
+                fail("resolved Apple dependency is not the approved source/version")
+            seen.add(identity)
+            remaining.extend(node["dependencies"])
+            continue
+        path = Path(node["path"]).resolve()
+        if path.parent != VENDOR.resolve() or node["identity"] != path.name or path.name not in packages:
+            fail("resolved dependency is outside the local source snapshots")
+        if node["url"] != node["path"]:
+            fail("resolved dependency has a remote source location")
+        seen.add(path.name)
+        remaining.extend(node["dependencies"])
+    if seen != packages | trusted.keys():
+        fail("resolved graph does not match the complete dependency provenance")
+
+
+def main():
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--record", action="store_true", help="Record hashes after an explicitly reviewed vendor change")
+    parser.add_argument("--graph", type=Path, help="Also verify SwiftPM show-dependencies JSON")
+    args = parser.parse_args()
+    pins = json.loads((VENDOR / "Package.resolved").read_text())["pins"]
+    identities = {pin["identity"] for pin in pins}
+    packages = identities - APPLE_IDENTITIES
+    if not packages or len(identities) != len(pins):
+        fail("missing or duplicate dependency provenance")
+    check_apple_lock()
+    native = native_pins()
+    native_ids = {pin["identity"] for pin in native}
+    if len(native_ids) != len(native) or native_ids & identities:
+        fail("duplicate native dependency provenance")
+    for pin in native:
+        if not re.fullmatch(r"[0-9a-f]{40}", pin["state"]["revision"]):
+            fail("native dependency requires an immutable revision")
+        if not (VENDOR / pin["identity"] / pin["project"]).is_file():
+            fail("missing native dependency source project")
+    actual_packages = {path.name for path in VENDOR.iterdir() if path.is_dir()}
+    if actual_packages != packages | native_ids:
+        fail("Vendor directories do not match the recorded dependency identities")
+    for pin in pins:
+        if not re.fullmatch(r"[0-9a-f]{40}", pin["state"]["revision"]):
+            fail(f"missing immutable revision for {pin['identity']}")
+        if pin["identity"] in packages and not (VENDOR / pin["identity"] / "Package.swift").is_file():
+            fail(f"missing source package for {pin['identity']}")
+    check_manifests(packages | native_ids)
+    if args.graph is not None:
+        check_graph(json.loads(args.graph.read_text()), packages)
+    actual = inventory()
+    if args.record:
+        INVENTORY.write_text(json.dumps(actual, indent=2, sort_keys=True) + "\n")
+    else:
+        expected = json.loads(INVENTORY.read_text())
+        changed = [name for name in sorted(actual.keys() | expected.keys()) if actual.get(name) != expected.get(name)]
+        if changed:
+            fail("vendored source inventory mismatch: " + ", ".join(changed[:20]))
+    print(f"Verified {len(packages)} local source packages, {len(native)} native sources and {len(actual)} inventory entries")
+
+
+if __name__ == "__main__":
+    try:
+        main()
+    except (ValueError, OSError, KeyError) as error:
+        print(f"check-vendor: {error}", file=sys.stderr)
+        sys.exit(1)

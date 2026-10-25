@@ -1,0 +1,214 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>browser.transferConfirm.download.message %lld %@</key>
+	<dict>
+		<key>NSStringLocalizedFormatKey</key>
+		<string>%1$#@items@</string>
+		<key>items</key>
+		<dict>
+			<key>NSStringFormatSpecTypeKey</key>
+			<string>NSStringPluralRuleType</string>
+			<key>NSStringFormatValueTypeKey</key>
+			<string>lld</string>
+			<key>one</key>
+			<string>Verrà scaricato %1$lld elemento in «%2$@».</string>
+			<key>other</key>
+			<string>Verranno scaricati %1$lld elementi in «%2$@».</string>
+		</dict>
+	</dict>
+	<key>browser.transferConfirm.download.messageWithFolders %lld %@</key>
+	<dict>
+		<key>NSStringLocalizedFormatKey</key>
+		<string>%1$#@items@</string>
+		<key>items</key>
+		<dict>
+			<key>NSStringFormatSpecTypeKey</key>
+			<string>NSStringPluralRuleType</string>
+			<key>NSStringFormatValueTypeKey</key>
+			<string>lld</string>
+			<key>one</key>
+			<string>Verrà scaricata %1$lld cartella in «%2$@», con tutto il suo contenuto.</string>
+			<key>other</key>
+			<string>Verranno scaricati %1$lld elementi in «%2$@», incluse le cartelle e tutto il loro contenuto.</string>
+		</dict>
+	</dict>
+	<key>browser.transferConfirm.upload.message %lld %@</key>
+	<dict>
+		<key>NSStringLocalizedFormatKey</key>
+		<string>%1$#@items@</string>
+		<key>items</key>
+		<dict>
+			<key>NSStringFormatSpecTypeKey</key>
+			<string>NSStringPluralRuleType</string>
+			<key>NSStringFormatValueTypeKey</key>
+			<string>lld</string>
+			<key>one</key>
+			<string>Verrà caricato %1$lld elemento in «%2$@».</string>
+			<key>other</key>
+			<string>Verranno caricati %1$lld elementi in «%2$@».</string>
+		</dict>
+	</dict>
+	<key>browser.transferConfirm.upload.messageWithFolders %lld %@</key>
+	<dict>
+		<key>NSStringLocalizedFormatKey</key>
+		<string>%1$#@items@</string>
+		<key>items</key>
+		<dict>
+			<key>NSStringFormatSpecTypeKey</key>
+			<string>NSStringPluralRuleType</string>
+			<key>NSStringFormatValueTypeKey</key>
+			<string>lld</string>
+			<key>one</key>
+			<string>Verrà caricata %1$lld cartella in «%2$@», con tutto il suo contenuto.</string>
+			<key>other</key>
+			<string>Verranno caricati %1$lld elementi in «%2$@», incluse le cartelle e tutto il loro contenuto.</string>
+		</dict>
+	</dict>
+	<key>connection.convertKey.repoint.message %lld %@</key>
+	<dict>
+		<key>NSStringLocalizedFormatKey</key>
+		<string>%1$#@sessions@</string>
+		<key>sessions</key>
+		<dict>
+			<key>NSStringFormatSpecTypeKey</key>
+			<string>NSStringPluralRuleType</string>
+			<key>NSStringFormatValueTypeKey</key>
+			<string>lld</string>
+			<key>one</key>
+			<string>Queste credenziali sono usate da una sessione, direttamente o per il suo host di salto. La sua chiave diventerà la chiave convertita «%2$@».</string>
+			<key>other</key>
+			<string>Queste credenziali sono usate da %1$lld sessioni, direttamente o per i loro host di salto. Tutte useranno la chiave convertita «%2$@».</string>
+		</dict>
+	</dict>
+	<key>logins.export.summary %lld</key>
+	<dict>
+		<key>NSStringLocalizedFormatKey</key>
+		<string>%#@count@</string>
+		<key>count</key>
+		<dict>
+			<key>NSStringFormatSpecTypeKey</key>
+			<string>NSStringPluralRuleType</string>
+			<key>NSStringFormatValueTypeKey</key>
+			<string>lld</string>
+			<key>one</key>
+			<string>Verrà scritta %lld credenziale nel file.</string>
+			<key>other</key>
+			<string>Verranno scritte %lld credenziali nel file.</string>
+		</dict>
+	</dict>
+	<key>settings.connection.keepAlive.footer %lld</key>
+	<dict>
+		<key>NSStringLocalizedFormatKey</key>
+		<string>%#@count@</string>
+		<key>count</key>
+		<dict>
+			<key>NSStringFormatSpecTypeKey</key>
+			<string>NSStringPluralRuleType</string>
+			<key>NSStringFormatValueTypeKey</key>
+			<string>lld</string>
+			<key>one</key>
+			<string>Quando è attivo, MacSCP controlla una connessione inattiva ogni %lld secondo. Disattivandolo, l'intervallo viene conservato per la prossima attivazione.</string>
+			<key>other</key>
+			<string>Quando è attivo, MacSCP controlla una connessione inattiva ogni %lld secondi. Disattivandolo, l'intervallo viene conservato per la prossima attivazione.</string>
+		</dict>
+	</dict>
+	<key>settings.connection.keepAliveInterval %lld</key>
+	<dict>
+		<key>NSStringLocalizedFormatKey</key>
+		<string>%#@count@</string>
+		<key>count</key>
+		<dict>
+			<key>NSStringFormatSpecTypeKey</key>
+			<string>NSStringPluralRuleType</string>
+			<key>NSStringFormatValueTypeKey</key>
+			<string>lld</string>
+			<key>one</key>
+			<string>Ogni %lld secondo</string>
+			<key>other</key>
+			<string>Ogni %lld secondi</string>
+		</dict>
+	</dict>
+	<key>tabs.closeOthers.activeTransfers %1$lld %2$lld</key>
+	<dict>
+		<key>NSStringLocalizedFormatKey</key>
+		<string>%1$#@tabs@</string>
+		<key>tabs</key>
+		<dict>
+			<key>NSStringFormatSpecTypeKey</key>
+			<string>NSStringPluralRuleType</string>
+			<key>NSStringFormatValueTypeKey</key>
+			<string>lld</string>
+			<key>one</key>
+			<string>Chiudere %1$lld scheda annulla i trasferimenti attivi in %2$lld di esse.</string>
+			<key>other</key>
+			<string>Chiudere %1$lld schede annulla i trasferimenti attivi in %2$lld di esse.</string>
+		</dict>
+	</dict>
+	<key>tabs.closeOthers.incomingTransfers %lld</key>
+	<dict>
+		<key>NSStringLocalizedFormatKey</key>
+		<string>%#@count@</string>
+		<key>count</key>
+		<dict>
+			<key>NSStringFormatSpecTypeKey</key>
+			<string>NSStringPluralRuleType</string>
+			<key>NSStringFormatValueTypeKey</key>
+			<string>lld</string>
+			<key>one</key>
+			<string>%lld di esse sta ricevendo un trasferimento da un'altra scheda; la chiusura lo annulla.</string>
+			<key>other</key>
+			<string>%lld di esse stanno ricevendo trasferimenti da altre schede; la chiusura li annulla.</string>
+		</dict>
+	</dict>
+	<key>tunnel.dock.running %lld</key>
+	<dict>
+		<key>NSStringLocalizedFormatKey</key>
+		<string>%#@count@</string>
+		<key>count</key>
+		<dict>
+			<key>NSStringFormatSpecTypeKey</key>
+			<string>NSStringPluralRuleType</string>
+			<key>NSStringFormatValueTypeKey</key>
+			<string>lld</string>
+			<key>one</key>
+			<string>%lld tunnel attivo</string>
+			<key>other</key>
+			<string>%lld tunnel attivi</string>
+		</dict>
+	</dict>
+	<key>tunnel.state.activeWithFailures %lld</key>
+	<dict>
+		<key>NSStringLocalizedFormatKey</key>
+		<string>%#@count@</string>
+		<key>count</key>
+		<dict>
+			<key>NSStringFormatSpecTypeKey</key>
+			<string>NSStringPluralRuleType</string>
+			<key>NSStringFormatValueTypeKey</key>
+			<string>lld</string>
+			<key>one</key>
+			<string>Attivo · %lld connessione non riuscita</string>
+			<key>other</key>
+			<string>Attivo · %lld connessioni non riuscite</string>
+		</dict>
+	</dict>
+	<key>tunnel.state.degraded %lld</key>
+	<dict>
+		<key>NSStringLocalizedFormatKey</key>
+		<string>%#@count@</string>
+		<key>count</key>
+		<dict>
+			<key>NSStringFormatSpecTypeKey</key>
+			<string>NSStringPluralRuleType</string>
+			<key>NSStringFormatValueTypeKey</key>
+			<string>lld</string>
+			<key>one</key>
+			<string>Degradato · %lld connessione consecutiva non riuscita</string>
+			<key>other</key>
+			<string>Degradato · %lld connessioni consecutive non riuscite</string>
+		</dict>
+	</dict>
+</dict>
+</plist>

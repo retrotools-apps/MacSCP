@@ -1,0 +1,113 @@
+#!/bin/bash
+# Signs a packaged app or the development executable; never creates an identity.
+set -euo pipefail
+MODE=app
+AD_HOC=0
+case "${1:-}" in
+    --ad-hoc) AD_HOC=1; shift ;;
+    --check) MODE=check; shift ;;
+    --executable) MODE=executable; shift ;;
+esac
+TARGET="${1:-dist/MacSCP.app}"
+if [[ "$AD_HOC" == 1 ]]; then
+    IDENTITY="-"
+    TEAM=""
+    [[ "$(/usr/libexec/PlistBuddy -c 'Print :MacSCPDistribution' "$TARGET/Contents/Info.plist")" == direct ]] || {
+        echo "error: ad-hoc signing is only available for direct-distribution app packages" >&2; exit 1;
+    }
+else
+    IDENTITY="${MACSCP_SIGN_IDENTITY:?Set MACSCP_SIGN_IDENTITY to an installed Apple signing identity}"
+    TEAM="${MACSCP_TEAM_ID:?Set MACSCP_TEAM_ID to your ten-character Apple Team ID}"
+    [[ "$TEAM" =~ ^[A-Z0-9]{10}$ ]] || { echo "error: invalid Apple Team ID" >&2; exit 1; }
+    [[ "$IDENTITY" != "-" ]] || { echo "error: ad-hoc signing is not a persistent identity" >&2; exit 1; }
+    IDENTITIES="$(security find-identity -v -p codesigning)"
+    grep -Fq -- "$IDENTITY" <<< "$IDENTITIES" || {
+        echo "error: signing identity is not installed" >&2; exit 1;
+    }
+    if [[ "$MODE" == check ]]; then exit 0; fi
+fi
+if [[ "$MODE" == app ]]; then
+    [[ -d "$TARGET/Contents" && -f "$TARGET/Contents/MacOS/MacSCP" ]] || {
+        echo "error: expected an assembled MacSCP.app" >&2; exit 1;
+    }
+    [[ "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "$TARGET/Contents/Info.plist")" == "retroTools.MacSCP" ]] || {
+        echo "error: unexpected application identifier" >&2; exit 1;
+    }
+else
+    [[ -f "$TARGET" && -x "$TARGET" ]] || {
+        echo "error: expected an executable development binary" >&2; exit 1;
+    }
+fi
+SIGNING_WORK="$(mktemp -d -t macscp-signing)"
+APP_ENTITLEMENTS="$SIGNING_WORK/app.plist"
+trap 'rm -f "$APP_ENTITLEMENTS"; rmdir "$SIGNING_WORK"' EXIT
+write_entitlements() {
+    local destination="$1" identifier="$2"
+    /usr/bin/plutil -create xml1 "$destination"
+    /usr/libexec/PlistBuddy -c "Add :com.apple.application-identifier string $TEAM.$identifier" "$destination"
+    /usr/libexec/PlistBuddy -c 'Add :keychain-access-groups array' "$destination"
+    /usr/libexec/PlistBuddy -c "Add :keychain-access-groups:0 string $TEAM.retroTools.MacSCP.credentials" "$destination"
+}
+if [[ "$MODE" == app && "$AD_HOC" == 0 ]]; then
+    write_entitlements "$APP_ENTITLEMENTS" retroTools.MacSCP
+fi
+TIMESTAMP=(--timestamp=none)
+if [[ "$AD_HOC" == 0 && "${MACSCP_SIGN_TIMESTAMP:-none}" == "secure" ]]; then TIMESTAMP=(--timestamp); fi
+BASE_ARGS=(--force "${TIMESTAMP[@]}" --sign "$IDENTITY")
+EXEC_ARGS=("${BASE_ARGS[@]}")
+# Ad-hoc signatures have no Apple Team ID. Hardened-runtime library validation
+# would reject the bundled ad-hoc Sparkle framework. Grant no restricted
+# entitlements or library-validation exceptions in this distribution.
+if [[ "$AD_HOC" == 0 ]]; then EXEC_ARGS+=(--options runtime); fi
+# A hardened development executable also needs a framework with the same
+# Team ID. Keep library validation enabled; sign the source-built dependency.
+SPARKLE=""
+if [[ "$MODE" == app ]]; then
+    SPARKLE="$TARGET/Contents/Frameworks/Sparkle.framework"
+elif [[ "$MODE" == executable ]]; then
+    LINKS="$(/usr/bin/otool -L "$TARGET" 2>/dev/null || true)"
+    if [[ "$LINKS" == *"/Sparkle.framework/"* ]]; then
+        SPARKLE="$(cd "$(dirname "$0")/.." && pwd)/.build/sparkle/Build/Products/Release/Sparkle.framework"
+        [[ -d "$SPARKLE" ]] || { echo "error: source-built Sparkle framework is missing" >&2; exit 1; }
+    fi
+fi
+if [[ -n "$SPARKLE" && -d "$SPARKLE" ]]; then
+        # Sign nested executables first; do not use --deep to hide omissions.
+        codesign "${EXEC_ARGS[@]}" \
+            "$SPARKLE/Versions/B/Autoupdate"
+        codesign "${EXEC_ARGS[@]}" \
+            "$SPARKLE/Versions/B/Updater.app"
+        codesign "${EXEC_ARGS[@]}" "$SPARKLE"
+        codesign --verify --deep --strict "$SPARKLE"
+fi
+# Sign resource bundles first. Only Apple-identity mode grants the app's
+# credential access group; ad-hoc packages remain on the standard Keychain.
+if [[ "$MODE" == app ]]; then
+    codesign "${BASE_ARGS[@]}" \
+        "$TARGET/Contents/Resources/macSCP_MacSCPAppKit.bundle" \
+        "$TARGET/Contents/Resources/macSCP_macSCPCore.bundle"
+fi
+# Bash 3.2 treats an empty array as unset under nounset. Keep this array
+# nonempty in executable mode so signing cannot be skipped before invocation.
+SIGN_ARGS=("${EXEC_ARGS[@]}" --identifier retroTools.MacSCP)
+if [[ "$MODE" == app && "$AD_HOC" == 0 ]]; then SIGN_ARGS+=(--entitlements "$APP_ENTITLEMENTS"); fi
+codesign "${SIGN_ARGS[@]}" "$TARGET"
+codesign --verify --deep --strict --test-requirement '=identifier "retroTools.MacSCP"' "$TARGET"
+# Read the complete output before matching: grep -q in a pipe can close it
+# early and turn a valid signature into a SIGPIPE failure under pipefail.
+SIGNATURE_INFO="$(codesign -dvv "$TARGET" 2>&1)"
+if [[ "$AD_HOC" == 1 ]]; then
+    grep -Fxq 'Signature=adhoc' <<< "$SIGNATURE_INFO" || {
+        echo "error: expected an ad-hoc signature" >&2; exit 1;
+    }
+    echo "Ad-hoc signed MacSCP for direct distribution (not Apple-notarized). Standard Keychain only."
+    exit 0
+fi
+grep -Fxq -- "TeamIdentifier=$TEAM" <<< "$SIGNATURE_INFO" || {
+    echo "error: signing identity does not match MACSCP_TEAM_ID" >&2; exit 1;
+}
+if [[ "$MODE" == app ]]; then
+    echo "Signed MacSCP with shared Keychain entitlements. No credentials were read or migrated."
+else
+    echo "Signed MacSCP development executable with a stable identity (standard Keychain, no restricted Touch ID entitlements)."
+fi

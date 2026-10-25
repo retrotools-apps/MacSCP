@@ -1,0 +1,693 @@
+import Foundation
+
+/// WebDAV backend (M21). Third implementation of `RemoteFileSystem`, and the
+/// first with real directories and atomic rename — the two capability axes S3
+/// leaves false.
+public final class WebDAVFileSystem: RemoteFileSystem, @unchecked Sendable {
+    private let base: WebDAVURL
+    private let transport: any HTTPTransport
+    private let session: URLSession?
+
+    /// Test seam: inject a transport, skip the network entirely.
+    init(config: WebDAVConnectionConfig, transport: any HTTPTransport) {
+        self.base = WebDAVURL(
+            baseURL: URL(string: config.baseURL) ?? URL(string: "https://invalid.invalid")!,
+            nextcloudUser: config.useNextcloudPath ? config.username : nil)
+        self.transport = transport
+        self.session = nil
+    }
+
+    private init(base: WebDAVURL, transport: any HTTPTransport, session: URLSession) {
+        self.base = base
+        self.transport = transport
+        self.session = session
+    }
+
+    /// Builds the delegate-bearing session, verifies the credentials with a
+    /// `Depth: 0` PROPFIND on the root, and returns a connected file system.
+    ///
+    /// Module-internal, like every backend's dial: the only way in from
+    /// outside Core is `BackendDescriptor.openConnection`, which is where the
+    /// deciders and the configured connect timeout are supplied. Core's own
+    /// tests import `@testable` and keep this.
+    static func connect(
+        _ config: WebDAVConnectionConfig,
+        trustStore: TrustedCertificateStore,
+        decider: WebDAVSessionDelegate.CertificateDecider
+    ) async throws -> WebDAVFileSystem {
+        try WebDAVEndpointSecurity.rejectUserinfo(config.baseURL)
+        guard let url = URL(string: config.baseURL.trimmingCharacters(in: .whitespacesAndNewlines)),
+              ["http", "https"].contains(url.scheme?.lowercased() ?? ""), url.host() != nil else {
+            throw RemoteFSError.connectionFailed(reason: "WebDAV base URL is not a valid URL")
+        }
+        let delegate = WebDAVSessionDelegate(
+            baseURL: url, username: config.username, password: config.password,
+            trustStore: trustStore, decider: decider)
+        let configuration = URLSessionConfiguration.ephemeral
+        // The server-trust challenge is answered INSIDE this request's
+        // lifetime, by `decider`, which for an unknown certificate suspends
+        // until a human compares a SHA-256 fingerprint against, say, a NAS
+        // admin page they have to go open first. The default 60s
+        // `timeoutIntervalForRequest` races that: reading and comparing a
+        // fingerprint routinely takes over a minute, and a `stat("/")` that
+        // times out while the user is still looking surfaces as a generic
+        // `NSURLErrorTimedOut` with no indication that the certificate was
+        // in fact accepted (it gets written to the trust store regardless,
+        // so the NEXT attempt silently works — which makes the timeout look
+        // like a flake rather than what it is). Five minutes comfortably
+        // outlasts that reading time without masking a genuinely dead
+        // connection for an unreasonable while. Do not "simplify" this back
+        // to the default — that reintroduces exactly this race.
+        configuration.timeoutIntervalForRequest = 300
+        // `timeoutIntervalForResource` (the cap on a single request's total
+        // duration, including a slow upload) is left at its default, which
+        // is already 7 days — ample for even a very large, very slow
+        // transfer, so there is nothing to raise here.
+        let session = URLSession(
+            configuration: configuration, delegate: delegate, delegateQueue: nil)
+        let base = WebDAVURL(
+            baseURL: url, nextcloudUser: config.useNextcloudPath ? config.username : nil)
+        let fs = WebDAVFileSystem(
+            base: base, transport: URLSessionHTTPTransport(session: session), session: session)
+
+        do {
+            _ = try await fs.stat(path: "/")
+        } catch {
+            session.invalidateAndCancel()
+            // A refused or mismatched certificate surfaces as a generic
+            // cancellation from URLSession; report the precise cause instead.
+            if let certificateError = delegate.lastCertificateError {
+                throw certificateError
+            }
+            // A challenge from somewhere other than the configured server
+            // was refused unanswered, so the request died the same
+            // `NSURLErrorCancelled` death a rejected password does — but it
+            // is not a rejected password, and reporting it as one would
+            // send the user off to check credentials that were never sent.
+            // The delegate's own sentence names both origins instead.
+            //
+            // The order these two are read in cannot matter: a refused
+            // challenge is never answered, so it can never produce the
+            // repeat that marks a credential rejected, and the two flags
+            // therefore describe disjoint outcomes. That disjointness is
+            // the load-bearing part, so it is pinned by a test rather than
+            // claimed here — see `WebDAVSessionDelegateTests`.
+            if let foreignChallenge = delegate.lastForeignChallenge {
+                throw RemoteFSError.connectionFailed(reason: foreignChallenge)
+            }
+            // A rejected password is the same story as a refused
+            // certificate, one layer over: the delegate declines the
+            // repeated challenge, URLSession abandons the request, and what
+            // arrives here is `NSURLErrorCancelled` -- so `mapStatus` never
+            // sees the 401 and the honest `authenticationFailed` it would
+            // have produced. Asking the delegate what it did is the only
+            // way to tell a mistyped password from a cancelled request.
+            if delegate.credentialWasRejected {
+                throw RemoteFSError.authenticationFailed
+            }
+            // Everything else goes through the same wrap every other
+            // operation on this backend uses -- see `surfaceable(_:)`, which
+            // is where the reasoning for it lives.
+            throw Self.surfaceable(error)
+        }
+        return fs
+    }
+
+    // MARK: - The network boundary
+
+    /// Turns a foreign error from the network into one this app can put in
+    /// front of a user, and is the ONLY thing in this file that talks to
+    /// `transport`.
+    ///
+    /// **Why every call goes through here.** URL credentials are now refused
+    /// at configuration and connect time. The network wrapper remains a
+    /// backstop for foreign errors carrying server-controlled URL text.
+    ///
+    /// An `NSError`'s `description` prints its entire `userInfo`, and
+    /// Foundation puts the failing URL in there under
+    /// `NSErrorFailingURLStringKey`, verbatim, userinfo component included.
+    /// Measured against a dead loopback port: the secret is present in
+    /// `String(describing:)` and absent from `localizedDescription`. The
+    /// reachable sinks all stringified when this was written: the CLI's
+    /// stderr fallback, the transfer-failure text and the browse-error
+    /// text. None of the three describes an error any more (the queue since
+    /// fix round 1 of the 2026-09-19 small follow-ups' Task 1, the other two
+    /// since that plan's final review), but wrapping here stays the defence:
+    /// their filter, `URLText.withoutUserinfo`, is a backstop with a
+    /// documented hole. No attacker is needed to reach them -- a timeout, a
+    /// DNS failure or a dropped connection during an ordinary session is
+    /// enough.
+    ///
+    /// Round 1 of this fix wrapped `connect` alone, which left `list`,
+    /// `stat`, `readStream`, `delete`, `createDirectory` and `rename`
+    /// handing the raw `URLError` through. Wrapping at the transport
+    /// boundary instead of at each operation is deliberate: a seventh
+    /// operation added later gets this for free, and "which methods
+    /// remembered to wrap" stops being a thing anyone has to know.
+    ///
+    /// Two kinds of error are not wrapped, and both are the app's own
+    /// vocabulary rather than the network's: `RemoteFSError`, already
+    /// mapped and already safe, passes through unchanged, and a cancelled
+    /// request's end — a `CancellationError`, or the `URLError(.cancelled)`
+    /// a `URLSession` request throws when its task is cancelled — goes on
+    /// as a `CancellationError` (`HTTPCancellation`), which the transfer
+    /// queue distinguishes from a failure and would report as one if it
+    /// were wrapped. A `URLError(.cancelled)` in a task that is NOT
+    /// cancelled is still wrapped: it is also how a refused challenge ends
+    /// a request (`WebDAVSessionDelegate`), which is a failure.
+    static func surfaceable(_ error: Error) -> Error {
+        if let fsError = error as? RemoteFSError { return fsError }
+        if let cancellation = HTTPCancellation.cancellation(in: error) { return cancellation }
+        // `localizedDescription` is the localized sentence alone ("Could
+        // not connect to the server."), which carries no URL and no
+        // dictionary whose keys Foundation, not MacSCP, decides.
+        //
+        // Second effect, not a side effect: an unwrapped rethrow reaches
+        // `ConnectionViewModel.failedState`'s catch-all arm, so an ordinary
+        // WebDAV network failure read "Unexpected error: <NSError dump>"
+        // instead of the connection-failure text every other backend
+        // produces for the same condition.
+        return RemoteFSError.connectionFailed(reason: error.localizedDescription)
+    }
+
+    /// `transport.send`, with the wrap above. Every request in this file
+    /// goes through this rather than through `transport` directly.
+    private func send(_ request: URLRequest) async throws -> (Data, HTTPURLResponse) {
+        do {
+            return try await transport.send(request)
+        } catch {
+            throw Self.surfaceable(error)
+        }
+    }
+
+    /// `transport.sendStreaming`, with the wrap above applied BOTH to the
+    /// call and to the body it returns. A download that dies halfway
+    /// through throws from inside the stream, long after this function has
+    /// returned, and that error reaches the same transfer-failure text as
+    /// any other.
+    private func sendStreaming(_ request: URLRequest) async throws
+        -> (body: AsyncThrowingStream<Data, Error>, response: HTTPURLResponse)
+    {
+        do {
+            let (body, response) = try await transport.sendStreaming(request)
+            return (Self.surfacing(body), response)
+        } catch {
+            throw Self.surfaceable(error)
+        }
+    }
+
+    /// Re-emits a body stream with `surfaceable(_:)` applied to whatever it
+    /// throws.
+    static func surfacing(
+        _ body: AsyncThrowingStream<Data, Error>
+    ) -> AsyncThrowingStream<Data, Error> {
+        // One downstream next() owns one upstream next(); no producer task or
+        // queue may run ahead of a slow destination.
+        nonisolated(unsafe) var iterator = body.makeAsyncIterator()
+        return AsyncThrowingStream(unfolding: {
+            do {
+                try Task.checkCancellation()
+                return try await iterator.next()
+            } catch { throw surfaceable(error) }
+        })
+    }
+
+    // MARK: - Reads
+
+    public func list(path: String) async throws -> [RemoteFileItem] {
+        let data = try await propfind(path: path, depth: "1", isDirectory: true)
+        return try WebDAVPropfindParser.parse(data, base: base, requestedPath: path)
+    }
+
+    public func stat(path: String) async throws -> RemoteFileItem {
+        try await statWithEntityTag(path: path).item
+    }
+
+    /// Both answers off ONE PROPFIND: the response `stat` already needs
+    /// carries the `getetag` too, so a caller that wants both — every
+    /// download the transfer engine starts — pays one request rather than
+    /// two. `entityTag(path:)` above stays the standalone reader for callers
+    /// that want only the validator; it reads the same property out of the
+    /// same kind of response.
+    public func statWithEntityTag(
+        path: String
+    ) async throws -> (item: RemoteFileItem, entityTag: String?) {
+        // A collection and a file differ in URL shape, and servers disagree
+        // about what happens when you address a collection without its
+        // trailing slash: some redirect, some answer 2xx with no matching
+        // entry, and some flatly 404 it. Ask for the collection form first
+        // for the root (which is always a collection), the plain form
+        // otherwise, and fall back once — on a successful PROPFIND that
+        // didn't contain the addressed entry (a shape mismatch), AND on a
+        // 404 from the first attempt for a non-root path, since that is
+        // exactly the third server behaviour above and not distinguishable
+        // from a genuine miss without trying the other shape. A 404 from the
+        // SECOND attempt, or any non-404 error (401, 403, ...) from either
+        // attempt, is not shape-ambiguous and propagates immediately — it is
+        // the caller's answer already, and retrying would waste a round trip
+        // (or exhaust an unstubbed transport).
+        let isRoot = (path == "/")
+        do {
+            if let found = try await statOnce(path: path, isDirectory: isRoot) { return found }
+        } catch RemoteFSError.notFound where !isRoot {
+            // Shape-ambiguous: fall through to the second attempt below.
+        }
+        if let found = try await statOnce(path: path, isDirectory: !isRoot) { return found }
+        throw RemoteFSError.notFound(path: path)
+    }
+
+    /// Returns nil (rather than throwing `.notFound`) when the PROPFIND
+    /// succeeded but the addressed entry was not among the results — that is
+    /// one signal to retry with the opposite URL shape. Errors `propfind`
+    /// itself throws (mapped HTTP statuses) propagate unchanged; the retry
+    /// decides for itself which of those are worth a second attempt, and it
+    /// lives in `statWithEntityTag(path:)` above — `stat(path:)` reaches it
+    /// through that one, and this function's only two callers are there.
+    private func statOnce(
+        path: String, isDirectory: Bool
+    ) async throws -> (item: RemoteFileItem, entityTag: String?)? {
+        let data = try await propfind(path: path, depth: "0", isDirectory: isDirectory)
+        // Depth 0 reports exactly the addressed resource, which the listing
+        // parser excludes as "the requested collection". Ask it for the PARENT
+        // so the entry survives, then pick the one that matches.
+        let parent = path == "/" ? "/" : RemotePath.parent(of: path)
+        let entries = try WebDAVPropfindParser.parse(data, base: base, requestedPath: parent)
+        if let match = entries.first(where: { $0.path == path }) {
+            // The validator out of the SAME response, by the reader that
+            // `entityTag(path:)` uses. A collection, or a server that reports
+            // no `getetag`, yields `nil` — which is what a resumed read of it
+            // cannot be checked against, and is not an error.
+            return (match, try WebDAVPropfindParser.entityTag(data, base: base, at: path))
+        }
+        if path == "/" {
+            return (RemoteFileItem(name: "/", path: "/", kind: .directory), nil)
+        }
+        return nil
+    }
+
+    private func propfind(path: String, depth: String, isDirectory: Bool) async throws -> Data {
+        // The request, its `Depth` and its prop set are built by
+        // `WebDAVRequest`, which `WebDAVClaimsProbe` also asks — the body
+        // names exactly the properties `WebDAVPropfindParser` reads, and two
+        // copies of it could drift apart without anything failing.
+        let request = WebDAVRequest.propfind(
+            url: base.url(forPath: path, isDirectory: isDirectory), depth: depth)
+
+        let (data, response) = try await send(request)
+        try Self.mapStatus(response.statusCode, path: path, method: "PROPFIND")
+        return data
+    }
+
+    /// The validator the server reports for `path` right now: the
+    /// `getetag` of a depth-0 PROPFIND on the resource, as the server wrote
+    /// it. `nil` when that response carries no `getetag` — not every server
+    /// reports one, and a resource without a validator is not an error.
+    public func entityTag(path: String) async throws -> String? {
+        let data = try await propfind(path: path, depth: "0", isDirectory: false)
+        return try WebDAVPropfindParser.entityTag(data, base: base, at: path)
+    }
+
+    /// The two-argument spelling, delegating to the three-argument one with
+    /// no validator. This is the pairing `RemoteFileSystem` describes: this
+    /// backend overrides BOTH requirements, so the protocol extension's
+    /// default — the one that would call back into this function — is never
+    /// reached from here, and there is no cycle.
+    public func readStream(
+        path: String, fromOffset offset: UInt64
+    ) async throws -> AsyncThrowingStream<Data, Error> {
+        try await readStream(path: path, fromOffset: offset, ifMatching: nil)
+    }
+
+    public func readStream(
+        path: String, fromOffset offset: UInt64, ifMatching tag: String?
+    ) async throws -> AsyncThrowingStream<Data, Error> {
+        var request = URLRequest(url: base.url(forPath: path, isDirectory: false))
+        request.httpMethod = "GET"
+        if offset > 0 {
+            request.setValue("bytes=\(offset)-", forHTTPHeaderField: "Range")
+        }
+        // Only a RESUME carries the precondition: a fresh read has no
+        // partial file to protect, so a 412 there could only turn a
+        // perfectly good download into a failure. One `let` decides both
+        // whether the header goes out and whether a 412 coming back is this
+        // precondition's answer, so the two cannot drift apart.
+        let validatorSent: String? = offset > 0 ? tag : nil
+        if let validatorSent {
+            request.setValue(validatorSent, forHTTPHeaderField: "If-Match")
+        }
+        let (body, response) = try await sendStreaming(request)
+        if response.statusCode == 412, validatorSent != nil {
+            // Read BEFORE `mapStatus`, which maps 412 to the precondition a
+            // MOVE sets. Here the precondition is the `If-Match` above, and
+            // the sentence has to say what it means.
+            //
+            // GUARDED, because a 412 can also come back from a read that
+            // sent no precondition at all. Saying "the file changed on the
+            // server" there would be a claim about something nobody asked,
+            // so that one goes on to `mapStatus` — where a 412 went before
+            // this precondition existed.
+            throw RemoteFSError.finding(.sourceChangedSinceInterruption)
+        }
+        try Self.mapStatus(response.statusCode, path: path, method: "GET")
+        // A server that ignores Range answers 200 with the WHOLE body. Handing
+        // that to a caller who asked for byte N onward would append the head a
+        // second time and corrupt the file, so drop the head here: the caller
+        // gets exactly the bytes it asked for, at the cost of re-transferring
+        // what it already had.
+        guard offset > 0, response.statusCode != 206 else { return body }
+        return Self.dropping(offset, from: body)
+    }
+
+    /// Why a resumed download was refused: the resource is no longer the one
+    /// the interrupted attempt was reading. The request carried `If-Match`
+    /// with the entity tag taken before that attempt, and the server
+    /// answered 412 — so appending this body to the partial file on disk
+    /// would produce the old resource's head followed by the new one's tail,
+    /// at exactly the length a size check expects. Nothing was appended.
+    ///
+    /// As of the 2026-09-28 typed-findings change, this is no longer what
+    /// gets thrown: the site above throws
+    /// `RemoteFSError.finding(.sourceChangedSinceInterruption)`, whose
+    /// `logSentence` and `core.finding.sourceChangedSinceInterruption` `en`
+    /// catalogue entry carry the same English this constant does. It stays
+    /// here as that English's anchor in source — the user documentation
+    /// quotes it — even though nothing in this module reads it any more.
+    static let sourceChangedReason =
+        "The file changed on the server since the interrupted download, so nothing was added to the partial file"
+
+    /// Discards the first `count` bytes of a stream. The head may span several
+    /// chunks, so this tracks a running total rather than trimming only the
+    /// first chunk.
+    static func dropping(
+        _ count: UInt64, from body: AsyncThrowingStream<Data, Error>
+    ) -> AsyncThrowingStream<Data, Error> {
+        nonisolated(unsafe) var iterator = body.makeAsyncIterator()
+        nonisolated(unsafe) var remaining = count
+        return AsyncThrowingStream(unfolding: {
+            while true {
+                try Task.checkCancellation()
+                guard let chunk = try await iterator.next() else { return nil }
+                if remaining == 0 { return chunk }
+                if UInt64(chunk.count) <= remaining { remaining -= UInt64(chunk.count) }
+                else {
+                    let tail = Data(chunk.dropFirst(Int(remaining)))
+                    remaining = 0
+                    return tail
+                }
+            }
+        })
+    }
+
+    public func homeDirectoryPath() async throws -> String { "/" }
+
+    public func disconnect() async {
+        session?.invalidateAndCancel()
+    }
+
+    /// WebDAV has no partial PUT; Nextcloud's chunked upload is a proprietary
+    /// extension and out of scope. The transfer queue gates resume on this.
+    public var supportsAppendResume: Bool { false }
+
+    // MARK: - Writes (Task 7)
+
+    /// Streaming PUT.
+    ///
+    /// The body is fed through a bound stream pair rather than buffered: a
+    /// multi-gigabyte upload must not be held in memory.
+    ///
+    /// A consequence worth naming: **this body is not replayable.** If
+    /// URLSession decides to send the request again — an auth challenge on a
+    /// connection it had already started writing to, a redirect — it asks the
+    /// delegate for a fresh stream via `needNewBodyStream`, and there is
+    /// nothing to hand back. The pair's `InputStream` is single-use, and the
+    /// source it was fed from is a one-shot `AsyncThrowingStream` that has
+    /// already been consumed; re-reading either is impossible, not merely
+    /// unimplemented. `WebDAVSessionDelegate` therefore refuses the request
+    /// and records why.
+    ///
+    /// Whether this is ever actually asked for is unverified. The mitigation
+    /// we're relying on — the credential is cached from `connect`'s PROPFIND,
+    /// so URLSession should already be authenticated before the PUT body
+    /// starts streaming — is plausible but untested against a real server: a
+    /// stale Digest nonce mid-session is exactly the kind of case that would
+    /// provoke a fresh challenge, and therefore a replay, mid-upload. The
+    /// gated WebDAV-rig test that would exercise this against a real server
+    /// is a later task; until then, treat "does not bite in practice" as an
+    /// expectation, not a proven claim.
+    public func write(path: String, mode: WriteMode,
+                      contents: AsyncThrowingStream<Data, Error>) async throws {
+        guard mode == .overwrite else {
+            // WebDAV has no partial PUT. Treating .append as .overwrite would
+            // silently destroy the bytes already transferred.
+            throw RemoteFSError.finding(.resumeNotSupported)
+        }
+
+        var request = URLRequest(url: base.url(forPath: path, isDirectory: false))
+        request.httpMethod = "PUT"
+        request.setValue("application/octet-stream", forHTTPHeaderField: "Content-Type")
+
+        var input: InputStream?
+        var output: OutputStream?
+        Stream.getBoundStreams(withBufferSize: TransferChunk.size,
+                               inputStream: &input, outputStream: &output)
+        guard let input, let output else {
+            throw RemoteFSError.finding(.uploadStreamUnavailable)
+        }
+        request.httpBodyStream = input
+
+        // `BoundStreamWriter` owns every call on the output half: it never
+        // issues a write that could park a thread, and it waits for space on
+        // the run loop's `hasSpaceAvailable` event rather than on a timer.
+        // See that type for why both properties are load-bearing.
+        let writer = BoundStreamWriter(stream: output)
+        // Whichever way we leave — success, mapped status, thrown transport
+        // error, cancellation — the writer's thread is stopped and any
+        // suspended pump write is released. No parked thread, no orphaned
+        // continuation, no leaked run loop.
+        defer { writer.close() }
+
+        // Feeds the bound pair while the request is in flight, so a
+        // multi-gigabyte upload is never held in memory. Runs detached so
+        // the transport can start reading immediately — the pair has a
+        // single chunk of buffer, so the pump has to wait for the reader to
+        // drain it before it can write more.
+        let pump = Task.detached {
+            // Closes the write half so the reader (the transport, reading
+            // `input`) sees EOF once the source is exhausted. This looks
+            // redundant with the outer `defer` above, but it is not: on the
+            // success path nothing else ever calls `close()` before
+            // `transport.send` awaits the response, so without this the
+            // reader never observes EOF, `send` never returns, and `write`
+            // deadlocks. The outer `defer` only covers the failure/teardown
+            // paths that exit before the pump finishes on its own.
+            defer { writer.close() }
+            for try await chunk in contents {
+                try Task.checkCancellation()
+                try await writer.write(chunk)
+            }
+        }
+
+        let response: HTTPURLResponse
+        do {
+            response = try await send(request).1
+        } catch {
+            // The request is over; nothing will drain the body again. Stop
+            // the pump BEFORE looking at its outcome — awaiting a pump that
+            // is parked on an unread buffer is exactly the wedge.
+            pump.cancel()
+            // If the pump had ALSO failed on its own — e.g. the SOURCE
+            // stream threw a read error — that is the real cause and wins
+            // over a transport-level failure, which at this point is
+            // usually just a downstream symptom of the aborted body (or, if
+            // we're the one who just cancelled it, carries no information
+            // at all).
+            if let pumpError = await pumpFailure(pump) {
+                throw pumpError
+            }
+            throw error
+        }
+
+        // A server that rejects a PUT early — 401 after a stale Digest nonce,
+        // 403, 507 Insufficient Storage — answers WITHOUT reading the rest of
+        // the body, so `send` returns normally while the pump is still parked
+        // on a buffer that now has no reader at all. Cancel it and report the
+        // status: that status is the server's own answer, and it outranks
+        // whatever the abandoned body did on its way down.
+        //
+        // `mapStatus` throws for every non-2xx status, so control only reaches
+        // the wait below on success.
+        if !(200...299).contains(response.statusCode) {
+            pump.cancel()
+            try Self.mapStatus(response.statusCode, path: path, method: "PUT")
+        }
+
+        // 2xx: the server read the body to the end, so the pump has finished
+        // or is about to, and its outcome is the real one. The wait is made
+        // cancellation-responsive explicitly — `Task.value` does not observe
+        // the *awaiting* task's cancellation, so without this the caller
+        // could not break out of a stalled upload either.
+        try await withTaskCancellationHandler {
+            try await pump.value
+        } onCancel: {
+            pump.cancel()
+        }
+    }
+
+    /// Awaits `pump`'s outcome without throwing, so `write` can decide which
+    /// of two failures — the pump's or the transport's — is the more useful
+    /// one to report. `nil` means the pump succeeded, or its only failure was
+    /// uninformative on its own: our own teardown of it (cancellation, or the
+    /// writer being closed under it), or `BoundStreamWriter.Failure.readerGone`
+    /// — the write end observing the reader vanish, which at this call site is
+    /// always just a symptom of the transport tearing the body down and must
+    /// not be allowed to outrank the transport's own (usually far more
+    /// specific) error.
+    ///
+    /// Safe to await only after `pump.cancel()`: every suspension point in the
+    /// pump — the source stream, and `BoundStreamWriter.write` — is
+    /// cancellation-responsive, so this returns promptly rather than
+    /// inheriting the wait it was called to escape.
+    private func pumpFailure(_ pump: Task<Void, Error>) async -> Error? {
+        do {
+            try await pump.value
+            return nil
+        } catch is CancellationError {
+            return nil
+        } catch is BoundStreamWriter.Failure {
+            return nil
+        } catch {
+            return error
+        }
+    }
+
+    /// `RemoteFileSystem.delete`'s contract: this deletes a FILE, throws
+    /// `.notFound` for nothing, and `.protocolError` for a directory. WebDAV
+    /// cannot leave any of that to the server — `DELETE /dav/<name>` on a
+    /// collection is a perfectly ordinary mod_dav request and removes it,
+    /// recursively for a populated one (measured 2026-09-04 on the rig,
+    /// where this call used to delete a whole collection and report
+    /// success). That is `deleteTree`'s operation, not this one.
+    ///
+    /// So the kind decides, from the same single lookup `deleteTree` does —
+    /// which also supplies the `.notFound`, since a DELETE against a missing
+    /// path would answer 404 anyway but only after the request went out.
+    /// One extra round trip per call.
+    public func delete(path: String) async throws {
+        let entry = try await stat(path: path)
+        guard entry.kind != .directory else {
+            throw RemoteFSError.protocolError(
+                reason: "WebDAV delete: \(path) is a directory")
+        }
+        try await simple(method: "DELETE", path: path, isDirectory: false)
+    }
+
+    public func createDirectory(at path: String) async throws {
+        try await simple(method: "MKCOL", path: path, isDirectory: true)
+    }
+
+    /// MOVE is atomic server-side — unlike S3, where rename is copy-then-delete
+    /// and an interrupted call leaves both or neither.
+    ///
+    /// `Overwrite: F` is not optional: without it a server silently replaces
+    /// an existing destination, which is the one outcome the conflict rules
+    /// everywhere else in this app are built to prevent.
+    public func rename(from: String, to: String) async throws {
+        var request = URLRequest(url: base.url(forPath: from, isDirectory: false))
+        request.httpMethod = "MOVE"
+        request.setValue(base.url(forPath: to, isDirectory: false).absoluteString,
+                         forHTTPHeaderField: "Destination")
+        request.setValue("F", forHTTPHeaderField: "Overwrite")
+        let (_, response) = try await send(request)
+        try Self.mapStatus(response.statusCode, path: from, method: "MOVE")
+    }
+
+    /// One DELETE for the whole subtree — WebDAV removes a collection
+    /// recursively server-side, where the S3 backend needs a recursive
+    /// listing and batched DeleteObjects.
+    ///
+    /// The lookup in front of it is what makes a plain file behave exactly
+    /// like `delete`, as `RemoteFileSystem.deleteTree`'s contract says:
+    /// Apache answers 400 to a DELETE whose path carries a trailing slash
+    /// but names a file (measured 2026-09-04 on the rig), and only the
+    /// entry's kind says which of the two URL shapes to send. That is one
+    /// extra round trip per call, not a second delete path.
+    public func deleteTree(at path: String) async throws {
+        let entry = try await stat(path: path)
+        try await simple(method: "DELETE", path: path, isDirectory: entry.kind == .directory)
+    }
+
+    /// `permissionModel` is `.none`. Failing loudly beats reporting a success
+    /// the server never performed.
+    public func setPermissions(path: String, permissions: UInt32) async throws {
+        throw RemoteFSError.protocolError(
+            reason: "WebDAV has no permission model")
+    }
+
+    private func simple(method: String, path: String, isDirectory: Bool) async throws {
+        var request = URLRequest(url: base.url(forPath: path, isDirectory: isDirectory))
+        request.httpMethod = method
+        let (_, response) = try await send(request)
+        try Self.mapStatus(response.statusCode, path: path, method: method)
+    }
+
+    // MARK: - Error mapping
+
+    static func mapStatus(_ status: Int, path: String, method: String) throws {
+        switch status {
+        case 200...299: return
+        case 401: throw RemoteFSError.authenticationFailed
+        case 403: throw RemoteFSError.permissionDenied(path: path)
+        case 404: throw RemoteFSError.notFound(path: path)
+        case 405 where method == "MKCOL":
+            throw RemoteFSError.finding(.directoryAlreadyExists)
+        case 409: throw RemoteFSError.notFound(path: path)
+        // Kept as-is (docs/BACKLOG.md, "An unguarded WebDAV 412 outside the
+        // resume path reads as a MOVE's refusal", open): this is a MOVE's
+        // `Overwrite: F` answer, but a 412 from a GET with no precondition
+        // sent (see `readStream` above) falls through to this same arm and
+        // is reported as a destination conflict too — the wrong case for a
+        // read. Converting the string to a finding does not fix that; it is
+        // unchanged on purpose. Sibling row, same misreading for a MOVE
+        // whose failed precondition is on the source rather than the
+        // destination: "`WebDAVFileSystem.mapStatus` renders a
+        // source-precondition 412 as \"The destination already exists\"".
+        case 412: throw RemoteFSError.finding(.destinationAlreadyExists)
+        case 507: throw RemoteFSError.finding(.outOfStorage)
+        default:
+            // `method` is deliberately left out of the finding: the HTTP
+            // method is not information a user acts on, and the transfer
+            // queue's row already names the file and the direction.
+            throw RemoteFSError.finding(.unexpectedStatus(code: status))
+        }
+    }
+}
+
+/// WebDAV's answer to the checksum question, which is that it has none —
+/// said as an outcome rather than left as a hole.
+///
+/// The conformance exists precisely BECAUSE the answer is negative. A
+/// backend that simply did not conform would come back `nil` from the
+/// surface's `as?`, and a caller holding nothing has only a greyed-out menu
+/// entry to offer; the design of 2026-08-31 rules that out in as many words:
+/// "this server does not deliver checksums" is an answer, a dead menu entry
+/// is not. A thrown error is ruled out for the same reason — it would read
+/// as a failure of this request rather than a property of the protocol.
+///
+/// `ProtocolCapabilities.supportsRemoteChecksum` stays `false` for WebDAV,
+/// and the two say different things: the capability is what a menu consults
+/// before it is built, this is what a caller that asked anyway gets told.
+///
+/// Deliberately NOT read here: `OC-Checksum`, the Nextcloud/ownCloud
+/// property. The design excludes it from this piece of work — it is a
+/// server extension, present on some deployments and absent on others, so
+/// it is its own case with its own way of finding out whether it is there.
+extension WebDAVFileSystem: RemoteChecksumProvider {
+    /// Answers without asking the server, and that is the point: no request
+    /// can turn this into a checksum, so spending one would only make the
+    /// same answer slower.
+    public func remoteChecksum(
+        forFileAt path: String, algorithm: ChecksumAlgorithm
+    ) async throws -> RemoteChecksumOutcome {
+        .unavailableOnThisConnection
+    }
+}

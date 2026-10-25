@@ -1,0 +1,1013 @@
+import SwiftUI
+import macSCPCore
+
+/// One window's menu bridge (M8a/T4): `MacSCPCommands` holds no reference
+/// to `ContentView` — the menu items call these closures, and `ContentView`
+/// assigns them (in `wireTabCommands()`) to its own tab-lifecycle methods.
+/// `@Observable` for consistency with the app's other cross-layer bridges
+/// (`ConflictPromptBridge`); the closures themselves are read once per
+/// invocation, not observed reactively.
+///
+/// **Per window, not per app** (Detachable Tabs plan, Task 2 fix round 1).
+/// Each `ContentView` owns one and publishes it with
+/// `.focusedSceneValue(\.tabCommands, …)`; the menus read the FOCUSED
+/// window's instance back with `@FocusedValue`. Before that there was one
+/// instance for the whole app, and every closure carried a
+/// `window?.isKeyWindow` guard to decide after the fact whether it was the
+/// right window — which a second window broke twice over: the closures
+/// belonged to whichever window ran its setup last, and the mirrored
+/// enabled-state values to whichever window changed last, background
+/// windows included. None of those guards survives; being focused is now
+/// the precondition for being read at all.
+///
+/// What could NOT become per window is on `SettingsWindowBridge` — see
+/// that type for why.
+@MainActor
+@Observable
+final class TabCommands {
+    var newTab: (() -> Void)?
+    var closeActiveTab: (() -> Void)?
+    var selectTab: ((Int) -> Void)?
+    var windowTabs: [WindowTabMenuItem] = []
+    var showKeyboardShortcuts: (() -> Void)?
+    var showWhatsNew: (() -> Void)?
+
+    func selectAdjacentTab(by offset: Int) {
+        guard windowTabs.count > 1, let current = windowTabs.firstIndex(where: \.isSelected) else { return }
+        let count = windowTabs.count
+        let position = ((current + offset) % count + count) % count
+        selectTab?(windowTabs[position].index)
+    }
+    /// Sessions menu bridge (M10a/T2): "Known Hosts…" opens the management
+    /// sheet; the export/import closures bind to `ContentView`'s EXISTING
+    /// M9a handlers (`exportSheetItem`/`showImportFileImporter`) — the
+    /// sidebar's own "Export All…"/"Import…" entries are untouched.
+    var showKnownHosts: (() -> Void)?
+    var showSettings: (() -> Void)?
+    /// "Server Certificates…" — same bridge shape as
+    /// `showKnownHosts` above, opens the server-certificate management sheet.
+    /// Its own entry rather than a section inside the known-hosts sheet; see
+    /// `ServerCertificatesSheet`'s doc comment.
+    var showServerCertificates: (() -> Void)?
+    /// "Logins…" (M10b/T3) — same bridge shape as
+    /// `showKnownHosts` above, opens the login-sets management sheet.
+    var showLogins: (() -> Void)?
+    /// "Hidden Imports…" (M11f/T2) — same bridge shape as
+    /// `showKnownHosts`/`showLogins` above, opens the hidden-imports
+    /// management sheet.
+    var showHiddenImports: (() -> Void)?
+    /// "SSH Keys…" (M18/T5) — same bridge shape as
+    /// `showKnownHosts`/`showLogins`/`showHiddenImports` above, opens the
+    /// SSH-key management sheet (replaces the M17 Settings tab).
+    var showSSHKeys: (() -> Void)?
+    /// Opens the ad-hoc connection log (M31). Its own entry rather than a
+    /// parameter on the existing audit hook, because there is no session to
+    /// pass -- the ad-hoc log's session is a value the App layer builds.
+    var showAdHocAuditLog: (() -> Void)?
+    /// Mirrors `ContentView`'s `hiddenImportAliases.count` (M11f/T2, same
+    /// rationale as `isActiveTabConnected` below): the "Hidden Imports…"
+    /// menu title's count suffix needs this observed value since `MacSCPApp`
+    /// builds a separate Scene that does not see `ContentView`'s `@State`.
+    var hiddenImportsCount = 0
+    var exportAllSessions: (() -> Void)?
+    var importSessions: (() -> Void)?
+    var importWinSCP: (() -> Void)?
+    var exportWinSCP: (() -> Void)?
+    /// Internal shortcut to the login manager's own picker. The unified
+    /// Import command can also route a selected native login export there.
+    var importLogins: (() -> Void)?
+    /// Internal shortcut to installed Cyberduck bookmarks. The menu's
+    /// unified import instead detects a selected bookmark file or folder.
+    var importFromCyberduck: (() -> Void)?
+    /// Terminal menu (M11d/T2): these two entries always offer BOTH ways to
+    /// open a session's shell, regardless of `SettingsStore.terminalTarget`
+    /// — the setting only picks what ⌘T/the toolbar button do, it never
+    /// takes either capability away.
+    var toggleTerminal: (() -> Void)?
+    var openExternalTerminal: (() -> Void)?
+    /// Transfer-bar toggle (M11o): the "Show/Hide Transfers" menu entry and
+    /// ⌘⇧Y drive this. Each window fills in its own closure, which toggles
+    /// that window's active tab's `transfersPanelVisible`, and the menu
+    /// reaches only the focused window's — there is no key-window check
+    /// anywhere on this bridge any more. Enabled state mirrors
+    /// `isActiveTabConnected` (same as the Terminal entries).
+    var toggleTransfers: (() -> Void)?
+    /// Mirrors `ContentView`'s active tab connection state (M11d/T2): this
+    /// `TabCommands` instance is the only thing `MacSCPApp`'s `.commands`
+    /// closure observes, and that closure builds a separate Scene that does
+    /// NOT see `ContentView`'s own `tabsModel` — so the enabled state of the
+    /// two Terminal menu entries above has to be mirrored here explicitly
+    /// (see `ContentView`'s `.onChange(of: isActiveTabConnected)`).
+    var isActiveTabConnected = false
+    /// Capability gate (M12/T7b): `false` while the active tab's backend
+    /// has no shell (S3) — `ContentView` mirrors
+    /// `BackendDescriptor.descriptor(for:).capabilities.supportsShell` here
+    /// the same way it mirrors `isActiveTabConnected` above, for the same
+    /// reason (this Scene doesn't see `tabsModel`). Defaults `true` so the
+    /// menu behaves exactly as before this feature until the mirror runs.
+    var activeTabSupportsShell = true
+    /// Pane lock (P2 terminal-chrome milestone; whole-phase review, Fix 2):
+    /// `false` while the terminal is the last visible half, so turning it off
+    /// would empty the window. `ContentView` mirrors
+    /// `SessionTab.paneToggleState(for: .terminal, …).isEnabled` here the
+    /// same way it mirrors `activeTabSupportsShell` above, and for the same
+    /// reason (this Scene cannot see `tabsModel`).
+    ///
+    /// It exists because `toggleTerminal`'s closure checks the lock and
+    /// returns — and a menu entry that is enabled and does nothing is exactly
+    /// what `PaneToggleState`'s own doc comment rules out ("disabled rather
+    /// than silently inert, so the user can see why a click does not land").
+    /// The toolbar button got this right from the start via its own
+    /// `.disabled`; the menu entry lives in another Scene and could only get
+    /// it through a mirror.
+    ///
+    /// Defaults `true` for the same reason `activeTabSupportsShell` does: the
+    /// menu must behave exactly as before until the mirror has run once. The
+    /// disconnected case is not this flag's business — `isActiveTabConnected`
+    /// already covers it.
+    var activeTabTerminalToggleIsUnlocked = true
+    /// Whether the "Show/Hide Terminal" entry can do anything at all: a
+    /// connected tab, on a backend with a shell, whose terminal half is not
+    /// the last visible one. The menu's `.disabled` reads THIS rather than
+    /// re-spelling the three conditions, so the entry and
+    /// `toggleTerminal`'s own guards cannot drift apart on what "would not
+    /// land" means.
+    ///
+    /// "Open in External Terminal" deliberately does NOT read this: that
+    /// route never touches `TerminalPanelViewModel.isVisible`, so the pane
+    /// lock has nothing to say about it (documented deliberate asymmetry,
+    /// Task 3).
+    var canToggleTerminal: Bool {
+        isActiveTabConnected && activeTabSupportsShell && activeTabTerminalToggleIsUnlocked
+    }
+    /// "Move Tab to New Window" (Detachable Tabs plan, Task 2) — the Window
+    /// menu's route to the action the tab strip's context menu also offers.
+    /// Same bridge shape as the entries above; it moves the ACTIVE tab of
+    /// the window this bridge belongs to, which — the bridge being read
+    /// through `@FocusedValue` — is the window in front, and the only tab a
+    /// menu with no click target can mean.
+    var moveTabToNewWindow: (() -> Void)?
+    /// Whether that entry can do anything: `false` while the front window
+    /// holds a single tab, because moving the only tab of a window into a
+    /// new window closes one window and opens another holding the same
+    /// thing. Mirrored from `ContentView` for the same reason
+    /// `isActiveTabConnected` is — this Scene cannot see `tabsModel`.
+    ///
+    /// Defaults `false`, unlike the mirrors above, and deliberately: a
+    /// window comes up with exactly one tab, so `false` is the true value
+    /// until the mirror has run, and the entry is greyed rather than
+    /// enabled-and-inert in the moment before it does.
+    var canMoveTabToNewWindow = false
+    /// "Keep on Top" (Detachable Tabs plan, Task 4): mirrors `ContentView`'s
+    /// own `keepOnTop` `@State`, the same way `canMoveTabToNewWindow` mirrors
+    /// its tab count — this Scene cannot see that `@State` directly. The
+    /// Window menu's checkmark reads this rather than a constant, so it
+    /// always shows the FOCUSED window's sticky state, not whichever
+    /// window last changed it.
+    var keepOnTop = false
+    /// Toggles `ContentView`'s `keepOnTop` for the window this bridge
+    /// belongs to — same bridge shape as `moveTabToNewWindow` above: the
+    /// menu never flips `keepOnTop` itself, it only asks the focused
+    /// window to.
+    var toggleKeepOnTop: (() -> Void)?
+}
+
+/// Settings routing adapter. Each main window owns a page bridge for its
+/// management sheets. The app-level bridge also carries a pending request
+/// when Settings is requested while all main windows are closed.
+@MainActor
+@Observable
+final class SettingsWindowBridge {
+    /// Only a navigation request; session state remains window-local.
+    var settingsRequested = false
+    /// Settings-window route to the login-sets sheet ("Manage Data"
+    /// section).
+    ///
+    /// Deliberately a SEPARATE closure from `TabCommands.showLogins`: that
+    /// one belongs to the focused window and would be `nil` here, because
+    /// the Settings window is the focused one when this fires. It exists at
+    /// all because Settings must not present its own copy of
+    /// `LoginSetsSheet` — see the wiring comment in
+    /// `ContentView.wireTabCommands()` for the exact hazard.
+    var showLoginsFromSettings: (() -> Void)?
+    /// Settings-window route to the server-certificate sheet — same shape as
+    /// `showLoginsFromSettings` above; the reason is trust, not state (see
+    /// `ContentView.presentServerCertificatesFromSettings()`).
+    var showServerCertificatesFromSettings: (() -> Void)?
+    /// Settings-window route to the hidden-imports sheet — same shape and
+    /// same reason as `showLoginsFromSettings` above.
+    var showHiddenImportsFromSettings: (() -> Void)?
+    /// Whether a main window EXISTS: the three routed entries above have
+    /// nowhere to go without one, so the "Manage Data" section disables them
+    /// rather than letting the click vanish. `ContentView` keeps this in sync
+    /// from `updateMainWindowPresence()`/`handleWindowWillClose(_:)`, and it
+    /// starts `false` — no window has resolved yet at that point.
+    ///
+    /// Existence, not visibility: the routed handlers raise the window before
+    /// presenting, and raising deminiaturizes and unhides it, so a minimized
+    /// window or a hidden app is still a window those entries work on. Asking
+    /// `isVisible` here would grey them out (or worse, leave them enabled on a
+    /// stale `true`) for states in which the action would have succeeded.
+    var hasMainWindow = false
+    /// The hidden-import count the "Manage Data" entry's title shows.
+    ///
+    /// The SAME number also lives on `TabCommands`, and the duplication is
+    /// deliberate rather than an oversight: the Sessions menu's own "Hidden
+    /// Imports…" title shows the FOCUSED window's count, and this one shows
+    /// the count of whichever window the "Manage Data" entries would route
+    /// to. With one window open the two are the same number; with two open
+    /// they are answers to different questions.
+    var hiddenImportsCount = 0
+}
+
+/// Wired into `MacSCPApp` through `@NSApplicationDelegateAdaptor` below —
+/// SwiftUI's own `App` protocol has no termination callback of its own, and
+/// `NSApplication.willTerminateNotification` (a prior round's choice, now
+/// replaced) cannot be waited on synchronously: the notification fires from
+/// a plain `NotificationCenter` block, and a callback that starts a `Task`
+/// and returns has no guarantee the process outlives that `Task` ever being
+/// scheduled — on an ordinary Cmd+Q that race can lose both the "app quit"
+/// line and whatever was still buffered. `applicationWillTerminate(_:)` is a
+/// real `NSApplicationDelegate` callback: AppKit holds the process open
+/// until it returns, so a synchronous call inside it is guaranteed to run
+/// before the process can exit — which is exactly what `flushSynchronously()`
+/// needs (Diagnostic Log plan, Task 2 round 1).
+///
+/// No other code under `Sources/MacSCPAppKit` reads `NSApp.delegate`
+/// (checked with `grep -rn "NSApp.delegate" Sources/MacSCPAppKit` before
+/// adding this — no matches, and re-counted on 2026-09-06: still none), so
+/// installing this adaptor changes nothing this app already depended on
+/// `NSApp.delegate` being. `applicationDidFinishLaunching` had no
+/// implementation at all until the port-forwarding plan's Task 7 added the
+/// one below; it is this type's only one, and nothing else in the target
+/// relies on that callback.
+final class AppDelegate: NSObject, NSApplicationDelegate {
+    /// The Dock badge's own controller (port-forwarding plan, Task 7).
+    /// Retained for the app's lifetime, like `MacSCPApp.menuBarController`:
+    /// it re-arms an observation after every fire, and a controller nobody
+    /// held would paint the badge once and be collected.
+    @MainActor private var dockBadge: DockBadgeController?
+    /// The forwarding block the Dock menu draws — the same builder the
+    /// menu-bar item uses (`TunnelMenuBlockController`). Held rather than
+    /// rebuilt per open because it is the `target` of every item's action:
+    /// `NSMenuItem.target` is a weak reference, so a controller created
+    /// inside `applicationDockMenu(_:)` would be gone before the user could
+    /// click anything in the menu it built.
+    @MainActor private var dockMenuBlock: TunnelMenuBlockController?
+    /// The activation observer's token (CLI sessions and tunnels plan,
+    /// Task 5). Held for the app's lifetime like the two controllers above:
+    /// `NotificationCenter.addObserver(forName:object:queue:using:)` returns
+    /// the only handle that could ever remove this observation, and this
+    /// object outlives the process's windows, so there is no removal path and
+    /// nothing to write one for. Kept rather than discarded so the
+    /// observation has an owner that can be named.
+    @MainActor private var activationObserver: (any NSObjectProtocol)?
+
+    /// The launch's own forwarding work, and the first point in this
+    /// process where it can be done (port-forwarding plan, Task 7).
+    ///
+    /// **Why here and not `MacSCPApp.init`.** Two of the three things below
+    /// need a launched application. `NSAppleEventManager.shared()
+    /// .currentAppleEvent` carries the launch event only while AppKit is
+    /// dispatching it, which is this callback and not the `App` value's
+    /// initializer; and `NSApp.dockTile` belongs to an application that has
+    /// finished starting up. The stores this reads are ready either way —
+    /// `MacSCPApp.init` runs before `NSApplication.run`, so the diagnostic
+    /// log is configured, the language override is applied and the What's
+    /// New decision is recorded by the time this runs.
+    ///
+    /// **Before any window connects**, which is what the plan asks for and
+    /// what this position gives for free: `ContentView` opens no connection
+    /// of its own at launch (window restoration deliberately rebuilds tabs
+    /// with nothing dialled), so the first dial a user makes is later than
+    /// this by definition.
+    ///
+    /// **Which moments run is `LaunchAutoStartPlan`'s**, over
+    /// `LoginLaunchDetector`'s answer — see that type for what the flag can
+    /// and cannot tell this app.
+    ///
+    /// The starts are `async` and this callback is not, so they run in a
+    /// `Task`. Nothing waits for them: a forwarding coming up is not a
+    /// precondition for a window, and `startAutoStart(_:)` uses `.refusing`,
+    /// so the slowest thing it can do is time out a dial.
+    func applicationDidFinishLaunching(_ notification: Notification) {
+        MainWindowPresentation.shared.foregroundAtLaunch()
+        let moments = LaunchAutoStartPlan.moments(
+            launchedAsLoginItem: LoginLaunchDetector.launchedAtLogin())
+        Task { @MainActor in
+            guard await CredentialStartup.shared.prepare() else { return }
+            for moment in moments {
+                await TunnelManager.shared.startAutoStart(moment)
+            }
+        }
+        let badge = DockBadgeController(manager: TunnelManager.shared)
+        dockBadge = badge
+        badge.start()
+        observeActivation()
+    }
+
+    func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
+        MainWindowPresentation.shared.show()
+        return false
+    }
+
+    func applicationDidHide(_ notification: Notification) {
+        MainWindowPresentation.shared.didHide()
+    }
+
+    /// Both stores are re-read whenever the app becomes active (CLI sessions
+    /// and tunnels plan, Task 5).
+    ///
+    /// **Why activation, and why here.** The CLI writes the very files this
+    /// app reads — `sessions-v2.json` through `SessionStore`, `tunnels.json`
+    /// through `TunnelStore` — and there is no IPC in either direction (the
+    /// design says so, and none is added). So a session added in a terminal
+    /// would otherwise need a relaunch to appear. Activation is the moment
+    /// the user comes back from that terminal, and this delegate is the
+    /// app's one owner of process-wide lifecycle, the same place the quit
+    /// chain lives.
+    ///
+    /// **The windows are the quit chain's windows.** `TabRegistry` already
+    /// answers "which windows exist right now" for the restoration sweep and
+    /// the quit teardown; asking it for their session lists adds a slot to
+    /// that registry rather than a second registry beside it.
+    ///
+    /// **An EDITED forwarding is not disturbed; a DELETED one is stopped**
+    /// (fix round 1). `TunnelManager.reloadReconciling()` re-reads the
+    /// profile mirror and then discards the runners of profiles that
+    /// disappeared from it — a plain `reload()` left a deleted profile's
+    /// runner holding its port and its forward with no row anywhere left to
+    /// stop it from, because every caller of `stop(_:)` needs a
+    /// `TunnelProfile` out of `allProfiles`. A `tunnels.json` it cannot READ
+    /// is a third case again and changes nothing at all (fix round 2) — an
+    /// empty answer from a broken file must not read as a deletion. An edit
+    /// changes nothing about a runner, so a forwarding edited from the CLI
+    /// keeps running as it was
+    /// until it is stopped and started, which is what the sheet's help text
+    /// tells the user (`tunnel.help.externalEdits`). Both halves are held by
+    /// `TunnelManagerTests
+    /// .reloadPicksUpAnOutsideWriteAndLeavesARunningRunnerAlone` and
+    /// `.reloadStopsARunningForwardingWhoseProfileWasDeletedOnDisk`.
+    ///
+    /// **No session edit is lost either.** `SessionListViewModel.reload()`
+    /// assigns only its four store-derived properties, and every draft being
+    /// edited lives in the view layer — a form's own state, never the view
+    /// model — so this needs no "not while a sheet is open" condition;
+    /// `SessionListViewModelTests.anEditSavedAfterAnActivationReloadStillLands`
+    /// is the measurement behind that sentence.
+    ///
+    /// **What this costs, stated rather than optimised** (fix round 1
+    /// minor): each `SessionListViewModel.reload()` is three file reads
+    /// (`sessions-v2.json`, its groups, `logins.json`), so an activation
+    /// costs 3n reads for n open windows plus the tunnel store's one.
+    /// Neither of the two cheaper shapes was built: ONE read fanned out to
+    /// every window would mean a new Core seam handing decoded values to a
+    /// view model that currently owns its own read, and an mtime check would
+    /// be a second source of truth about a file two processes write, wrong
+    /// exactly when a write lands inside the same timestamp granularity.
+    /// Windows are single digits and an activation is a human-paced event;
+    /// if that ever stops being true, the fan-out is the one to build,
+    /// because it removes the reads rather than guessing about them.
+    ///
+    /// **The session lists go first, and the tunnel reconcile second** (fix
+    /// round 3). The session reloads are synchronous — a few file reads —
+    /// while the reconcile can suspend for as long as a discarded runner's
+    /// `stop()` takes, which for a runner parked in a dial is
+    /// `connectTimeoutSeconds`, up to 120 s. Behind it, the sidebar would
+    /// have gone on showing yesterday's sessions for that whole wait.
+    ///
+    /// The block starts a `Task` because the reconcile is `async`. AppKit
+    /// does not wait for that task — the activation notification returns as
+    /// soon as it is scheduled — but the two reloads inside it are ordered
+    /// with respect to each other, which is the point above. A second
+    /// activation arriving while the reconcile is in flight WAITS for it and
+    /// then reads the store again (`TunnelManager.reloadReconciling()`), so
+    /// no activation returns having skipped a read.
+    @MainActor
+    private func observeActivation() {
+        // Installed once. `applicationDidFinishLaunching` is called once per
+        // process, but this is the kind of guard whose absence is only
+        // visible as a store read happening n times per activation.
+        guard activationObserver == nil else { return }
+        activationObserver = NotificationCenter.default.addObserver(
+            forName: NSApplication.didBecomeActiveNotification, object: nil, queue: .main
+        ) { _ in
+            Task { @MainActor in
+                for sessionList in TabRegistry.shared.allSessionLists() {
+                    sessionList.reload()
+                }
+                await TunnelManager.shared.reloadReconciling()
+            }
+        }
+    }
+
+    /// The Dock icon's menu: the forwarding block, and nothing else this app
+    /// has asked for there.
+    ///
+    /// AppKit calls this on every right-click of the Dock icon, so the menu
+    /// is built fresh each time and needs no observation of its own — the
+    /// same "rebuilt per open" shape `MenuBarController.menuNeedsUpdate(_:)`
+    /// uses, with the same builder behind it.
+    func applicationDockMenu(_ sender: NSApplication) -> NSMenu? {
+        let block = dockMenuBlock ?? TunnelMenuBlockController(manager: TunnelManager.shared)
+        dockMenuBlock = block
+        let menu = NSMenu()
+        for item in block.items() {
+            menu.addItem(item)
+        }
+        return menu
+    }
+
+    /// The quit sequence (Quit Teardown plan, Task 1).
+    ///
+    /// **Why this callback and not `applicationWillTerminate`.** ⌘Q closes
+    /// no window, so no window's close path runs and nothing tears a held
+    /// tab down. `applicationWillTerminate` cannot fix that: it is
+    /// synchronous, AppKit holds the process open only until it returns, and
+    /// `TabTeardown.run(_:reason:)` is main-actor `async` — blocking the
+    /// main thread to await it deadlocks, and starting a `Task` and
+    /// returning gives the process permission to exit first. This callback
+    /// is the one that can wait: `.terminateLater` defers the quit, and
+    /// `NSApp.reply(toApplicationShouldTerminate: true)` is what releases
+    /// it. That is why the four-stage order had to leave `ContentView`
+    /// (see `TabTeardown`): a delegate has no view to call it on.
+    ///
+    /// **The order is `QuitSequence.steps`**, and
+    /// `QuitSequenceTests.theDelegateRunsTheQuitStepsInOrder` pins this
+    /// body against it positionally. The `.later` case is written FIRST so
+    /// that reading is possible — it is the branch that runs all seven steps,
+    /// and `.now` repeats three of the same calls.
+    ///
+    /// **`.now` is not a shortcut past the teardown.** It is chosen only
+    /// when `liveTabCount` is zero, counted over every tab the registry
+    /// knows — parked ones included — AND no forwarding is running
+    /// (`TunnelManager.runningCount`, which belongs to no tab and would
+    /// otherwise be invisible to this count), so there is provably nothing
+    /// open to close. The parked sweep still runs, because the RECORD of a move
+    /// that never landed is written whether or not the tab was connected;
+    /// with nothing live, the tabs it hands back have no session and their
+    /// teardown would be a no-op, so this branch discards them and stays
+    /// synchronous.
+    func applicationShouldTerminate(
+        _ sender: NSApplication
+    ) -> NSApplication.TerminateReply {
+        let liveTabCount = TabRegistry.shared.allTabs().filter { $0.session != nil }.count
+        let tunnels = TunnelManager.shared.runningCount
+        switch QuitSequence.decision(liveTabCount: liveTabCount, runningTunnelCount: tunnels) {
+        case .later:
+            // FIRST, and synchronously, before any teardown can run: a
+            // teardown clears `tab.activeStoredSessionID`, which is exactly
+            // what `describeForRestoration(_:)` writes into a seed. Ask the
+            // windows afterwards and every restored tab comes back blank.
+            writeRestorationSeeds()
+            let windowTeardowns = TabRegistry.shared.allWindowTeardowns()
+            Task { @MainActor in
+                await ExternalTerminalLauncher.stopCredentialSessions()
+                let parked = sweepUnclaimedMoves()
+                // Before the windows (port-forwarding plan, Task 6;
+                // `QuitStep.stopTunnels`): a forwarding is held by no window
+                // and by no tab, so no window's closure reaches one, and a
+                // process that exits without this leaves the server holding
+                // a remote forward nobody cancelled. Bounded by the same
+                // watchdog the teardown races — see `runBoundedTunnelStop`.
+                await runBoundedTunnelStop()
+                let outcome = await runBoundedQuitTeardown(
+                    parked: parked, windows: windowTeardowns)
+                SharedCredentialVault.shared.close()
+                DiagnosticLog.shared.log(
+                    .info, "app",
+                    QuitSequence.quitLine(
+                        windows: windowTeardowns.count,
+                        tornDown: outcome.tornDown,
+                        forced: outcome.forced))
+                DiagnosticLog.shared.flushSynchronously()
+                NSApp.reply(toApplicationShouldTerminate: true)
+            }
+            return .terminateLater
+        case .now:
+            SharedCredentialVault.shared.close()
+            writeRestorationSeeds()
+            _ = sweepUnclaimedMoves()
+            DiagnosticLog.shared.log(.info, "app", "quit")
+            DiagnosticLog.shared.flushSynchronously()
+            guard ExternalTerminalLauncher.hasCredentialSessions else { return .terminateNow }
+            Task { @MainActor in
+                await ExternalTerminalLauncher.stopCredentialSessions()
+                NSApp.reply(toApplicationShouldTerminate: true)
+            }
+            return .terminateLater
+        }
+    }
+
+    /// Every forwarding stopped, with a ceiling on how long the quit waits
+    /// for it (port-forwarding plan, Task 6, fix rounds 1 and 2).
+    ///
+    /// **It needed a ceiling.** `TunnelManager.stopAll()` waits for each
+    /// runner's run task, and a run task parked in a DIAL is bounded by
+    /// `connectTimeoutSeconds` — 10 s by default, settable to 120 s. Round 0
+    /// awaited that unbounded and in sequence in front of a quit whose own
+    /// watchdog is 15 s. `stopAll()` now stops the runners concurrently (one
+    /// timeout, not n) and this puts `QuitWatchdog.bound` on the wait.
+    ///
+    /// **Round 1's version bounded nothing**, and the correction is
+    /// `BoundedStep`'s whole subject: a `TaskGroup` child awaiting
+    /// `TunnelRunner.stop()` cannot be cancelled (it ends at `await
+    /// mine.value` on a `Task<Void, Never>`), so `cancelAll()` was a no-op
+    /// and the group waited for the work anyway.
+    ///
+    /// **Its own bound, spent before the window teardown's.** This step and
+    /// `runBoundedQuitTeardown(parked:windows:)` each race `QuitWatchdog
+    /// .bound` in turn, so a worst-case quit spends it twice — see that
+    /// constant's doc comment, which states the arithmetic and why the two
+    /// steps do not share one deadline.
+    ///
+    /// **What losing the race costs**, stated: the stop keeps running,
+    /// detached, and the quit goes on without it — so a forwarding that had
+    /// not finished stopping is dropped by process exit instead, the same
+    /// trade `QuitTeardownChain` makes when the watchdog beats it.
+    ///
+    /// **And it is written down** (fix round 3). The outcome used to be
+    /// discarded, with a comment saying the step had no count of its own —
+    /// true, and beside the point: the fact worth keeping is not a count but
+    /// that the bound won, because a server may still be holding a forward
+    /// this quit never cancelled. `QuitSequence.tunnelStopLine(_:)` decides
+    /// the text and writes nothing at all for the ordinary outcome, so the
+    /// log gains a line exactly when there is something to explain.
+    @MainActor
+    private func runBoundedTunnelStop() async {
+        let outcome = await BoundedStep.run(bound: QuitWatchdog.bound) {
+            await TunnelManager.shared.stopAll()
+        }
+        if let line = QuitSequence.tunnelStopLine(outcome) {
+            DiagnosticLog.shared.log(.info, "app", line)
+        }
+    }
+
+    /// The whole deferred teardown, raced against `QuitWatchdog.bound`.
+    ///
+    /// **The race is two children of one group**, and the first to finish
+    /// wins: the teardown chain (parked tabs, then every window's closure in
+    /// registration order) and a sleeper. `group.cancelAll()` then cancels
+    /// the loser.
+    ///
+    /// **What cancelling the chain does, exactly.** `TabTeardown.run`
+    /// deliberately does not check `Task.isCancelled` — a teardown abandoned
+    /// half way would leave a shell open on a connection whose queue had
+    /// already been swept. So the chain checks between items instead: a
+    /// cancelled chain finishes the tab or window it is already inside,
+    /// under that tab's own per-stage bounds, and starts no further one. The
+    /// real ceiling on a quit is therefore this bound plus at most one more
+    /// window's bounded teardown, and `forced=true` in the log line is what
+    /// tells a reader the difference.
+    ///
+    /// `tornDown` counts WINDOW closures that ran to completion, which is
+    /// the number the log line reports beside `windows=`; the parked sweep
+    /// is reported by its own `info` line per seed.
+    ///
+    /// The work list travels in a `QuitWorkList` rather than as two plain
+    /// arrays: a task group's child closure must be `Sendable`, and neither
+    /// `[SessionTab]` (main-actor isolated) nor a list of main-actor
+    /// closures is. A `@MainActor` class IS `Sendable`, and the child that
+    /// reads it is `@MainActor` too, so nothing crosses an actor at all.
+    ///
+    /// The chain itself lives in `QuitTeardownChain` (`QuitSequence.swift`)
+    /// rather than here: it makes no AppKit call, and a test can drive it
+    /// with recording closures — which is how "a cancelled chain starts no
+    /// further item" is a measured property rather than a read of the
+    /// source (fix round 1).
+    @MainActor
+    private func runBoundedQuitTeardown(
+        parked: [SessionTab], windows: [(WindowID, TabRegistry.WindowTeardown)]
+    ) async -> (tornDown: Int, forced: Bool) {
+        let work = QuitWorkList(parked: parked, windows: windows)
+        return await withTaskGroup(of: QuitRaceOutcome.self) { group in
+            group.addTask { await QuitTeardownChain.run(work) }
+            group.addTask {
+                try? await Task.sleep(for: QuitWatchdog.bound)
+                return .watchdogFired
+            }
+            // Whoever answers first decides `forced`; the other child is
+            // cancelled and then drained, because a task group awaits its
+            // children before it returns either way. Draining is also how
+            // the chain's own count is read when the watchdog won it.
+            let first = await group.next() ?? .watchdogFired
+            group.cancelAll()
+            var tornDown = 0
+            if case .chainFinished(let count) = first { tornDown = count }
+            for await outcome in group {
+                if case .chainFinished(let count) = outcome { tornDown = count }
+            }
+            return (tornDown, first == .watchdogFired)
+        }
+    }
+
+
+    /// The last synchronous moment the process has, and all that is left of
+    /// what this callback used to do.
+    ///
+    /// Everything else moved to `applicationShouldTerminate(_:)` above —
+    /// AppKit calls that one first on every route that reaches this one at
+    /// all, so a restoration write, a parked sweep or an `app quit` line
+    /// here would be a second copy of work already done, and on the deferred
+    /// path it would run AFTER the reply.
+    ///
+    /// The flush stays because it is cheap and it is the only guaranteed
+    /// point after the reply: the teardown chain's own lines (a
+    /// `TeardownStage` abandonment goes to `os.Logger`, but the parked
+    /// sweep's `info` lines do not) are already flushed by the sequence
+    /// itself, and anything appended between the reply and the process
+    /// actually ending would otherwise be lost. It is defensive, not load
+    /// bearing.
+    func applicationWillTerminate(_ notification: Notification) {
+        DiagnosticLog.shared.flushSynchronously()
+    }
+
+    /// Describes every window still open and replaces `windows.json` with
+    /// the result (Detachable Tabs plan, Task 5 fix round 1).
+    ///
+    /// **This is the only place the file is written**, and the reason is
+    /// the fact `sweepUnclaimedMoves()` below already records: **⌘Q closes
+    /// no windows.** The first version of restoration wrote a window's
+    /// description from its own `willClose` handler, which described
+    /// exactly the wrong set — every window the user deliberately closed
+    /// during a session accumulated in the file, and the windows actually
+    /// on screen at quit, the ones "restore windows" is about, were never
+    /// described at all.
+    ///
+    /// Unlike the parked-move teardown this callback cannot perform, this
+    /// one is a thing it CAN guarantee: `describeAllWindows()` is a
+    /// synchronous read of values that returns a `[WindowSeed]`, and
+    /// `replace(_:whenEnabled:)` is one synchronous file write. Nothing
+    /// here awaits, so nothing here depends on the process outliving a
+    /// task that may never be scheduled.
+    ///
+    /// Both stores are built here rather than handed down from
+    /// `MacSCPApp`. `SettingsStore` persists on every set, so a store
+    /// constructed now reads the value the user last chose; and
+    /// `WindowRestorationStore` is a stateless struct over a directory
+    /// both sides resolve the same way. An `NSApplicationDelegateAdaptor`
+    /// instance is built by SwiftUI before `MacSCPApp.init` can reach it,
+    /// so the alternative would be a mutable app-wide handle for the sake
+    /// of two values that are cheap and unambiguous to read.
+    ///
+    /// With the setting off the file is deleted rather than skipped — see
+    /// `WindowRestorationStore.replace(_:whenEnabled:)`.
+    @MainActor
+    private func writeRestorationSeeds() {
+        let settings = SettingsStore(directory: SettingsStore.defaultDirectory)
+        let store = WindowRestorationStore(directory: WindowRestorationStore.defaultDirectory)
+        store.replace(
+            TabRegistry.shared.describeAllWindows(), whenEnabled: settings.restoresWindows)
+    }
+
+    /// Every tab still parked for a window that never appeared, at the
+    /// moment the process is ending (Detachable Tabs plan, Task 2 fix
+    /// round 3; it TEARS DOWN as of the Quit Teardown plan, Task 1).
+    ///
+    /// **This used to guarantee the RECORD and deliberately not more**, and
+    /// the two reasons it gave are worth keeping, because the second is what
+    /// made the first fixable:
+    ///
+    /// 1. **No bound could apply to a teardown started from
+    ///    `applicationWillTerminate`.** That callback is synchronous and
+    ///    AppKit holds the process open only until it returns, while the
+    ///    teardown and its `TeardownStage` bounds are `async` and
+    ///    main-actor isolated — and the main thread is the thread standing
+    ///    inside it. Blocking it to await them deadlocks; starting a `Task`
+    ///    and returning gives the process permission to exit first.
+    /// 2. **The four-stage order has one owner.** `cancelAll` →
+    ///    `stopAll` → `shutdown` → `disconnect` is an architecture
+    ///    invariant (`CLAUDE.md`), and spelling it a second time here would
+    ///    be the second copy this project's rules exist to prevent.
+    ///
+    /// Both are answered rather than argued around (Quit Teardown plan,
+    /// Task 1): the sweep moved to `applicationShouldTerminate(_:)`, which
+    /// CAN wait, and the order moved out of `ContentView` into
+    /// `TabTeardown`, which a delegate can call. So this function now hands
+    /// its tabs to a caller that tears them down — under
+    /// `QuitWatchdog.bound` — instead of only writing that they existed.
+    ///
+    /// What it still does itself is the record: one `info` line per seed,
+    /// written BEFORE the teardown starts, so a diagnostic report shows a
+    /// move that never landed even if the teardown is the thing that hangs.
+    /// The residue a hard exit can still leave is swept at the NEXT launch
+    /// by `EditSessionManager.sweepOrphanedTempDirectories()` and
+    /// `ExternalTerminalLauncher.sweepOrphanedTempDirectories()` in
+    /// `MacSCPApp.init`.
+    ///
+    /// The same sweep for a single window is that window's own close path,
+    /// `ContentView.releaseUnclaimedSeedsOnClose()`; this is the one case
+    /// that path cannot cover, because ⌘Q closes no window.
+    @MainActor
+    private func sweepUnclaimedMoves() -> [SessionTab] {
+        let taken = TabRegistry.shared.takeAllPendingSeeds()
+        for seed in taken {
+            DiagnosticLog.shared.log(
+                .info, "app", TabMoveLogLines.tornDownUnclaimed(seedID: seed.seedID))
+        }
+        return taken.flatMap(\.tabs)
+    }
+}
+
+struct MacSCPApp: App {
+    /// Installs `AppDelegate` above as `NSApp.delegate` — this is the ONLY
+    /// thing that makes `applicationWillTerminate(_:)` run. `@State`/
+    /// `@NSApplicationDelegateAdaptor` are both property wrappers SwiftUI
+    /// resolves before `body` is ever asked for, so declaration order here
+    /// doesn't matter the way it would for a plain stored property, but it
+    /// is listed first as the thing the whole app's lifecycle depends on.
+    @NSApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
+    /// Single instance for the whole app — passed to `ContentView` and the
+    /// `Settings` scene below (M5c/T3: no singleton, per the v2 multi-window
+    /// rule).
+    @State private var settingsStore: SettingsStore
+    @State private var applicationUpdater = ApplicationUpdater()
+    /// App-global bandwidth ceilings (M8a/T2): one shared instance for the
+    /// whole app, passed to `ContentView` so every tab's queue (T3) resolves
+    /// its throttle from the same buckets — limits apply in aggregate across
+    /// tabs, not per tab.
+    @State private var bandwidthLimiter = BandwidthLimiter()
+    /// App-wide per-session audit log persistence (M9b) — one instance for
+    /// the whole app, passed to `ContentView` (no singleton, same pattern as
+    /// `settingsStore`/`bandwidthLimiter` above). A stateless struct over a
+    /// fixed directory, so a plain default-initialized `@State` is enough.
+    @State private var auditStore = AuditLogStore(
+        directory: AuditLogStore.defaultDirectory,
+        isLoggingEnabled: { DiagnosticLog.shared.isEnabled(.error) })
+    /// Tab menu command bridge (M8a/T4) — see `TabCommands`.
+    @State private var settingsBridge = SettingsWindowBridge()
+    /// The releases `decideWhatsNew(store:)` decided to show this launch —
+    /// see that function's doc comment. `showWhatsNew` drives the sheet's
+    /// presentation; this carries what it should show once presented.
+    @State private var whatsNewReleases: [ChangelogRelease] = []
+    /// Whether the "What's New" sheet should be showing. Set once in
+    /// `init` from `decideWhatsNew(store:)`'s result and flipped back to
+    /// `false` by the sheet's own Close button (`WhatsNewSheet.onClose`).
+    @State private var showWhatsNew = false
+    /// Menu-bar status bridge (M11n) — one instance for the whole app,
+    /// passed to `ContentView` (which mirrors its tabs into it) and to the
+    /// `MenuBarController` below, same no-singleton pattern as the other
+    /// app-global stores above.
+    @State private var menuBarModel: MenuBarStatusModel
+    /// What this launch still has to restore. Filled in `init` from the
+    /// file, handed out once per half — see `WindowRestorationLaunch`.
+    @State private var restorationLaunch: WindowRestorationLaunch
+    /// The live macOS notifier (next build of 2026-09-17, Task 7 fix round
+    /// 1): built here and nowhere else, handed to every window and
+    /// installed on `TunnelManager.shared` in `init`. Anything built
+    /// without it is silent — `ErrorNotificationWiringGuardTests
+    /// .theLiveNotifierIsBuiltAndInjectedOnlyInMacSCPApp`.
+    private let errorNotifier: ErrorNotifier
+
+    /// AppKit menu-bar status item (M11n, re-landed). Retained for the app's
+    /// lifetime; reads `menuBarModel` and shows/hides itself from
+    /// `settingsStore.menuBarEnabled`. Replaces the SwiftUI `MenuBarExtra`,
+    /// which loops SwiftUI layout on macOS 26 — see `MenuBarController`.
+    private let menuBarController: MenuBarController
+    /// The language that was in effect when THIS process launched (M11p):
+    /// captured once in `init`, alongside the explicit catalog selection.
+    /// The General settings section compares this against the live
+    /// `store.selectedLanguage` to decide whether to show the relaunch
+    /// button — a change only takes effect on a fresh launch.
+    let launchLanguage: AppLanguage
+    /// Release metadata captured once for the What's New title. No sheet is
+    /// presented when neither packaged nor source version metadata exists.
+    let whatsNewCurrentVersion: String
+
+    init() {
+        // Sessions use MacSCP's own tab strip, not NSWindow tab groups.
+        NSWindow.allowsAutomaticWindowTabbing = false
+        // Sweep any orphaned edit temp directories left behind by a
+        // hard-killed previous run (M6a) — first, before anything else
+        // touches the temp tree.
+        EditSessionManager.sweepOrphanedTempDirectories()
+        // Same sweep for orphaned external-terminal launch scripts (M11d/T2)
+        // — see `ExternalTerminalLauncher.sweepOrphanedTempDirectories`.
+        ExternalTerminalLauncher.sweepOrphanedTempDirectories()
+        // Without an app bundle (started via `swift run`) the process runs
+        // as an accessory — only the regular policy brings a window and a
+        // Dock icon. Install the resource icon for bare-executable launches too.
+        NSApplication.shared.setActivationPolicy(.regular)
+        ApplicationIcon.install()
+
+        // Build the settings store and the menu-bar bridge here (not as
+        // property initializers) so the AppKit `MenuBarController` can share
+        // the very same instances the views observe.
+        let store = SettingsStore(directory: SettingsStore.defaultDirectory)
+
+        // Select catalogs explicitly: AppKit or Bundle.main may already have
+        // cached English before the app initializer runs, especially in a
+        // bare SwiftPM executable. Changing AppleLanguages here is too late.
+        let language = store.selectedLanguage
+        LocalizationContext.shared.configure(language: language)
+        launchLanguage = language
+
+        // Diagnostic log (Diagnostic Log plan, Task 2): configure the sink
+        // from the persisted setting BEFORE anything else in this process
+        // could log, then write the first line so a log file always
+        // identifies the build that wrote it. Placed right beside the
+        // What's New decision below — both are "the first thing this launch
+        // decides" — rather than inside `decideWhatsNew(store:)` itself,
+        // which is unrelated to logging and already documents its own,
+        // narrower contract.
+        DiagnosticLog.shared.configure(level: store.diagnosticLogLevel)
+        let launchVersion = Self.bundleVersion
+        let launchBuild = Self.bundleBuild
+        DiagnosticLog.shared.log(.info, "app", "launch version=\(launchVersion) build=\(launchBuild)")
+
+        // "app quit" (Diagnostic Log plan, Task 2 round 1): logged from
+        // `AppDelegate.applicationWillTerminate`, not from here — see that
+        // type's own doc comment for why a `NotificationCenter` observer
+        // (this file's prior approach) could not guarantee the line, or the
+        // rest of the buffer, actually reached disk before the process
+        // exited.
+
+        // "What's New" decision (What's New plan, Task 2) — see
+        // `decideWhatsNew(store:)`'s own doc comment for exactly when
+        // `lastSeenVersion` gets written and why that happens inside it,
+        // synchronously, rather than after the sheet is dismissed.
+        let whatsNew = Self.decideWhatsNew(store: store)
+        whatsNewCurrentVersion = whatsNew.current
+        _whatsNewReleases = State(initialValue: whatsNew.releases)
+        _showWhatsNew = State(initialValue: !whatsNew.releases.isEmpty)
+
+        // Window restoration (Detachable Tabs plan, Task 5), beside the
+        // What's New decision above because it is the same kind of thing:
+        // something this launch decides ONCE, before any window exists.
+        //
+        // The read CONSUMES the file, in both directions: read then
+        // deleted with the setting on, deleted unread with it off. A seed
+        // file describes one quit and is used by exactly one launch —
+        // otherwise a launch that crashed before its quit sweep ran would
+        // reopen its predecessor's windows forever, and a run with the
+        // setting off would leave a file behind for the next run with it
+        // on to restore a generation of windows two quits old.
+        //
+        // NOTHING here connects. The windows come back with their tabs
+        // showing the sessions they had and no connection behind them;
+        // the first connect is the user's click, which is the promise the
+        // settings footer makes and `WindowRestorationWiringGuardTests`
+        // keeps. `openWindow(value:)` is not reachable from here either —
+        // it is an environment value — so the primary window's setup pass
+        // is what opens the rest (`ContentView.openRestoredWindows()`).
+        let restoration = WindowRestorationStore(
+            directory: WindowRestorationStore.defaultDirectory)
+        let restoredWindows = restoration.consumeAtLaunch(whenEnabled: store.restoresWindows)
+        _restorationLaunch = State(initialValue: WindowRestorationLaunch(
+            flag: store.restoresWindows, stored: restoredWindows))
+
+        let model = MenuBarStatusModel()
+        _settingsStore = State(initialValue: store)
+        _menuBarModel = State(initialValue: model)
+        menuBarController = MenuBarController(model: model, settingsStore: store)
+
+        // Notifications (Task 7 fix round 1). Here, in `init`, because
+        // `applicationDidFinishLaunching(_:)` is where the first forwarding
+        // can start, and its failure must already have somewhere to go. The
+        // forwarding reads the switch from this app's one `SettingsStore`,
+        // the instance the Settings window writes.
+        let notifier = ErrorNotifier(
+            poster: UserNotificationCenterPoster(operations: LiveNotificationCenterOperations()),
+            appIsActive: { NSApp?.isActive ?? false })
+        errorNotifier = notifier
+        TunnelManager.shared.notifyForwardingFailed = { name in
+            notifier.notify(
+                .forwardingFailed, name: name,
+                enabled: store.notificationsEnabled,
+                windowIsKey: nil)
+        }
+    }
+
+    /// Running build metadata; source-only launches may have no bundle version.
+    private static var bundleVersion: String {
+        ReleaseMetadata().version ?? "unknown"
+    }
+
+    private static var bundleBuild: String {
+        ReleaseMetadata().build ?? "source"
+    }
+
+    /// Decide once per process and record the release before displaying its
+    /// notes. Packaged metadata takes precedence over source launch metadata.
+    /// Missing metadata leaves the last-seen release unchanged.
+    private static func decideWhatsNew(
+        store: SettingsStore
+    ) -> (current: String, releases: [ChangelogRelease]) {
+        guard let current = ReleaseMetadata().version
+        else { return ("", []) }
+
+        let releases = ChangelogResource.load().map(ChangelogParser.parse) ?? []
+        let toShow = WhatsNewModel.releasesToShow(
+            current: current, lastSeen: store.lastSeenVersion, in: releases)
+        store.lastSeenVersion = current
+        return (current, toShow)
+    }
+
+    /// The PRIMARY window: the one SwiftUI opens for the value-keyed
+    /// `WindowGroup` with no seed at launch.
+    ///
+    /// It is the only window that presents "What's New", and that is the
+    /// whole difference between the two branches. The decision was taken
+    /// ONCE PER PROCESS, in `init` (`decideWhatsNew(store:)`, which also
+    /// records `lastSeenVersion` there and then), so `showWhatsNew` is
+    /// app-scope `@State`: a second window attaching the same sheet would
+    /// present the same release notes again, over a window the user opened
+    /// to move a tab into.
+    @ViewBuilder
+    private func primaryWindow() -> some View {
+        windowContent(seed: nil)
+            // "What's New" (What's New plan, Task 2): `showWhatsNew` was
+            // decided once, in `init`, by `decideWhatsNew(store:)` — this
+            // only presents what that decision already made.
+            .sheet(isPresented: $showWhatsNew) {
+                WhatsNewSheet(
+                    currentVersion: whatsNewCurrentVersion, releases: whatsNewReleases,
+                    onClose: { showWhatsNew = false })
+            }
+    }
+
+    /// A window opened by moving a tab out of another one — see
+    /// `primaryWindow()` above for what it deliberately does NOT carry.
+    @ViewBuilder
+    private func detachedWindow(seed: WindowSeed) -> some View {
+        windowContent(seed: seed)
+    }
+
+    /// Everything both windows are: the same `ContentView` over the same
+    /// app-global stores, told which seed (if any) it opened with.
+    ///
+    /// The diagnostic-log observer lives here rather than in one branch
+    /// because a level change has to take effect while ANY window is open —
+    /// including after the primary one has been closed. `configure(level:)`
+    /// is idempotent, so several windows reacting to one change reconfigure
+    /// the same sink to the same level; what it costs is one `level=` line
+    /// per open window.
+    @ViewBuilder
+    private func windowContent(seed: WindowSeed?) -> some View {
+        MainWindowPresentationHost {
+            CredentialStartupView {
+                ContentView(
+                    settingsStore: settingsStore, bandwidthLimiter: bandwidthLimiter,
+                    auditStore: auditStore, settingsBridge: settingsBridge, 
+                    menuBarModel: menuBarModel, seed: seed,
+                    restorationLaunch: restorationLaunch, errorNotifier: errorNotifier,
+                    launchLanguage: launchLanguage)
+                    // Reconfigure the shared sink when the General settings
+                    // picker changes, regardless of which window remains open.
+                    .onChange(of: settingsStore.diagnosticLogLevel) { _, newLevel in
+                        DiagnosticLog.shared.configure(level: newLevel)
+                        DiagnosticLog.shared.log(.info, "app", "level=\(newLevel.rawValue)")
+                    }
+            }
+        }
+        .environment(\.applicationUpdater, applicationUpdater)
+        .task { applicationUpdater.start() }
+    }
+
+    var body: some Scene {
+        // The minimum size depends on the connection state (compact form vs.
+        // browser) — it lives conditionally in `ContentView` instead of here
+        // globally (M5c/T0).
+        // Value-keyed (Detachable Tabs plan, Task 2): each window instance
+        // is identified by the `WindowSeed` it was opened with, which is
+        // what lets `openWindow(value:)` open a SECOND window for a tab that
+        // moved out of this one. SwiftUI opens the group's own window with a
+        // `nil` value at launch — that one is the PRIMARY window, and the
+        // two branches below are what "primary" means in code.
+        WindowGroup("MacSCP", id: MainWindowPresentation.sceneID, for: WindowSeed.self) { $seed in
+            if let seed {
+                detachedWindow(seed: seed)
+            } else {
+                primaryWindow()
+            }
+        }
+        // Every menu this app adds lives in `MacSCPCommands`
+        // (`MacSCPCommands.swift`): it reads the focused window's
+        // `TabCommands` through `@FocusedValue`, which `App.body` — not a
+        // dynamic-property type — cannot do.
+        // SYSTEM window restoration stays off (Detachable Tabs plan,
+        // Task 2 fix round 1), and Task 5 did not turn it back on. A
+        // value-keyed group persists its `WindowSeed`s, so without this
+        // macOS would reopen every detached window on the next launch with
+        // a seed nobody parked anything under: a window per moved tab,
+        // each holding one fresh, empty form tab.
+        //
+        // The app's own restoration (Task 5) is a different mechanism and
+        // deliberately so: it is off unless `SettingsStore.restoresWindows`
+        // says otherwise, it reads `windows.json` in `init` above, and it
+        // rebuilds TABS — each showing its stored session, connected to
+        // nothing — rather than window frames. The one frame that is
+        // remembered is the primary window's, through AppKit's own autosave
+        // name (`ContentView.applyFrameAutosave(to:)`).
+        .defaultSize(width: MainWindowSizePlan.defaultSize.width, height: MainWindowSizePlan.defaultSize.height)
+        .restorationBehavior(.disabled)
+        .commands { MacSCPCommands(settingsStore: settingsStore, settingsBridge: settingsBridge, updater: applicationUpdater) }
+
+
+        // The menu-bar status item is an AppKit `NSStatusItem` driven by
+        // `menuBarController` (created in `init`), NOT a SwiftUI scene —
+        // `MenuBarExtra` loops SwiftUI layout on macOS 26. See
+        // `MenuBarController`.
+    }
+
+}

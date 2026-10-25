@@ -1,0 +1,693 @@
+import Foundation
+import Testing
+@testable import macSCPCore
+
+/// Plain payload stand-in — the rules under test are payload-agnostic.
+private struct StubTab: Identifiable, Equatable {
+    let id: UUID
+    var connected: Bool = false
+    /// Stands in for `SessionTab.activeStoredSessionID`: set only for a
+    /// STORED connection, `nil` for an ad-hoc one.
+    var storedSessionID: UUID?
+}
+
+@Suite("TabsViewModel")
+@MainActor
+struct TabsViewModelTests {
+    @Test func initialTabIsActiveAndLast() {
+        let first = StubTab(id: UUID())
+        let vm = TabsViewModel(initial: first)
+        #expect(vm.tabs.map(\.id) == [first.id])
+        #expect(vm.activeTabID == first.id)
+        #expect(vm.activeTab.id == first.id)
+        #expect(vm.isLastTab)
+    }
+
+    @Test func addTabAppendsAndActivates() {
+        let first = StubTab(id: UUID())
+        let vm = TabsViewModel(initial: first)
+        let second = StubTab(id: UUID())
+        vm.addTab(second)
+        #expect(vm.tabs.map(\.id) == [first.id, second.id])
+        #expect(vm.activeTabID == second.id)
+        #expect(!vm.isLastTab)
+    }
+
+    /// "Duplicate Tab": the new tab sits right after the one it was made
+    /// from, not appended at the far end — and becomes active, the same as
+    /// `addTab(_:)`.
+    @Test func addTabAfterInsertsRightAfterAndActivates() {
+        let a = StubTab(id: UUID()), b = StubTab(id: UUID()), c = StubTab(id: UUID())
+        let vm = TabsViewModel(initial: a)
+        vm.addTab(b)
+        vm.addTab(c)
+        let duplicate = StubTab(id: UUID())
+        vm.addTab(duplicate, after: a.id)
+        #expect(vm.tabs.map(\.id) == [a.id, duplicate.id, b.id, c.id])
+        #expect(vm.activeTabID == duplicate.id)
+    }
+
+    /// Same insertion rule at the far end of the strip: "after the last
+    /// tab" is still "right after", not "appended past it a second time".
+    @Test func addTabAfterTheLastTabInsertsAtTheEnd() {
+        let a = StubTab(id: UUID()), b = StubTab(id: UUID())
+        let vm = TabsViewModel(initial: a)
+        vm.addTab(b)
+        let duplicate = StubTab(id: UUID())
+        vm.addTab(duplicate, after: b.id)
+        #expect(vm.tabs.map(\.id) == [a.id, b.id, duplicate.id])
+        #expect(vm.activeTabID == duplicate.id)
+    }
+
+    /// A stale id — the source tab closed between the menu opening and the
+    /// click landing — falls back to `addTab(_:)`'s plain append rather
+    /// than losing the tab this call already promised to make.
+    @Test func addTabAfterAnUnknownIDAppendsInstead() {
+        let a = StubTab(id: UUID())
+        let vm = TabsViewModel(initial: a)
+        let duplicate = StubTab(id: UUID())
+        vm.addTab(duplicate, after: UUID())
+        #expect(vm.tabs.map(\.id) == [a.id, duplicate.id])
+        #expect(vm.activeTabID == duplicate.id)
+    }
+
+    @Test func activateSwitchesAndIgnoresUnknown() {
+        let first = StubTab(id: UUID())
+        let vm = TabsViewModel(initial: first)
+        let second = StubTab(id: UUID())
+        vm.addTab(second)
+        vm.activate(first.id)
+        #expect(vm.activeTabID == first.id)
+        vm.activate(UUID()) // unknown — no-op
+        #expect(vm.activeTabID == first.id)
+    }
+
+    @Test func closeActiveTabActivatesRightNeighbor() {
+        let a = StubTab(id: UUID()), b = StubTab(id: UUID()), c = StubTab(id: UUID())
+        let vm = TabsViewModel(initial: a)
+        vm.addTab(b)
+        vm.addTab(c)
+        vm.activate(b.id)
+        #expect(vm.closeTab(b.id))
+        #expect(vm.tabs.map(\.id) == [a.id, c.id])
+        #expect(vm.activeTabID == c.id) // right neighbor
+    }
+
+    @Test func closeActiveLastPositionActivatesLeftNeighbor() {
+        let a = StubTab(id: UUID()), b = StubTab(id: UUID())
+        let vm = TabsViewModel(initial: a)
+        vm.addTab(b) // b active, rightmost
+        #expect(vm.closeTab(b.id))
+        #expect(vm.activeTabID == a.id) // no right neighbor -> left
+    }
+
+    @Test func closeInactiveTabKeepsActive() {
+        let a = StubTab(id: UUID()), b = StubTab(id: UUID())
+        let vm = TabsViewModel(initial: a)
+        vm.addTab(b) // b active
+        #expect(vm.closeTab(a.id))
+        #expect(vm.activeTabID == b.id)
+        #expect(vm.tabs.map(\.id) == [b.id])
+    }
+
+    @Test func lastTabCannotBeClosed() {
+        let a = StubTab(id: UUID())
+        let vm = TabsViewModel(initial: a)
+        #expect(!vm.closeTab(a.id))
+        #expect(vm.tabs.count == 1)
+        #expect(!vm.closeTab(UUID())) // unknown id -> false, no change
+    }
+
+    // MARK: - Detaching (Detachable Tabs plan, Task 1: "remove without closing")
+
+    /// Unlike `closeTab`, the last tab CAN be detached — a move into
+    /// another window's model is not a close, so the model is allowed to
+    /// end up with none.
+    /// Fix round 1: `activeTabID` used to be left dangling — naming the
+    /// tab that just left — when `detach` emptied the model. It is `nil`
+    /// now, a state this type actually documents rather than a stale id
+    /// that happens to be safe only because nothing reads it.
+    @Test func detachingTheLastTabLeavesActiveTabIDNilAndTheModelEmpty() {
+        let a = StubTab(id: UUID())
+        let vm = TabsViewModel(initial: a)
+        let detached = vm.detach(tabID: a.id)
+        #expect(detached?.id == a.id)
+        #expect(vm.tabs.isEmpty)
+        #expect(vm.activeTabID == nil)
+    }
+
+    /// Same active-tab arithmetic `closeTab` uses: the right neighbor
+    /// takes over when the removed tab was active and one remains to its
+    /// right.
+    @Test func detachingTheActiveTabActivatesRightNeighbor() {
+        let a = StubTab(id: UUID()), b = StubTab(id: UUID()), c = StubTab(id: UUID())
+        let vm = TabsViewModel(initial: a)
+        vm.addTab(b); vm.addTab(c)
+        vm.activate(b.id)
+        let detached = vm.detach(tabID: b.id)
+        #expect(detached?.id == b.id)
+        #expect(vm.tabs.map(\.id) == [a.id, c.id])
+        #expect(vm.activeTabID == c.id)
+    }
+
+    /// Same rightmost-position arithmetic `closeTab` uses: no right
+    /// neighbor, so the left one takes over.
+    @Test func detachingTheActiveTabAtTheRightmostPositionActivatesLeftNeighbor() {
+        let a = StubTab(id: UUID()), b = StubTab(id: UUID())
+        let vm = TabsViewModel(initial: a)
+        vm.addTab(b) // b active, rightmost
+        #expect(vm.detach(tabID: b.id)?.id == b.id)
+        #expect(vm.activeTabID == a.id)
+    }
+
+    /// Detaching a background tab leaves the active one active.
+    @Test func detachingAnInactiveTabKeepsActive() {
+        let a = StubTab(id: UUID()), b = StubTab(id: UUID())
+        let vm = TabsViewModel(initial: a)
+        vm.addTab(b) // b active
+        #expect(vm.detach(tabID: a.id)?.id == a.id)
+        #expect(vm.activeTabID == b.id)
+        #expect(vm.tabs.map(\.id) == [b.id])
+    }
+
+    /// An unknown id is a no-op, mirroring `closeTab`'s `false`.
+    @Test func detachingAnUnknownTabIsANoOp() {
+        let a = StubTab(id: UUID())
+        let vm = TabsViewModel(initial: a)
+        #expect(vm.detach(tabID: UUID()) == nil)
+        #expect(vm.tabs.map(\.id) == [a.id])
+        #expect(vm.activeTabID == a.id)
+    }
+
+    // MARK: - Which tab already holds a stored session
+
+    /// Nothing holds it, so nothing stands in the way of a start — the case
+    /// in which the sidebar's behaviour is unchanged.
+    @Test func noTabHoldingTheSessionAnswersNil() {
+        let a = StubTab(id: UUID()), b = StubTab(id: UUID(), storedSessionID: UUID())
+        let vm = TabsViewModel(initial: a)
+        vm.addTab(b)
+        #expect(vm.tabHolding(UUID(), storedSessionIDOf: \.storedSessionID) == nil)
+    }
+
+    /// Every tab is connected ad hoc, so every projection is `nil` — and an
+    /// answer of "nil holds nil" would make each of them hold every stored
+    /// session at once. A typed connection to the same host can carry other
+    /// credentials, another key, another jump host: it looks the same and
+    /// is not.
+    @Test func anAdHocTabHoldsNoStoredSession() {
+        let a = StubTab(id: UUID(), storedSessionID: nil)
+        let vm = TabsViewModel(initial: a)
+        vm.addTab(StubTab(id: UUID(), storedSessionID: nil))
+        #expect(vm.tabHolding(UUID(), storedSessionIDOf: \.storedSessionID) == nil, """
+            an ad-hoc tab was reported as holding a stored session — every ad-hoc tab would \
+            then hold every session, and no stored session could ever be started again.
+            """)
+    }
+
+    /// Several holders exist as soon as somebody has answered "open anyway"
+    /// once. Tab order is then the only rule that invents no preference.
+    @Test func theFirstHolderInTabOrderWins() {
+        let session = UUID()
+        let a = StubTab(id: UUID())
+        let vm = TabsViewModel(initial: a)
+        let first = StubTab(id: UUID(), storedSessionID: session)
+        let second = StubTab(id: UUID(), storedSessionID: session)
+        vm.addTab(first)
+        vm.addTab(second)
+        #expect(vm.tabHolding(session, storedSessionIDOf: \.storedSessionID)?.id == first.id)
+    }
+
+    /// "First" means first where the strip shows it, not first opened —
+    /// which is what makes `tabs` the array the answer is derived from.
+    @Test func reorderingChangesWhichHolderIsFirst() {
+        let session = UUID()
+        let a = StubTab(id: UUID())
+        let vm = TabsViewModel(initial: a)
+        let opened = StubTab(id: UUID(), storedSessionID: session)
+        let later = StubTab(id: UUID(), storedSessionID: session)
+        vm.addTab(opened)
+        vm.addTab(later)
+        vm.move(tabID: later.id, to: 0)
+        #expect(vm.tabHolding(session, storedSessionIDOf: \.storedSessionID)?.id == later.id, """
+            the answer followed the order the tabs were opened in rather than the order they \
+            are now shown in — "the first tab" is a statement about the strip.
+            """)
+    }
+
+    /// The ACTIVE tab is not exempt. Jumping to it is then a no-op, and
+    /// that is the correct effect of that choice, not a reason to withhold
+    /// the question: "open another one" is as sensible here as anywhere.
+    @Test func theActiveTabCountsLikeAnyOtherHolder() {
+        let session = UUID()
+        let a = StubTab(id: UUID())
+        let vm = TabsViewModel(initial: a)
+        let active = StubTab(id: UUID(), storedSessionID: session)
+        vm.addTab(active)
+        #expect(vm.activeTabID == active.id)
+        #expect(vm.tabHolding(session, storedSessionIDOf: \.storedSessionID)?.id == active.id)
+    }
+
+    @Test func sidebarConnectTargetReusesUnconnectedActiveTab() {
+        let a = StubTab(id: UUID(), connected: false)
+        let vm = TabsViewModel(initial: a)
+        let target = vm.sidebarConnectTarget(activeTabIsConnected: false) {
+            StubTab(id: UUID())
+        }
+        #expect(target.id == a.id)
+        #expect(vm.tabs.count == 1)
+    }
+
+    @Test func sidebarConnectTargetOpensNewTabWhenActiveConnected() {
+        let a = StubTab(id: UUID(), connected: true)
+        let vm = TabsViewModel(initial: a)
+        let fresh = StubTab(id: UUID())
+        let target = vm.sidebarConnectTarget(activeTabIsConnected: true) { fresh }
+        #expect(target.id == fresh.id)
+        #expect(vm.tabs.map(\.id) == [a.id, fresh.id])
+        #expect(vm.activeTabID == fresh.id)
+    }
+
+    @Test func movingATabPutsItAtTheRequestedPosition() {
+        let a = StubTab(id: UUID()), b = StubTab(id: UUID()), c = StubTab(id: UUID())
+        let vm = TabsViewModel(initial: a)
+        vm.addTab(b); vm.addTab(c)
+        vm.move(tabID: a.id, to: 2)
+        #expect(vm.tabs.map(\.id) == [b.id, c.id, a.id])
+    }
+
+    @Test func movingSomeOtherTabLeavesTheActiveOneActive() {
+        let a = StubTab(id: UUID()), b = StubTab(id: UUID()), c = StubTab(id: UUID())
+        let vm = TabsViewModel(initial: a)
+        vm.addTab(b); vm.addTab(c)
+        vm.activate(b.id)
+        vm.move(tabID: c.id, to: 0)
+        // b moved from the middle to the end without being touched.
+        #expect(vm.tabs.map(\.id) == [c.id, a.id, b.id])
+        #expect(vm.activeTabID == b.id)
+        #expect(vm.activeTab.id == b.id)
+    }
+
+    @Test func movingTheActiveTabKeepsItActive() {
+        let a = StubTab(id: UUID()), b = StubTab(id: UUID())
+        let vm = TabsViewModel(initial: a)
+        vm.addTab(b)
+        vm.activate(a.id)
+        vm.move(tabID: a.id, to: 1)
+        #expect(vm.tabs.map(\.id) == [b.id, a.id])
+        #expect(vm.activeTabID == a.id)
+    }
+
+    @Test func aDestinationBeyondTheEndsDoesNothingRatherThanTrapping() {
+        // b sits in the middle — neither edge it would clamp to is where it
+        // already is, so a clamp-and-move (instead of a true no-op) moves
+        // it and this test catches that.
+        let a = StubTab(id: UUID()), b = StubTab(id: UUID()), c = StubTab(id: UUID())
+        let vm = TabsViewModel(initial: a)
+        vm.addTab(b); vm.addTab(c)
+        vm.move(tabID: b.id, to: -5)
+        #expect(vm.tabs.map(\.id) == [a.id, b.id, c.id])
+        vm.move(tabID: b.id, to: 99)
+        #expect(vm.tabs.map(\.id) == [a.id, b.id, c.id])
+    }
+
+    /// The commonest drag of all: picked up and put back down on itself.
+    /// It arrives here as a move to the tab's own index, and must leave
+    /// both the order and the active tab exactly as they were — including
+    /// when the tab dropped on itself is not the active one.
+    @Test func movingATabOntoItsOwnPositionChangesNothing() {
+        let a = StubTab(id: UUID()), b = StubTab(id: UUID()), c = StubTab(id: UUID())
+        let vm = TabsViewModel(initial: a)
+        vm.addTab(b); vm.addTab(c)
+        vm.activate(c.id)
+        vm.move(tabID: b.id, to: 1)
+        #expect(vm.tabs.map(\.id) == [a.id, b.id, c.id])
+        #expect(vm.activeTabID == c.id)
+        vm.move(tabID: c.id, to: 2)
+        #expect(vm.tabs.map(\.id) == [a.id, b.id, c.id])
+        #expect(vm.activeTabID == c.id)
+    }
+
+    // MARK: - Moving one step (what the context menu asks for)
+    //
+    // The direction of "Move Left"/"Move Right" was the last arithmetic of
+    // this feature and the only part of it no test reached: while the step
+    // was taken in the app layer, swapping the two numbers left the whole
+    // suite green (final review, I1). The step is taken in the model now,
+    // and these say what each direction owes.
+
+    @Test func movingOneStepLeftPutsTheTabBeforeItsLeftNeighbour() {
+        let a = StubTab(id: UUID()), b = StubTab(id: UUID()), c = StubTab(id: UUID())
+        let vm = TabsViewModel(initial: a)
+        vm.addTab(b); vm.addTab(c)
+        vm.move(tabID: b.id, oneStep: .left)
+        #expect(vm.tabs.map(\.id) == [b.id, a.id, c.id])
+    }
+
+    @Test func movingOneStepRightPutsTheTabAfterItsRightNeighbour() {
+        let a = StubTab(id: UUID()), b = StubTab(id: UUID()), c = StubTab(id: UUID())
+        let vm = TabsViewModel(initial: a)
+        vm.addTab(b); vm.addTab(c)
+        vm.move(tabID: b.id, oneStep: .right)
+        #expect(vm.tabs.map(\.id) == [a.id, c.id, b.id])
+    }
+
+    /// A tab with no neighbour on the side it is asked to move to stays
+    /// where it is, rather than trapping on an index off the end. The menu
+    /// does not offer that step, so this only ever arrives from a menu that
+    /// went stale between opening and clicking.
+    @Test func aStepPastEitherEndOfTheStripDoesNothing() {
+        let a = StubTab(id: UUID()), b = StubTab(id: UUID())
+        let vm = TabsViewModel(initial: a)
+        vm.addTab(b)
+        vm.move(tabID: a.id, oneStep: .left)
+        #expect(vm.tabs.map(\.id) == [a.id, b.id])
+        vm.move(tabID: b.id, oneStep: .right)
+        #expect(vm.tabs.map(\.id) == [a.id, b.id])
+    }
+
+    @Test func steppingATabTheModelDoesNotKnowIsANoOp() {
+        let a = StubTab(id: UUID()), b = StubTab(id: UUID())
+        let vm = TabsViewModel(initial: a)
+        vm.addTab(b)
+        vm.move(tabID: UUID(), oneStep: .right)
+        #expect(vm.tabs.map(\.id) == [a.id, b.id])
+    }
+
+    /// The reported failure, end to end: the first tab is offered exactly
+    /// one move entry, and taking that entry moves it towards the tab next
+    /// to it. Both halves of the direction are in this test — which step the
+    /// edge tab is offered, and where that step puts it — so a disagreement
+    /// between them shows up as the tab not moving, which is precisely what
+    /// the user saw.
+    @Test func theOnlyMoveTheFirstTabIsOfferedTakesItPastItsNeighbour() {
+        let a = StubTab(id: UUID()), b = StubTab(id: UUID()), c = StubTab(id: UUID())
+        let vm = TabsViewModel(initial: a)
+        vm.addTab(b); vm.addTab(c)
+        let entries = TabContextMenu.entries(
+            atIndex: 0, ofTabCount: vm.tabs.count,
+            supportsShell: false, isAdHoc: false, isConnected: true, hasStoredSession: false,
+            filesToggle: PaneToggleState(isOn: true, isEnabled: false),
+            terminalToggle: PaneToggleState(isOn: false, isEnabled: false))
+        let steps = entries.compactMap { entry -> TabMoveStep? in
+            guard case .move(let step) = entry else { return nil }
+            return step
+        }
+        #expect(steps == [.right])
+        for step in steps { vm.move(tabID: a.id, oneStep: step) }
+        #expect(vm.tabs.map(\.id) == [b.id, a.id, c.id])
+    }
+
+    // MARK: - Moving onto another tab (what a drop reports)
+
+    /// The drag's way in: two identities, no index. The destination is the
+    /// position the TARGET holds at the moment of the drop, derived here
+    /// from the model's own array — so a caller cannot compute a position,
+    /// carry a stale one, or shift one by a step.
+    @Test func movingATabOntoAnotherTakesThatTabsPosition() {
+        let a = StubTab(id: UUID()), b = StubTab(id: UUID()), c = StubTab(id: UUID())
+        let vm = TabsViewModel(initial: a)
+        vm.addTab(b); vm.addTab(c)
+        vm.move(tabID: a.id, onto: c.id)
+        #expect(vm.tabs.map(\.id) == [b.id, c.id, a.id])
+    }
+
+    /// The same answer `move(tabID:to:)` gives for that target's index —
+    /// this is one rule reached two ways, not a second one.
+    @Test func movingOntoATabMatchesMovingToItsIndex() {
+        let a = StubTab(id: UUID()), b = StubTab(id: UUID()), c = StubTab(id: UUID())
+        let byTarget = TabsViewModel(initial: a)
+        byTarget.addTab(b); byTarget.addTab(c)
+        byTarget.move(tabID: c.id, onto: a.id)
+        let byIndex = TabsViewModel(initial: a)
+        byIndex.addTab(b); byIndex.addTab(c)
+        byIndex.move(tabID: c.id, to: 0)
+        #expect(byTarget.tabs.map(\.id) == byIndex.tabs.map(\.id))
+    }
+
+    /// Picked up and put back down on itself — the commonest drag there is.
+    @Test func movingATabOntoItselfChangesNothing() {
+        let a = StubTab(id: UUID()), b = StubTab(id: UUID()), c = StubTab(id: UUID())
+        let vm = TabsViewModel(initial: a)
+        vm.addTab(b); vm.addTab(c)
+        vm.activate(c.id)
+        vm.move(tabID: b.id, onto: b.id)
+        #expect(vm.tabs.map(\.id) == [a.id, b.id, c.id])
+        #expect(vm.activeTabID == c.id)
+    }
+
+    /// A tab that closed while the drag was in flight names no position any
+    /// more. That is the whole of what used to need clamping: there is no
+    /// stale index to clamp, only a target that is or is not there.
+    @Test func movingOntoATabThatIsGoneDoesNothing() {
+        let a = StubTab(id: UUID()), b = StubTab(id: UUID())
+        let vm = TabsViewModel(initial: a)
+        vm.addTab(b)
+        vm.move(tabID: b.id, onto: UUID())
+        #expect(vm.tabs.map(\.id) == [a.id, b.id])
+    }
+
+    @Test func movingAnUnknownTabOntoATabDoesNothing() {
+        let a = StubTab(id: UUID()), b = StubTab(id: UUID())
+        let vm = TabsViewModel(initial: a)
+        vm.addTab(b)
+        vm.move(tabID: UUID(), onto: a.id)
+        #expect(vm.tabs.map(\.id) == [a.id, b.id])
+    }
+
+    @Test func movingOntoATabLeavesTheActiveTabActive() {
+        let a = StubTab(id: UUID()), b = StubTab(id: UUID()), c = StubTab(id: UUID())
+        let vm = TabsViewModel(initial: a)
+        vm.addTab(b); vm.addTab(c)
+        vm.activate(b.id)
+        vm.move(tabID: c.id, onto: a.id)
+        #expect(vm.tabs.map(\.id) == [c.id, a.id, b.id])
+        #expect(vm.activeTabID == b.id)
+        #expect(vm.activeTab.id == b.id)
+    }
+
+    @Test func movingAnUnknownTabIsANoOp() {
+        let a = StubTab(id: UUID())
+        let vm = TabsViewModel(initial: a)
+        vm.move(tabID: UUID(), to: 0)
+        #expect(vm.tabs.map(\.id) == [a.id])
+    }
+
+    // MARK: - Every relative position a drop can have
+    //
+    // Every other `onto:` test that moves anything at all picks its
+    // target two places away; the rest drop a tab on itself or name an id
+    // the model does not have. That left the commonest drag there is — nudge a
+    // tab one place — with no case of its own, and a derivation that
+    // treated a neighbouring target as nothing to do would have passed all
+    // of them. The four checks here say what the derivation owes for a
+    // target on either side at any distance, so that "the position is
+    // derived from the model" is a claim with values behind it.
+
+    /// The nudge to the right: the dragged tab takes the neighbour's place
+    /// and the neighbour takes the dragged tab's.
+    @Test func movingATabOntoItsRightNeighbourSwapsTheTwo() {
+        let a = StubTab(id: UUID()), b = StubTab(id: UUID()), c = StubTab(id: UUID())
+        let vm = TabsViewModel(initial: a)
+        vm.addTab(b); vm.addTab(c)
+        vm.move(tabID: a.id, onto: b.id)
+        #expect(vm.tabs.map(\.id) == [b.id, a.id, c.id])
+    }
+
+    /// The nudge to the left, which is the same rule read the other way:
+    /// the dragged tab lands on the index its target held, whichever side
+    /// it came from.
+    @Test func movingATabOntoItsLeftNeighbourSwapsTheTwo() {
+        let a = StubTab(id: UUID()), b = StubTab(id: UUID()), c = StubTab(id: UUID())
+        let vm = TabsViewModel(initial: a)
+        vm.addTab(b); vm.addTab(c)
+        vm.move(tabID: c.id, onto: b.id)
+        #expect(vm.tabs.map(\.id) == [a.id, c.id, b.id])
+    }
+
+    /// The longest drag a strip allows, in both directions: onto the tab at
+    /// the far end. The dragged tab becomes the new end and everything it
+    /// passed keeps its order.
+    @Test func movingATabOntoTheOppositeEndTakesThatEndsPosition() {
+        let a = StubTab(id: UUID()), b = StubTab(id: UUID())
+        let c = StubTab(id: UUID()), d = StubTab(id: UUID())
+        let rightwards = TabsViewModel(initial: a)
+        rightwards.addTab(b); rightwards.addTab(c); rightwards.addTab(d)
+        rightwards.move(tabID: a.id, onto: d.id)
+        #expect(rightwards.tabs.map(\.id) == [b.id, c.id, d.id, a.id])
+        let leftwards = TabsViewModel(initial: a)
+        leftwards.addTab(b); leftwards.addTab(c); leftwards.addTab(d)
+        leftwards.move(tabID: d.id, onto: a.id)
+        #expect(leftwards.tabs.map(\.id) == [d.id, a.id, b.id, c.id])
+    }
+
+    /// Every ordered pair of a five-tab strip — each tab dropped on each
+    /// tab, itself included — against the two things a drop promises,
+    /// stated as values rather than as a rewrite of the implementation:
+    /// the dragged tab ends up at the index its target held, and every
+    /// other tab keeps the order it had.
+    ///
+    /// Together those two say the whole rule for every relative position
+    /// there is: neighbour and distant, either side, and the drop onto
+    /// itself, where the target's index is the dragged tab's own and the
+    /// order therefore cannot change.
+    @Test func everyRelativePositionPutsTheTabWhereItsTargetWas() {
+        let ids = (0..<5).map { _ in UUID() }
+        for draggedIndex in ids.indices {
+            for targetIndex in ids.indices {
+                let vm = TabsViewModel(initial: StubTab(id: ids[0]))
+                for id in ids.dropFirst() { vm.addTab(StubTab(id: id)) }
+                let before = vm.tabs.map(\.id)
+                vm.move(tabID: ids[draggedIndex], onto: ids[targetIndex])
+                let after = vm.tabs.map(\.id)
+                #expect(
+                    after.firstIndex(of: ids[draggedIndex]) == targetIndex,
+                    "dropping tab \(draggedIndex) on tab \(targetIndex) did not land it there")
+                #expect(
+                    after.filter { $0 != ids[draggedIndex] }
+                        == before.filter { $0 != ids[draggedIndex] },
+                    "dropping tab \(draggedIndex) on tab \(targetIndex) disturbed the others")
+            }
+        }
+    }
+
+    // MARK: - Bulk close ("others" means all but the CLICKED tab)
+
+    /// The rule the design emphasises hardest, and the one a reading of
+    /// `activeTabID` gets subtly wrong: the active tab is closed too when
+    /// the bulk close was asked about a different tab.
+    @Test func othersMeansAllButTheAskedAboutTabNotAllButTheActiveOne() {
+        let a = StubTab(id: UUID()), b = StubTab(id: UUID()), c = StubTab(id: UUID())
+        let vm = TabsViewModel(initial: a)
+        vm.addTab(b); vm.addTab(c)
+        vm.activate(b.id)
+        // Asked about `c` while `b` is active: `b` is in the closing set.
+        #expect(vm.tabsToClose(besides: c.id).map(\.id) == [a.id, b.id])
+        // And the active tab is NOT the yardstick — asking about the active
+        // tab itself is only one case of the same rule, not the rule.
+        #expect(vm.tabsToClose(besides: b.id).map(\.id) == [a.id, c.id])
+    }
+
+    @Test func theClosingSetKeepsStripOrder() {
+        let a = StubTab(id: UUID()), b = StubTab(id: UUID()), c = StubTab(id: UUID())
+        let vm = TabsViewModel(initial: a)
+        vm.addTab(b); vm.addTab(c)
+        #expect(vm.tabsToClose(besides: b.id).map(\.id) == [a.id, c.id])
+    }
+
+    @Test func aLoneTabHasNoOthersToClose() {
+        let a = StubTab(id: UUID())
+        let vm = TabsViewModel(initial: a)
+        #expect(vm.tabsToClose(besides: a.id).isEmpty)
+    }
+
+    /// A tab that has already gone leaves nothing to keep, so every tab
+    /// comes back — and `closeOthers(besides:)` refuses to act on it rather
+    /// than emptying the strip.
+    @Test func anUnknownTabYieldsEveryTabAndClosesNone() {
+        let a = StubTab(id: UUID()), b = StubTab(id: UUID())
+        let vm = TabsViewModel(initial: a)
+        vm.addTab(b)
+        let stale = UUID()
+        #expect(vm.tabsToClose(besides: stale).map(\.id) == [a.id, b.id])
+        vm.closeOthers(besides: stale)
+        #expect(vm.tabs.map(\.id) == [a.id, b.id])
+        #expect(vm.activeTabID == b.id)
+    }
+
+    /// The second half of the same rule: the tab the close was asked about
+    /// is the one left, and it is active afterwards even when it was not
+    /// before.
+    @Test func closingOthersLeavesTheAskedAboutTabActive() {
+        let a = StubTab(id: UUID()), b = StubTab(id: UUID()), c = StubTab(id: UUID())
+        let vm = TabsViewModel(initial: a)
+        vm.addTab(b); vm.addTab(c)
+        vm.activate(b.id)
+        vm.closeOthers(besides: c.id)
+        #expect(vm.tabs.map(\.id) == [c.id])
+        #expect(vm.activeTabID == c.id)
+        #expect(vm.activeTab.id == c.id)
+        #expect(vm.isLastTab)
+    }
+
+    /// Closing others around the ALREADY active tab keeps it active — the
+    /// same code path, stated so the case cannot regress into a needless
+    /// re-activation of something else.
+    @Test func closingOthersAroundTheActiveTabKeepsItActive() {
+        let a = StubTab(id: UUID()), b = StubTab(id: UUID())
+        let vm = TabsViewModel(initial: a)
+        vm.addTab(b)
+        vm.activate(a.id)
+        vm.closeOthers(besides: a.id)
+        #expect(vm.tabs.map(\.id) == [a.id])
+        #expect(vm.activeTabID == a.id)
+    }
+
+    // MARK: - closeOthersReportingRemoved
+
+    /// The ordinary case: everything `tabsToClose(besides:)` would have
+    /// named comes back as removed.
+    @Test func reportingRemovedNamesEveryTabItActuallyTookOut() {
+        let a = StubTab(id: UUID()), b = StubTab(id: UUID()), c = StubTab(id: UUID())
+        let vm = TabsViewModel(initial: a)
+        vm.addTab(b); vm.addTab(c)
+        let removed = vm.closeOthersReportingRemoved(besides: a.id)
+        #expect(Set(removed) == [b.id, c.id])
+        #expect(vm.tabs.map(\.id) == [a.id])
+    }
+
+    /// `ContentView.performCloseOthers`'s own reason for calling this
+    /// instead of reusing an earlier `tabsToClose(besides:)` snapshot
+    /// (Detachable Tabs plan, Task 6 closeout): a caller's per-tab teardown
+    /// loop `await`s between reading that snapshot and calling
+    /// `closeOthers`, and something else — a cross-window drag — can
+    /// `addTab` into this same model during one of those suspensions.
+    /// `closeOthers(besides:)` removes everything but the kept tab
+    /// regardless of any snapshot, so the arrival is swept out too; this
+    /// method must report it as removed even though no earlier list ever
+    /// named it.
+    @Test func reportingRemovedNamesAnArrivalNoEarlierSnapshotKnewAbout() {
+        let a = StubTab(id: UUID()), b = StubTab(id: UUID())
+        let vm = TabsViewModel(initial: a)
+        vm.addTab(b)
+        let snapshot = vm.tabsToClose(besides: a.id)
+        #expect(snapshot.map(\.id) == [b.id])
+
+        // The arrival: something the snapshot above could not have seen.
+        let arrival = StubTab(id: UUID())
+        vm.addTab(arrival)
+
+        let removed = vm.closeOthersReportingRemoved(besides: a.id)
+        #expect(Set(removed) == [b.id, arrival.id], """
+            expected both the snapshotted tab and the late arrival to be reported as \
+            removed, got \(removed)
+            """)
+        #expect(vm.tabs.map(\.id) == [a.id])
+    }
+
+    /// The control beside it (CLAUDE.md, "Guards that name what they
+    /// watch"): reusing the STALE snapshot instead of this method's own
+    /// return value really would miss the arrival — proving the test above
+    /// can fail.
+    @Test func theStaleSnapshotAloneWouldHaveMissedTheArrival() {
+        let a = StubTab(id: UUID()), b = StubTab(id: UUID())
+        let vm = TabsViewModel(initial: a)
+        vm.addTab(b)
+        let snapshot = vm.tabsToClose(besides: a.id)
+        let arrival = StubTab(id: UUID())
+        vm.addTab(arrival)
+        vm.closeOthers(besides: a.id)
+        #expect(!snapshot.map(\.id).contains(arrival.id))
+    }
+
+    /// A no-op call (unknown id) reports nothing removed, mirroring
+    /// `closeOthers(besides:)`'s own no-op for the same input.
+    @Test func reportingRemovedIsEmptyForAnUnknownID() {
+        let a = StubTab(id: UUID()), b = StubTab(id: UUID())
+        let vm = TabsViewModel(initial: a)
+        vm.addTab(b)
+        let removed = vm.closeOthersReportingRemoved(besides: UUID())
+        #expect(removed.isEmpty)
+        #expect(vm.tabs.map(\.id) == [a.id, b.id])
+    }
+}

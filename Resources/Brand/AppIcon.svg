@@ -1,0 +1,25 @@
+<svg width="1024" height="1024" viewBox="0 0 96 96" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="MacSCP: a padlock between two chevrons">
+  <title>MacSCP secure connections</title>
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0.75" y2="1">
+      <stop offset="0" stop-color="#171D25"/>
+      <stop offset="0.55" stop-color="#0D1117"/>
+      <stop offset="1" stop-color="#070A0F"/>
+    </linearGradient>
+    <linearGradient id="lock" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#FFFFFF" stop-opacity="0.16"/>
+      <stop offset="1" stop-color="#FFFFFF" stop-opacity="0.025"/>
+    </linearGradient>
+  </defs>
+  <rect x="4" y="4" width="88" height="88" rx="20" fill="url(#bg)"/>
+  <rect x="4.5" y="4.5" width="87" height="87" rx="19.5" fill="none" stroke="url(#lock)"/>
+  <!-- Mirrored original geometry, with no raster tracing or font dependency. -->
+  <g id="mark">
+  <g fill="none" stroke="#70D333" stroke-width="5.5" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M28 38 17 49 28 60"/>
+    <path d="M68 38 79 49 68 60"/>
+  </g>
+  <path d="M40 45 V38 A8 8 0 0 1 56 38 V45" fill="none" stroke="#FFFFFF" stroke-width="5"/>
+  <path fill="#FFFFFF" fill-rule="evenodd" d="M40 43 H56 A5 5 0 0 1 61 48 V62 A5 5 0 0 1 56 67 H40 A5 5 0 0 1 35 62 V48 A5 5 0 0 1 40 43 Z M48 50 A3.25 3.25 0 0 0 46.5 56.13 L45.6 60 H50.4 L49.5 56.13 A3.25 3.25 0 0 0 48 50 Z"/>
+  </g>
+</svg>

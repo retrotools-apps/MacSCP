@@ -1,0 +1,30 @@
+#!/usr/bin/env python3
+"""Extract curated notes for the tagged version without rewriting history."""
+from pathlib import Path
+import re
+import sys
+
+
+def extract(markdown, version):
+    match = re.search(r"^## \[" + re.escape(version) + r"\](?:[^\n]*)\n", markdown, re.MULTILINE)
+    if match is None:
+        raise ValueError(f"CHANGELOG.md has no release section for {version}")
+    next_release = re.search(r"^## \[", markdown[match.end():], re.MULTILINE)
+    end = match.end() + next_release.start() if next_release else len(markdown)
+    return markdown[match.start():end].strip() + "\n"
+
+
+def main():
+    root = Path(__file__).resolve().parent.parent
+    expected = (root / "VERSION").read_text().strip()
+    version = sys.argv[1].removeprefix("v") if len(sys.argv) == 2 else expected
+    if version != expected:
+        raise ValueError(f"Tag version {version} does not match VERSION ({expected})")
+    print(extract((root / "CHANGELOG.md").read_text(), version), end="")
+
+
+if __name__ == "__main__":
+    try:
+        main()
+    except ValueError as error:
+        sys.exit(f"error: {error}")

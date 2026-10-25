@@ -1,0 +1,75 @@
+#!/usr/bin/env python3
+"""Inspect the tracked and publishable untracked tree without staging files."""
+import argparse
+import hashlib
+import json
+from pathlib import Path
+import re
+import subprocess
+
+PRIVATE_PARTS = {".git", ".codex", ".agents", ".claude", ".superpowers", ".vscode",
+                 ".idea", ".build", ".swiftpm", "DerivedData", "xcuserdata", "__pycache__"}
+PRIVATE_NAMES = {".DS_Store", "AGENTS.md", "CLAUDE.md", "sessions-v2.json", "known-hosts.json"}
+PRIVATE_SUFFIXES = {".har", ".trace", ".keychain", ".keychain-db", ".p12", ".pfx", ".p8", ".pyc"}
+TOKENS = re.compile(rb"(?:gh[pousr]_[A-Za-z0-9]{36,}|github_pat_[A-Za-z0-9_]{60,}|AKIA[A-Z0-9]{16}(?![A-Z0-9]))")
+PRIVATE_KEY = re.compile(rb"-----BEGIN (?:OPENSSH |RSA |EC |DSA |ENCRYPTED )?PRIVATE KEY-----\r?\n[A-Za-z0-9+/=]{20,}")
+
+
+def inspect(root):
+    result = subprocess.run(["git", "ls-files", "--cached", "--others", "--exclude-standard", "-z"],
+                            cwd=root, check=True, capture_output=True)
+    names = sorted(set(p.decode("utf-8", "surrogateescape") for p in result.stdout.split(b"\0") if p))
+    ignored = subprocess.run(["git", "check-ignore", "--no-index", "--stdin", "-z"], cwd=root,
+                             input=b"\0".join(name.encode("utf-8", "surrogateescape") for name in names) + b"\0",
+                             capture_output=True, check=False)
+    if ignored.returncode not in {0, 1}:
+        raise RuntimeError("Unable to verify publication ignore rules")
+    ignored_names = {p.decode("utf-8", "surrogateescape") for p in ignored.stdout.split(b"\0") if p}
+    issues, fixture_keys, upstream_metadata = [], [], []
+    inventory_path = root / "Vendor/checksums.json"
+    inventory = json.loads(inventory_path.read_text()) if inventory_path.is_file() else {}
+    for name in names:
+        relative = Path(name)
+        path = root / relative
+        fixture = relative.parts[0] in {"Tests", "Vendor"}
+        if name in ignored_names:
+            issues.append({"path": name, "reason": "tracked file excluded by publication ignore rules"})
+        recorded = inventory.get(str(Path(*relative.parts[1:])), {}) if relative.parts[0] == "Vendor" else {}
+        reviewed_editor_file = ".vscode" in relative.parts and path.is_file() and recorded.get("sha256") == hashlib.sha256(path.read_bytes()).hexdigest()
+        if reviewed_editor_file:
+            upstream_metadata.append(name)
+        if (any(p in PRIVATE_PARTS for p in relative.parts) and not reviewed_editor_file) or relative.name in PRIVATE_NAMES:
+            issues.append({"path": name, "reason": "local metadata or contributor instructions"})
+        if relative.suffix in PRIVATE_SUFFIXES or relative.name == ".env" or relative.name.startswith(".env.") and relative.name not in {".env.example", ".env.template"}:
+            issues.append({"path": name, "reason": "local credential or diagnostic artifact"})
+        if path.is_symlink():
+            if not path.resolve().is_relative_to(root):
+                issues.append({"path": name, "reason": "symlink escapes the public tree"})
+            continue
+        if not path.is_file():
+            issues.append({"path": name, "reason": "missing tracked file"})
+            continue
+        content = path.read_bytes()
+        # AWS publishes this exact key ID as documentation material; it is not a credential.
+        if any(match.group() != b"AKIAIOSFODNN7EXAMPLE" for match in TOKENS.finditer(content)):
+            issues.append({"path": name, "reason": "possible credential token; inspect privately"})
+        if PRIVATE_KEY.search(content):
+            if fixture:
+                fixture_keys.append(name)
+            else:
+                issues.append({"path": name, "reason": "private-key body outside test/dependency fixtures"})
+    return {"candidateFiles": len(names), "issues": issues, "fixtureKeyFiles": fixture_keys,
+            "verifiedUpstreamEditorFiles": upstream_metadata}
+
+
+def main():
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--root", type=Path, default=Path(__file__).resolve().parents[1])
+    args = parser.parse_args()
+    report = inspect(args.root.resolve())
+    print(json.dumps(report, indent=2))  # Paths and reasons only, never matching values.
+    raise SystemExit(bool(report["issues"]))
+
+
+if __name__ == "__main__":
+    main()

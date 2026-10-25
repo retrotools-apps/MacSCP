@@ -1,0 +1,310 @@
+import AppKit
+import SwiftUI
+import macSCPCore
+
+/// Transfer actions split out of `ContentView.swift`: the upload/download
+/// toolbar buttons, the context-menu and drag-and-drop enqueue paths (same
+/// pane, another tab's session, or a Finder drop), "Copy Path", the Finder
+/// promise provider, and double-click-to-edit.
+///
+/// Extraction only (no behavior change) -- see `ContentView.swift` for the
+/// surrounding state and the rest of the window's modifier groups.
+extension ContentView {
+    // MARK: - Transfers
+
+    /// This window's two pane scopes: which rows each pane is showing, and
+    /// therefore what may be done with them and what may be sent into them.
+    /// Both toolbar buttons below read them, and both are computed the same
+    /// way `BrowserPane` computes its own — from the connection's answer and
+    /// the pane's current directory (review C-1).
+    func localScope(_ session: BrowserSession) -> BrowserScope {
+        BrowserScope(
+            rootIsContainerList: session.localFS.rootIsContainerList,
+            currentPath: session.local.currentPath)
+    }
+
+    func remoteScope(_ session: BrowserSession) -> BrowserScope {
+        BrowserScope(
+            rootIsContainerList: session.remoteFS.rootIsContainerList,
+            currentPath: session.remote.currentPath)
+    }
+
+    /// Whether the toolbar may offer a transfer of `selection` out of `side`.
+    ///
+    /// **Asks the same Core predicate the context menu and the keyboard ask**
+    /// (review C-1). Before this, each button carried its own rule —
+    /// `!selected.contains { $0.kind != .symlink }` — which was both a second
+    /// copy of the symlink eligibility rule AND blind to the bucket-list
+    /// gates: a bucket row is a non-symlink, so selecting one (without
+    /// opening it) enabled Download, and one click enqueued
+    /// `enqueueTree(direction: .download, sourceDirectory: "/<bucket>")` —
+    /// the entire bucket, refused by nothing, since `list` and `stat` are
+    /// exactly the two calls a bucket legitimately answers.
+    ///
+    /// Both directions in one call: `scope` rejects a source row that is a
+    /// bucket, `destination` rejects a target pane sitting at a bucket list.
+    private func offersTransfer(
+        _ selection: [RemoteFileItem], from side: BrowserPaneSide, in session: BrowserSession
+    ) -> Bool {
+        BrowserContextMenu.entries(
+            for: selection, side: side,
+            scope: side == .local ? localScope(session) : remoteScope(session),
+            destination: side == .local ? remoteScope(session) : localScope(session)
+        ).contains(.transferToOtherPane)
+    }
+
+    /// Locally selected files/folders → current remote directory.
+    /// Symlinks in the selection are skipped silently (not a meaningful
+    /// transfer target); enabled exactly when the menu would offer the same
+    /// transfer — see `offersTransfer`. Asks first when the selection holds
+    /// more than one item or a folder — see `requestToolbarTransfer`.
+    @ViewBuilder
+    func uploadButton(in tab: SessionTab, session: BrowserSession) -> some View {
+        let selected = session.local.selectedItems
+        Button {
+            requestToolbarTransfer(selected, from: .local, in: tab, session: session)
+        } label: {
+            Label(L10n.string("browser.upload", "Upload"), systemImage: "arrow.up")
+        }
+        .tint(DesignTokens.localAmber)
+        .disabled(!offersTransfer(selected, from: .local, in: session))
+        .help(L10n.string(
+            "browser.uploadHelp", "Upload the selected local file/folder to the remote directory"))
+    }
+
+    /// Remotely selected files/folders → current local directory.
+    /// Symlinks in the selection are skipped silently (not a meaningful
+    /// transfer target); enabled exactly when the menu would offer the same
+    /// transfer — see `offersTransfer`. Asks first when the selection holds
+    /// more than one item or a folder — see `requestToolbarTransfer`.
+    @ViewBuilder
+    func downloadButton(in tab: SessionTab, session: BrowserSession) -> some View {
+        let selected = session.remote.selectedItems
+        Button {
+            requestToolbarTransfer(selected, from: .remote, in: tab, session: session)
+        } label: {
+            Label(L10n.string("browser.download", "Download"), systemImage: "arrow.down")
+        }
+        .tint(DesignTokens.remoteBlue)
+        .disabled(!offersTransfer(selected, from: .remote, in: session))
+        .help(L10n.string(
+            "browser.downloadHelp", "Download the selected remote file/folder to the local directory"))
+    }
+
+    /// The toolbar buttons' route to a transfer (maintainer decision of
+    /// 2026-09-16): `ToolbarTransferPlan` decides whether to ask. A single
+    /// file transfers at once; anything more stores a
+    /// `ToolbarTransferRequest` carrying the selection as it stands at this
+    /// press, and the window's question (`ContentView+Sheets.swift`)
+    /// answers it through `confirmToolbarTransfer(_:)`. The context menu and
+    /// drag and drop do not come through here and do not ask.
+    func requestToolbarTransfer(
+        _ selection: [RemoteFileItem], from side: BrowserPaneSide,
+        in tab: SessionTab, session: BrowserSession
+    ) {
+        let destination = ToolbarTransferPlan.destinationPath(
+            side: side, localPath: session.local.currentPath, remotePath: session.remote.currentPath)
+        switch ToolbarTransferPlan.plan(for: selection) {
+        case .transferNow:
+            transferSelection(selection, from: side, in: tab, session: session, destinationDirectory: destination)
+        case .ask(let itemCount, let includesFolders):
+            toolbarTransferRequest = ToolbarTransferRequest(
+                tab: tab, session: session, side: side, selection: selection,
+                itemCount: itemCount, includesFolders: includesFolders,
+                destinationPath: destination)
+        }
+    }
+
+    /// The question's confirm action: transfers the selection captured at
+    /// press into the destination captured at press — the one the question
+    /// named, even if the other pane has moved since. A tab whose session was replaced or ended while the question
+    /// was open (a disconnect, a reconnect) transfers nothing — the captured
+    /// session's file systems are no longer the tab's.
+    func confirmToolbarTransfer(_ request: ToolbarTransferRequest) {
+        guard request.tab.session?.id == request.session.id else { return }
+        transferSelection(
+            request.selection, from: request.side, in: request.tab, session: request.session,
+            destinationDirectory: request.destinationPath)
+    }
+
+    /// The per-item enqueue behind the context menu's transfer and the
+    /// toolbar buttons (the latter through `requestToolbarTransfer`).
+    ///
+    /// `destinationDirectory` nil means the other pane's current directory,
+    /// read now — what the context menu passes. The toolbar passes the
+    /// directory it read at press, so a confirmed question transfers to the
+    /// directory it named.
+    func transferSelection(
+        _ selection: [RemoteFileItem], from side: BrowserPaneSide,
+        in tab: SessionTab, session: BrowserSession, destinationDirectory: String? = nil
+    ) {
+        let remoteDestination = destinationDirectory ?? session.remote.currentPath
+        let localDestination = destinationDirectory ?? session.local.currentPath
+        let queue = tab.transferQueue
+        for item in selection where item.kind != .symlink {
+            switch (side, item.kind) {
+            case (.local, .directory):
+                queue.enqueueTree(
+                    directoryName: item.name, direction: .upload,
+                    source: session.localFS, sourceDirectory: item.path,
+                    destination: session.remoteFS,
+                    destinationDirectory: remoteDestination,
+                    onCompleted: { [weak remote = session.remote] in await remote?.refresh() })
+            case (.local, _):
+                queue.enqueue(
+                    fileName: item.name, direction: .upload,
+                    source: session.localFS, sourcePath: item.path,
+                    destination: session.remoteFS,
+                    destinationDirectory: remoteDestination,
+                    onCompleted: { [weak remote = session.remote] in await remote?.refresh() })
+            case (.remote, .directory):
+                queue.enqueueTree(
+                    directoryName: item.name, direction: .download,
+                    source: session.remoteFS, sourceDirectory: item.path,
+                    destination: session.localFS,
+                    destinationDirectory: localDestination,
+                    onCompleted: { [weak local = session.local] in await local?.refresh() })
+            case (.remote, _):
+                queue.enqueue(
+                    fileName: item.name, direction: .download,
+                    source: session.remoteFS, sourcePath: item.path,
+                    destination: session.localFS,
+                    destinationDirectory: localDestination,
+                    onCompleted: { [weak local = session.local] in await local?.refresh() })
+            }
+        }
+    }
+
+    /// Context-menu transfer to ANOTHER tab's remote (M8b/T4): same
+    /// per-item enqueue as `transferSelection`, but the destination is
+    /// `target`'s remote file system/directory (frozen at menu-build time)
+    /// instead of this tab's own other pane. Always enqueued on the SOURCE
+    /// tab's queue (`tab.transferQueue`), regardless of which tab owns the
+    /// destination. If the target tab disconnected between menu build and
+    /// click, `targetTab.session` is `nil` — enqueue is silently skipped, no
+    /// crash (Spec §5.3; the queue only surfaces an error for already
+    /// in-flight jobs, not for a destination that was never enqueued).
+    func transferToSession(
+        _ selection: [RemoteFileItem], from side: BrowserPaneSide, target: CrossSessionTarget,
+        in tab: SessionTab, session: BrowserSession
+    ) {
+        guard !tab.isDisconnecting, tab.session?.id == session.id,
+              let targetTab = tabsModel.tabs.first(where: { $0.id == target.id }),
+              !targetTab.isDisconnecting, let targetSession = targetTab.session else { return }
+        if side == .remote {
+            _ = RemoteSessionTransfer.enqueue(selection, from: tab, to: targetTab, directory: target.remotePath,
+                expectedSourceSessionID: session.id)
+            return
+        }
+        for item in selection where item.kind != .symlink {
+            if item.kind == .directory {
+                tab.transferQueue.enqueueTree(
+                    directoryName: item.name, direction: .upload,
+                    source: session.localFS, sourceDirectory: item.path, destination: targetSession.remoteFS,
+                    destinationDirectory: target.remotePath,
+                    onCompleted: { [weak remote = targetSession.remote] in await remote?.refresh() },
+                    destinationTabID: target.id,
+                    crossBackendTarget: CrossBackendTarget(name: target.title, kind: target.kind))
+            } else {
+                tab.transferQueue.enqueue(
+                    fileName: item.name, direction: .upload,
+                    source: session.localFS, sourcePath: item.path, destination: targetSession.remoteFS,
+                    destinationDirectory: target.remotePath,
+                    onCompleted: { [weak remote = targetSession.remote] in await remote?.refresh() },
+                    destinationTabID: target.id,
+                    crossBackendTarget: CrossBackendTarget(name: target.title, kind: target.kind))
+            }
+        }
+    }
+
+    /// "Copy Path": one absolute path per line.
+    func copyPaths(of selection: [RemoteFileItem]) {
+        let text = selection.map(\.path).joined(separator: "\n")
+        NSPasteboard.general.clearContents()
+        NSPasteboard.general.setString(text, forType: .string)
+    }
+
+    /// Enqueues dropped file/folder URLs onto the tab's queue. Files run
+    /// through `enqueue`, folders recursively through `enqueueTree`
+    /// (M5b/T3/T4) — no directory filter, only URLs that no longer exist are
+    /// discarded.
+    func uploadDropped(_ urls: [URL], in tab: SessionTab, session: BrowserSession) {
+        let queue = tab.transferQueue
+        for url in urls {
+            var isDirectory: ObjCBool = false
+            let exists = FileManager.default.fileExists(
+                atPath: url.path(percentEncoded: false), isDirectory: &isDirectory)
+            guard exists else { continue }
+            if isDirectory.boolValue {
+                queue.enqueueTree(
+                    directoryName: url.lastPathComponent, direction: .upload,
+                    source: session.localFS, sourceDirectory: url.path(percentEncoded: false),
+                    destination: session.remoteFS,
+                    destinationDirectory: session.remote.currentPath,
+                    onCompleted: { [weak remote = session.remote] in await remote?.refresh() }
+                )
+            } else {
+                queue.enqueue(
+                    fileName: url.lastPathComponent, direction: .upload,
+                    source: session.localFS, sourcePath: url.path(percentEncoded: false),
+                    destination: session.remoteFS,
+                    destinationDirectory: session.remote.currentPath,
+                    onCompleted: { [weak remote = session.remote] in await remote?.refresh() }
+                )
+            }
+        }
+    }
+
+    /// Promise fulfillment: loads a remote file through the tab's queue to
+    /// the URL specified by the Finder — serializes with all other transfers
+    /// of that tab.
+    func remotePromiseProvider(
+        for item: RemoteFileItem, in tab: SessionTab, session: BrowserSession
+    ) -> RemoteFilePromiseProvider {
+        let queue = tab.transferQueue
+        return RemoteFilePromiseProvider(item: item) { item, url in
+            try await queue.enqueueAndWait(
+                fileName: url.lastPathComponent, direction: .download,
+                source: session.remoteFS, sourcePath: item.path,
+                destination: session.localFS,
+                destinationDirectory: url.deletingLastPathComponent()
+                    .path(percentEncoded: false)
+            )
+        }
+    }
+
+    /// Double-click on a remote FILE (kind == .file; directories `cd` via
+    /// `RemoteBrowserViewModel.open`, symlinks/other stay no-ops — unchanged,
+    /// M5e/T4): downloads it into the session's edit temp dir via
+    /// `editManager.beginEditing` (shows up as a download in the tab's queue
+    /// bar), then opens it in the resolved application.
+    ///
+    /// This path is only for an explicitly configured extension rule or
+    /// default editor. The pane uses the built-in editor when resolution
+    /// returns nil, before any remote bytes are downloaded.
+    func openInEditor(
+        _ item: RemoteFileItem, in tab: SessionTab, session: BrowserSession
+    ) {
+        guard let appURL = EditorResolver.applicationURL(
+            forFileName: item.name, settings: settingsStore) else { return }
+        Task {
+            do {
+                let localURL = try await session.editManager.beginEditing(
+                    remotePath: item.path, fileName: item.name,
+                    source: session.remoteFS, destinationForUploads: session.remoteFS)
+                _ = try await NSWorkspace.shared.open(
+                    [localURL], withApplicationAt: appURL,
+                    configuration: NSWorkspace.OpenConfiguration())
+                tab.editErrorMessage = nil
+            } catch is CancellationError {
+                // Teardown cancelled the download (disconnect while opening) —
+                // the session is going away; a stale banner on the NEXT
+                // session would be misattributed. Show nothing.
+            } catch {
+                tab.editErrorMessage = String(format: L10n.string(
+                    "edit.openFailed", "Could not open file for editing: %@"),
+                    TransferFailureLabel.text(for: error))
+            }
+        }
+    }
+}

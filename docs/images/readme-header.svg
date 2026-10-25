@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="320" viewBox="0 0 1280 320" role="img" aria-labelledby="title description">
+  <title id="title">MacSCP. Files. Sessions. Tunnels.</title>
+  <desc id="description">Native file transfers and SSH tunnels for macOS, by RetroTools.</desc>
+  <rect width="1280" height="320" fill="#0d1117"/>
+  <path d="m52 26 10 10-10 10" fill="none" stroke="#70d333" stroke-width="4"/>
+  <text x="77" y="43" fill="#f5eedc" font-family="Consolas, Liberation Mono, monospace" font-size="22" font-weight="700" letter-spacing="-1">retroTools<tspan fill="#70d333">_</tspan></text>
+  <text x="1228" y="40" text-anchor="end" fill="#9fa9b1" font-family="Consolas, Liberation Mono, monospace" font-size="12" letter-spacing="2">NATIVE TO YOUR MAC</text>
+  <path d="M52 66H1228" stroke="#30393e"/>
+  <text x="49" y="163" fill="#f5eedc" font-family="Arial, Helvetica, sans-serif" font-size="86" font-weight="700" letter-spacing="-4">MacSCP.</text>
+  <text x="53" y="217" fill="#f5eedc" font-family="Arial, Helvetica, sans-serif" font-size="37" font-weight="600" letter-spacing="-1">Files. Sessions. <tspan fill="#70d333">Tunnels.</tspan></text>
+  <text x="54" y="258" fill="#9fa9b1" font-family="Arial, Helvetica, sans-serif" font-size="20">SFTP, S3 and WebDAV. Two panes. Your servers in tabs.</text>
+  <g transform="translate(1002 95) scale(1.8)">
+    <rect x="4" y="4" width="88" height="88" rx="20" fill="#151c22" stroke="#30393e"/>
+    <g fill="none" stroke="#70d333" stroke-width="5.5" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M28 38 17 49 28 60"/>
+      <path d="M68 38 79 49 68 60"/>
+    </g>
+    <path d="M40 45V38A8 8 0 0 1 56 38V45" fill="none" stroke="#fff" stroke-width="5"/>
+    <path fill="#fff" fill-rule="evenodd" d="M40 43H56A5 5 0 0 1 61 48V62A5 5 0 0 1 56 67H40A5 5 0 0 1 35 62V48A5 5 0 0 1 40 43Z M48 50A3.25 3.25 0 0 0 46.5 56.13L45.6 60H50.4L49.5 56.13A3.25 3.25 0 0 0 48 50Z"/>
+  </g>
+  <path d="M54 289H114" stroke="#70d333" stroke-width="4"/>
+</svg>

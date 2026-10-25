@@ -1,0 +1,240 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>browser.transferConfirm.download.message %lld %@</key>
+	<dict>
+		<key>NSStringLocalizedFormatKey</key>
+		<string>%1$#@items@</string>
+		<key>items</key>
+		<dict>
+			<key>NSStringFormatSpecTypeKey</key>
+			<string>NSStringPluralRuleType</string>
+			<key>NSStringFormatValueTypeKey</key>
+			<string>lld</string>
+			<key>few</key>
+			<string>%1$lld elemente vor fi descărcate în „%2$@”.</string>
+			<key>one</key>
+			<string>%1$lld element va fi descărcat în „%2$@”.</string>
+			<key>other</key>
+			<string>%1$lld de elemente vor fi descărcate în „%2$@”.</string>
+		</dict>
+	</dict>
+	<key>browser.transferConfirm.download.messageWithFolders %lld %@</key>
+	<dict>
+		<key>NSStringLocalizedFormatKey</key>
+		<string>%1$#@items@</string>
+		<key>items</key>
+		<dict>
+			<key>NSStringFormatSpecTypeKey</key>
+			<string>NSStringPluralRuleType</string>
+			<key>NSStringFormatValueTypeKey</key>
+			<string>lld</string>
+			<key>few</key>
+			<string>%1$lld elemente vor fi descărcate în „%2$@”, inclusiv dosarele și tot conținutul lor.</string>
+			<key>one</key>
+			<string>%1$lld dosar va fi descărcat în „%2$@”, cu tot conținutul său.</string>
+			<key>other</key>
+			<string>%1$lld de elemente vor fi descărcate în „%2$@”, inclusiv dosarele și tot conținutul lor.</string>
+		</dict>
+	</dict>
+	<key>browser.transferConfirm.upload.message %lld %@</key>
+	<dict>
+		<key>NSStringLocalizedFormatKey</key>
+		<string>%1$#@items@</string>
+		<key>items</key>
+		<dict>
+			<key>NSStringFormatSpecTypeKey</key>
+			<string>NSStringPluralRuleType</string>
+			<key>NSStringFormatValueTypeKey</key>
+			<string>lld</string>
+			<key>few</key>
+			<string>%1$lld elemente vor fi încărcate în „%2$@”.</string>
+			<key>one</key>
+			<string>%1$lld element va fi încărcat în „%2$@”.</string>
+			<key>other</key>
+			<string>%1$lld de elemente vor fi încărcate în „%2$@”.</string>
+		</dict>
+	</dict>
+	<key>browser.transferConfirm.upload.messageWithFolders %lld %@</key>
+	<dict>
+		<key>NSStringLocalizedFormatKey</key>
+		<string>%1$#@items@</string>
+		<key>items</key>
+		<dict>
+			<key>NSStringFormatSpecTypeKey</key>
+			<string>NSStringPluralRuleType</string>
+			<key>NSStringFormatValueTypeKey</key>
+			<string>lld</string>
+			<key>few</key>
+			<string>%1$lld elemente vor fi încărcate în „%2$@”, inclusiv dosarele și tot conținutul lor.</string>
+			<key>one</key>
+			<string>%1$lld dosar va fi încărcat în „%2$@”, cu tot conținutul său.</string>
+			<key>other</key>
+			<string>%1$lld de elemente vor fi încărcate în „%2$@”, inclusiv dosarele și tot conținutul lor.</string>
+		</dict>
+	</dict>
+	<key>connection.convertKey.repoint.message %lld %@</key>
+	<dict>
+		<key>NSStringLocalizedFormatKey</key>
+		<string>%1$#@sessions@</string>
+		<key>sessions</key>
+		<dict>
+			<key>NSStringFormatSpecTypeKey</key>
+			<string>NSStringPluralRuleType</string>
+			<key>NSStringFormatValueTypeKey</key>
+			<string>lld</string>
+			<key>few</key>
+			<string>Aceste date de autentificare sunt folosite de %1$lld sesiuni, direct sau pentru gazdele intermediare. Toate vor folosi cheia convertită „%2$@”.</string>
+			<key>one</key>
+			<string>Aceste date de autentificare sunt folosite de o sesiune, direct sau pentru gazda intermediară. Cheia sa va deveni cheia convertită „%2$@”.</string>
+			<key>other</key>
+			<string>Aceste date de autentificare sunt folosite de %1$lld de sesiuni, direct sau pentru gazdele intermediare. Toate vor folosi cheia convertită „%2$@”.</string>
+		</dict>
+	</dict>
+	<key>logins.export.summary %lld</key>
+	<dict>
+		<key>NSStringLocalizedFormatKey</key>
+		<string>%#@count@</string>
+		<key>count</key>
+		<dict>
+			<key>NSStringFormatSpecTypeKey</key>
+			<string>NSStringPluralRuleType</string>
+			<key>NSStringFormatValueTypeKey</key>
+			<string>lld</string>
+			<key>few</key>
+			<string>%lld seturi de date de autentificare vor fi scrise în fișier.</string>
+			<key>one</key>
+			<string>%lld set de date de autentificare va fi scris în fișier.</string>
+			<key>other</key>
+			<string>%lld de seturi de date de autentificare vor fi scrise în fișier.</string>
+		</dict>
+	</dict>
+	<key>settings.connection.keepAlive.footer %lld</key>
+	<dict>
+		<key>NSStringLocalizedFormatKey</key>
+		<string>%#@count@</string>
+		<key>count</key>
+		<dict>
+			<key>NSStringFormatSpecTypeKey</key>
+			<string>NSStringPluralRuleType</string>
+			<key>NSStringFormatValueTypeKey</key>
+			<string>lld</string>
+			<key>few</key>
+			<string>Când este activat, MacSCP verifică o conexiune inactivă la fiecare %lld secunde. Dezactivarea păstrează intervalul pentru următoarea activare.</string>
+			<key>one</key>
+			<string>Când este activat, MacSCP verifică o conexiune inactivă la fiecare %lld secundă. Dezactivarea păstrează intervalul pentru următoarea activare.</string>
+			<key>other</key>
+			<string>Când este activat, MacSCP verifică o conexiune inactivă la fiecare %lld de secunde. Dezactivarea păstrează intervalul pentru următoarea activare.</string>
+		</dict>
+	</dict>
+	<key>settings.connection.keepAliveInterval %lld</key>
+	<dict>
+		<key>NSStringLocalizedFormatKey</key>
+		<string>%#@count@</string>
+		<key>count</key>
+		<dict>
+			<key>NSStringFormatSpecTypeKey</key>
+			<string>NSStringPluralRuleType</string>
+			<key>NSStringFormatValueTypeKey</key>
+			<string>lld</string>
+			<key>few</key>
+			<string>La fiecare %lld secunde</string>
+			<key>one</key>
+			<string>La fiecare %lld secundă</string>
+			<key>other</key>
+			<string>La fiecare %lld de secunde</string>
+		</dict>
+	</dict>
+	<key>tabs.closeOthers.activeTransfers %1$lld %2$lld</key>
+	<dict>
+		<key>NSStringLocalizedFormatKey</key>
+		<string>%1$#@tabs@</string>
+		<key>tabs</key>
+		<dict>
+			<key>NSStringFormatSpecTypeKey</key>
+			<string>NSStringPluralRuleType</string>
+			<key>NSStringFormatValueTypeKey</key>
+			<string>lld</string>
+			<key>few</key>
+			<string>Închiderea a %1$lld file anulează transferurile active în %2$lld dintre ele.</string>
+			<key>one</key>
+			<string>Închiderea unei file (%1$lld) anulează transferurile active în %2$lld dintre ele.</string>
+			<key>other</key>
+			<string>Închiderea a %1$lld de file anulează transferurile active în %2$lld dintre ele.</string>
+		</dict>
+	</dict>
+	<key>tabs.closeOthers.incomingTransfers %lld</key>
+	<dict>
+		<key>NSStringLocalizedFormatKey</key>
+		<string>%#@count@</string>
+		<key>count</key>
+		<dict>
+			<key>NSStringFormatSpecTypeKey</key>
+			<string>NSStringPluralRuleType</string>
+			<key>NSStringFormatValueTypeKey</key>
+			<string>lld</string>
+			<key>few</key>
+			<string>%lld dintre ele primesc transferuri din alte file; închiderea le anulează.</string>
+			<key>one</key>
+			<string>%lld dintre ele primește un transfer din altă filă; închiderea îl anulează.</string>
+			<key>other</key>
+			<string>%lld dintre ele primesc transferuri din alte file; închiderea le anulează.</string>
+		</dict>
+	</dict>
+	<key>tunnel.dock.running %lld</key>
+	<dict>
+		<key>NSStringLocalizedFormatKey</key>
+		<string>%#@count@</string>
+		<key>count</key>
+		<dict>
+			<key>NSStringFormatSpecTypeKey</key>
+			<string>NSStringPluralRuleType</string>
+			<key>NSStringFormatValueTypeKey</key>
+			<string>lld</string>
+			<key>few</key>
+			<string>%lld tuneluri active</string>
+			<key>one</key>
+			<string>%lld tunel activ</string>
+			<key>other</key>
+			<string>%lld de tuneluri active</string>
+		</dict>
+	</dict>
+	<key>tunnel.state.activeWithFailures %lld</key>
+	<dict>
+		<key>NSStringLocalizedFormatKey</key>
+		<string>%#@count@</string>
+		<key>count</key>
+		<dict>
+			<key>NSStringFormatSpecTypeKey</key>
+			<string>NSStringPluralRuleType</string>
+			<key>NSStringFormatValueTypeKey</key>
+			<string>lld</string>
+			<key>few</key>
+			<string>Activ · %lld conexiuni eșuate</string>
+			<key>one</key>
+			<string>Activ · %lld conexiune eșuată</string>
+			<key>other</key>
+			<string>Activ · %lld de conexiuni eșuate</string>
+		</dict>
+	</dict>
+	<key>tunnel.state.degraded %lld</key>
+	<dict>
+		<key>NSStringLocalizedFormatKey</key>
+		<string>%#@count@</string>
+		<key>count</key>
+		<dict>
+			<key>NSStringFormatSpecTypeKey</key>
+			<string>NSStringPluralRuleType</string>
+			<key>NSStringFormatValueTypeKey</key>
+			<string>lld</string>
+			<key>few</key>
+			<string>Degradat · %lld conexiuni eșuate consecutiv</string>
+			<key>one</key>
+			<string>Degradat · %lld conexiune eșuată consecutiv</string>
+			<key>other</key>
+			<string>Degradat · %lld de conexiuni eșuate consecutiv</string>
+		</dict>
+	</dict>
+</dict>
+</plist>

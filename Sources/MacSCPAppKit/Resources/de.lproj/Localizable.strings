@@ -1,0 +1,1716 @@
+"winscp.import" = "WinSCP.ini importieren…";
+"winscp.export" = "WinSCP.ini exportieren…";
+"winscp.choose" = "WinSCP.ini auswählen…";
+"winscp.master" = "Master-Passwort (erforderlich)";
+"winscp.repeat" = "Master-Passwort bestätigen";
+"winscp.scope" = "SSH/SFTP-Verbindungen, Ordner und SSH-Sprunghosts. Nicht unterstützte Proxys, Befehle und TLS-Gateways werden nicht konvertiert. Oberflächeneinstellungen und Startverzeichnisse werden nicht importiert. Schlüsseldateien werden nie kopiert. Passphrasen privater Schlüssel können in dieser Version nicht exportiert werden.";
+"winscp.preview %d %d" = "%d unterstützte Sitzungen; %d nicht unterstützte Sitzungen ausgeschlossen.";
+"winscp.notSupported" = "Nicht unterstützt";
+"winscp.withSecrets" = "Gespeicherte Geheimnisse werden immer eingeschlossen und verschlüsselt.";
+"winscp.confirmImport" = "Ausgewählte Sitzungen importieren";
+"winscp.unlock" = "Entsperren und Vorschau anzeigen";
+"winscp.writeFailed" = "Die verschlüsselte WinSCP-Datei konnte nicht gespeichert werden.";
+"browser.sidebar.toggle" = "Sitzungen ein- oder ausblenden";
+"connection.tls.host" = "TLS-Gateway";
+"connection.tls.targetHelp" = "Gib hier den endgültigen SSH-Host ein, nicht das TLS-Gateway. Konfiguriere das Gateway separat weiter unten.";
+"connection.tls.verifyHelp" = "Anders als ein openssl-s_client-Skript ohne Prüfoptionen prüft MacSCP das Zertifikat und den Servernamen standardmäßig. Deaktiviere dies nur, wenn du ausdrücklich das Verhalten dieses Skripts benötigst.";
+"connection.tls.enabled" = "SSH über ein TLS-Gateway verbinden";
+"connection.tls.verify" = "TLS-Zertifikat und Servernamen prüfen (empfohlen)";
+"connection.tls.port" = "TLS-Gateway-Port";
+"connection.tls.serverName" = "TLS-Servername (SNI; standardmäßig Gateway)";
+"browser.pane.homeHelp" = "Benutzerverzeichnis";
+"browser.pane.rootHelp" = "Wurzelverzeichnis";
+"browser.pathBar.edit" = "Pfad bearbeiten";
+
+/* Settings — Allgemein-Tab (M7a/T4) */
+"settings.tab.general" = "Allgemein";
+"settings.general.showHidden" = "Versteckte Dateien anzeigen";
+"settings.general.restoreWindows" = "Fenster beim Start wiederherstellen";
+"settings.general.restoreWindows.footer" = "Fenster und Tabs kommen so zurück, wie sie waren, ohne Verbindung. Verbunden wird erst, wenn du es tust.";
+"settings.general.notifications" = "Mitteilungen";
+"settings.general.notifications.footer" = "Eine macOS-Mitteilung, wenn eine Verbindung abbricht, eine Übertragung fehlschlägt oder eine Portweiterleitung ausfällt. Nur solange MacSCP im Hintergrund ist oder du das betroffene Fenster nicht vorne hast.";
+"settings.appearance.sidebarCompact" = "Kompakte Seitenleiste";
+"settings.general.showHiddenHint" = "Gilt für beide Seiten. Kürzel: ⌘⇧.";
+"settings.general.autoRefresh" = "Remote-Ansicht automatisch aktualisieren";
+"settings.general.autoRefreshInterval %lld" = "Alle %lld Sekunden";
+
+/* Einstellungen — Allgemein-Tab, Abschnitt Dateilisten-Spalten (M11m/T2) */
+"settings.general.columns.header" = "Dateilisten-Spalten";
+"settings.general.columns.footer" = "Gilt für beide Seiten. Name ist immer sichtbar.";
+
+/* Einstellungen — Sidebar-Bereichstitel (M18/T7) */
+"settings.section.appearance" = "Ansicht";
+"settings.section.protocols" = "Protokolle";
+"settings.section.manageData" = "Daten verwalten";
+"settings.manageData.footer" = "Logins, Server-Zertifikate und ausgeblendete Importe öffnen sich im Hauptfenster — dort gehört der Zustand hin, den sie ändern.";
+"settings.manageData.needsMainWindow" = "Diese Einträge sind nicht verfügbar, solange kein Hauptfenster geöffnet ist.";
+
+/* Einstellungen — Daten verwalten, Aufräumen übriger Zugangsdaten (M27/T3) */
+"settings.section.ssh" = "SSH";
+"settings.section.s3" = "S3";
+
+/* Settings — Übertragungen-Tab */
+"settings.tab.transfers" = "Übertragungen";
+"settings.maxConcurrent.label" = "Maximale gleichzeitige Übertragungen";
+"settings.maxConcurrent.footer" = "Gilt für neue Übertragungen; laufende sind nicht betroffen.";
+"settings.transfers.showFullPaths" = "Volle Pfade immer anzeigen";
+"settings.bandwidth.header" = "Bandbreiten-Limit Upload/Download";
+"settings.bandwidth.footer" = "0 = unbegrenzt";
+"settings.bandwidth.upload" = "Upload";
+"settings.bandwidth.download" = "Download";
+"settings.throughput.header" = "Durchsatztest";
+"settings.throughput.payload" = "Größe der Testdatei";
+"settings.throughput.footer" = "Der Durchsatztest in der Verbindungsdiagnose lädt eine Datei dieser Größe auf den Server hoch, lädt sie wieder herunter und löscht sie.";
+"settings.transfers.presignedExpiry.header" = "S3-Freigabe-Links";
+"settings.transfers.presignedExpiry" = "Standard-Ablaufzeit für Freigabe-Links";
+
+/* Settings — Tab „Terminal" (M9d) */
+"settings.tab.terminal" = "Terminal";
+"settings.terminal.font" = "Schrift";
+"settings.terminal.systemFont" = "System (SF Mono)";
+"settings.terminal.size %lld" = "Größe: %lld pt";
+"settings.terminal.cursor" = "Cursor";
+"settings.terminal.cursor.block" = "Block";
+"settings.terminal.cursor.bar" = "Balken";
+"settings.terminal.cursor.underline" = "Unterstrich";
+"settings.terminal.cursorBlink" = "Blinken";
+"settings.terminal.copyOnSelect" = "Text beim Auswählen kopieren";
+"settings.terminal.pasteOnRightClick" = "Mit Rechtsklick einfügen";
+"settings.terminal.type" = "Terminaltyp";
+"settings.terminal.type.footer" = "Der Name, den der Server erfährt (TERM); er entscheidet, welche Funktionen Programme auf dem Server nutzen. Das Terminal selbst ändert sich nicht. Gilt für die nächste Shell, die sich öffnet; eine Sitzung kann in ihrem Editor einen eigenen wählen.";
+"terminal.type.xterm-256color" = "xterm-256color (256 Farben)";
+"terminal.type.xterm" = "xterm (8 Farben)";
+"terminal.type.vt100" = "vt100 (keine Farben)";
+"settings.terminal.theme.header" = "Farben";
+"settings.terminal.theme" = "Farbschema";
+"settings.terminal.theme.import" = "iTerm2-Farben importieren…";
+"settings.terminal.theme.forget" = "Import entfernen";
+"settings.terminal.theme.footer" = "Ein Farbschema legt den Hintergrund, die Schrift, den Cursor und die sechzehn Farben fest, die Programme auf dem Server über ihre Nummer anfordern. Du kannst eine von iTerm2 exportierte Farbdatei importieren (eine Datei mit der Endung .itermcolors); MacSCP behält die Farben, nicht die Datei. Es wird immer nur ein Import aufbewahrt.";
+"settings.terminal.theme.refused.title" = "Import fehlgeschlagen";
+"settings.terminal.theme.refused" = "Diese Datei ließ sich nicht als iTerm2-Farbdatei lesen. Exportiere das Farbschema in iTerm2 erneut und wähle die .itermcolors-Datei, die dabei entsteht.";
+"terminal.theme.macSCP" = "MacSCP (dunkel)";
+"terminal.theme.midnight" = "Mitternacht (dunkel)";
+"terminal.theme.paper" = "Papier (hell)";
+"terminal.theme.imported" = "Importiertes Farbschema";
+"settings.terminal.target.header" = "Externes Terminal";
+"settings.terminal.target" = "Sitzungen öffnen in";
+"settings.terminal.target.builtIn" = "Eingebautes Terminal";
+"settings.terminal.target.terminalApp" = "Terminal";
+"settings.terminal.target.iTerm" = "iTerm";
+"settings.terminal.target.custom" = "Eigene App…";
+"settings.terminal.target.footer" = "Beide Wege, eine Sitzung zu öffnen, bleiben unabhängig von dieser Einstellung über das Menü „Terminal“ erreichbar.";
+"settings.terminal.target.builtInFallback.footer" = "Ist „Eingebautes Terminal“ gewählt, öffnet dieser Menüpunkt deine eigene App, falls eine festgelegt ist, sonst Terminal.";
+"settings.terminal.target.noneChosen" = "Keine App gewählt";
+
+/* Settings — SSH tab, connection behaviour (Task 9) */
+"settings.connection.timeout.header" = "Verbindungs-Timeout";
+"settings.connection.timeout %lld" = "Nach %lld Sekunden abbrechen";
+"settings.connection.timeout.footer" = "Begrenzt zwei Abschnitte einer Verbindung getrennt: das Warten auf die Antwort des Servers und das Warten darauf, dass er die Dateisitzung öffnet. Der Wert gilt für jeden der beiden, und dazwischen liegt eine feste Wartezeit, die diese Einstellung nicht abdeckt – eine fehlschlagende Verbindung dauert also spürbar länger als die angezeigten Sekunden. Bei einem Jump-Host ist auch der Schritt vom Jump-Host zum Server nicht abgedeckt.";
+"settings.connection.keepAlive.header" = "Keep-Alive";
+"settings.connection.keepAlive" = "Verbindung im Leerlauf prüfen";
+"settings.connection.keepAliveInterval %lld" = "Alle %lld Sekunden";
+"settings.connection.keepAlive.footer %lld" = "Eingeschaltet prüft MacSCP eine ruhige Verbindung alle %lld Sekunden. Ausgeschaltet bleibt das eingestellte Intervall erhalten, bis du die Prüfung wieder einschaltest.";
+"settings.connection.reconnect.header" = "Wiederverbindung";
+"settings.connection.reconnect" = "Wenn eine Verbindung getrennt wird";
+"settings.connection.reconnect.offerOnly" = "Wiederverbindung anbieten";
+"settings.connection.reconnect.onceThenAsk" = "Einmal automatisch wiederverbinden, danach fragen";
+"settings.connection.reconnect.automatic" = "Automatisch wiederverbinden";
+"settings.connection.reconnect.footer" = "„Wiederverbindung anbieten“ wartet auf einen Klick. „Einmal automatisch wiederverbinden, danach fragen“ versucht es einmal automatisch und fragt danach nach. „Automatisch wiederverbinden“ versucht es fortlaufend von selbst. Ein geänderter Host-Schlüssel stoppt in jedem Fall und fragt nach – unabhängig von dieser Einstellung.";
+
+/* Settings — Tab „Öffnen mit" */
+"settings.tab.openWith" = "Öffnen mit";
+"settings.openWith.defaultEditor.header" = "Standard-Editor";
+"settings.openWith.systemDefault" = "System-Standard";
+"settings.openWith.choose" = "Auswählen…";
+"settings.openWith.reset" = "Zurücksetzen";
+"settings.openWith.rules.header" = "Regeln";
+"settings.openWith.rules.remove" = "Entfernen";
+"settings.openWith.rules.extension" = "Endung";
+"settings.openWith.rules.extensionPlaceholder" = "php";
+"settings.openWith.rules.chooseApp" = "App wählen…";
+"settings.openWith.rules.footer" = "Erweiterungsregeln haben Vorrang vor dem Standardeditor; andernfalls verwendet MacSCP den integrierten Editor.";
+
+/* Verbindungsformular */
+"connection.title" = "Neue Verbindung";
+"connection.field.host" = "Host";
+"connection.field.host.placeholder" = "server.example.com";
+"connection.host.resolve" = "Auflösen…";
+"connection.host.resolve.help" = "Schlägt diesen Namen nach und bietet seine Adressen stattdessen an";
+"connection.host.resolve.choose" = "Adresse verwenden";
+"connection.host.resolve.resolving" = "Wird aufgelöst…";
+"connection.host.resolve.note" = "Beim Verbinden mit einer Adresse bestätigst du den Host-Schlüssel des Servers erneut, und der Name wird nicht behalten.";
+"connection.host.resolve.noAddress" = "Für diesen Namen wurde keine Adresse gefunden.";
+"connection.host.resolve.noAnswer" = "Der Name wurde nicht rechtzeitig aufgelöst.";
+"connection.field.port" = "Port";
+"connection.field.username" = "Benutzername";
+"connection.field.authMethod" = "Authentifizierung";
+"connection.auth.password" = "Passwort";
+"connection.auth.privateKey" = "SSH-Key";
+"connection.auth.agent" = "Agent";
+"connection.field.keyPath" = "Key-Pfad";
+"connection.field.keyPath.placeholder" = "~/.ssh/id_ed25519";
+"connection.field.keyPath.browseHelp" = "Key-Datei auswählen";
+"connection.field.passphrase" = "Passphrase (optional)";
+"connection.saveToggle" = "Als Session speichern";
+"connection.field.saveName" = "Session-Name";
+"connection.field.saveName.placeholder" = "z.B. hetzner-web";
+"connection.saveName.replaces %@" = "Beim Speichern ersetzt du die vorhandene Session „%@“.";
+"connection.saveName.duplicates %@" = "Eine andere Session heißt bereits „%@“.";
+"connection.hostkey.first" = "Erster Verbindungsaufbau zu %@";
+"connection.hostkey.fingerprintLabel" = "Fingerprint (%@):";
+"connection.hostkey.trust" = "Vertrauen & verbinden";
+"connection.connect" = "Verbinden";
+
+/* Server-Zertifikat-Vertrauensabfrage (M21/T10) — das TLS-Gegenstück zur Host-Key-Abfrage oben, für WebDAV/S3. */
+"certificate.prompt.title" = "Dem Zertifikat dieses Servers vertrauen?";
+"certificate.prompt.fingerprint" = "Fingerabdruck";
+"certificate.prompt.expires" = "Gültig bis";
+"certificate.prompt.trust" = "Vertrauen";
+
+/* Klartext-Transport-Bestätigung (M21/T10, Spec „Klartext-HTTP") */
+"transport.plaintext.title" = "Anmeldedaten unverschlüsselt senden?";
+"transport.plaintext.body" = "Diese Verbindung nutzt http://, das Passwort wird also im Klartext übertragen. Nutze https://, wenn der Server das anbietet.";
+
+/* Verbindungstyp-Umschalter + S3-Formularabschnitt (M12/T7b) */
+"connection.type.label" = "Verbindungstyp";
+"connection.badge.ssh" = "SCP";
+"connection.badge.s3" = "S3";
+"connection.s3.endpoint" = "Endpunkt";
+"connection.s3.endpoint.understood %@" = "Verbindet zu %@";
+"connection.s3.endpoint.unreadable" = "Das ist keine Serveradresse, die MacSCP lesen kann.";
+"connection.s3.region" = "Region";
+"connection.s3.bucket" = "Bucket";
+"connection.s3.startsAtBucketList" = "Mit der Bucket-Liste starten";
+"connection.s3.accessKey" = "Access Key ID";
+"connection.s3.secretKey" = "Secret Access Key";
+"connection.s3.pathStyle" = "Path-Style-URLs verwenden";
+"connection.s3.pathStyle.forcedByIP" = "Eine IP-Adresse wird immer im Path-Style adressiert.";
+"connection.s3.preset.label" = "Anbieter-Vorlage";
+"connection.s3.preset.aws" = "Amazon S3";
+"connection.s3.preset.hetzner" = "Hetzner Object Storage (Falkenstein)";
+"connection.s3.preset.hetzner-hel1" = "Hetzner Object Storage (Helsinki)";
+"connection.s3.preset.hetzner-nbg1" = "Hetzner Object Storage (Nuremberg)";
+"connection.s3.preset.custom" = "Benutzerdefiniert";
+"connection.badge.webdav" = "WebDAV";
+
+/* WebDAV-Formularabschnitt (M21/T9) */
+"connection.webdav.baseURL" = "Server-URL";
+"connection.webdav.username" = "Benutzername";
+"connection.webdav.password" = "Passwort";
+"connection.webdav.nextcloudPath" = "Nextcloud-Pfad anhängen";
+"connection.webdav.preset.nextcloud" = "Nextcloud / ownCloud";
+"connection.webdav.preset.custom" = "Eigene";
+
+/* Tastenkürzel ohne Shell auf nicht-Shell-Backend (M12/T7b) */
+"shortcut.unavailableForProtocol.title" = "Nicht verfügbar";
+"shortcut.unavailableForProtocol" = "Dieses Tastenkürzel ist für diesen Verbindungstyp nicht verfügbar.";
+
+/* Gemeinsam */
+"common.cancel" = "Abbrechen";
+
+/* Session-Seitenleiste */
+"sidebar.header" = "SESSIONS";
+"sidebar.empty.noSessions" = "Noch keine gespeicherten Verbindungen.";
+"sidebar.empty.noMatches" = "Keine Verbindung passt zum Filter.";
+"sidebar.empty.clearFilter" = "Alle anzeigen";
+"sidebar.newConnection" = "Neue Verbindung";
+"sidebar.delete" = "Löschen";
+"sidebar.importedHeader" = "IMPORTIERT";
+"sidebar.importedHelp" = "Aus ~/.ssh/config — füllt das Formular (Geheimnisse werden nicht importiert)";
+"sidebar.imported.hide" = "Ausblenden";
+"sidebar.hiddenImports.error %1$@ %2$@" = "Ausgeblendete Importe konnten nicht aktualisiert werden: %1$@ — die Liste lässt sich zurücksetzen, indem %2$@ gelöscht wird.";
+"sidebar.error.dismiss" = "Ausblenden";
+
+/* Konflikt-Sheet */
+"conflict.title" = "Datei existiert bereits";
+"conflict.message" = "„%@“ existiert in „%@“.";
+"conflict.applyToAll" = "Für alle weiteren übernehmen";
+"conflict.rename" = "Umbenennen";
+"conflict.skip" = "Überspringen";
+"conflict.overwrite" = "Überschreiben";
+"conflict.cancelFolder" = "Ordner-Übertragung abbrechen";
+"conflict.folderHint" = "Abbrechen beendet die gesamte Ordner-Übertragung; bereits kopierte Dateien bleiben erhalten.";
+
+/* Browser-Toolbar & Panes */
+"browser.filesToggle" = "Dateien";
+"browser.filesToggleHelp" = "Dateien ein-/ausblenden";
+"browser.ssh" = "SSH";
+"browser.terminalToggle" = "Terminal";
+"browser.terminalToggleHelp" = "Terminal ein-/ausblenden (⌘T)";
+"browser.terminalOpenExternalHelp" = "Im externen Terminal öffnen (⌘T)";
+"browser.transfersToggle" = "Übertragungen";
+"browser.transfersToggleHelp" = "Übertragungen ein-/ausblenden (⌘⇧Y)";
+"browser.disconnect" = "Trennen";
+"browser.paneLocal" = "Lokal";
+"browser.paneRemote" = "Remote";
+"browser.upload" = "Hochladen";
+"browser.uploadHelp" = "Ausgewählte lokale Datei/Ordner ins Remote-Verzeichnis hochladen";
+"browser.download" = "Herunterladen";
+"browser.downloadHelp" = "Ausgewählte Remote-Datei/Ordner ins lokale Verzeichnis herunterladen";
+
+/* Toolbar transfer question (2026-09-17): asked before Upload/Download transfers more than one item or a folder */
+"browser.transferConfirm.upload.title" = "Auswahl hochladen?";
+"browser.transferConfirm.download.title" = "Auswahl herunterladen?";
+"browser.transferConfirm.upload.message %lld %@" = "%1$lld Elemente werden nach „%2$@“ hochgeladen.";
+"browser.transferConfirm.upload.messageWithFolders %lld %@" = "%1$lld Elemente, darunter Ordner mit ihrem gesamten Inhalt, werden nach „%2$@“ hochgeladen.";
+"browser.transferConfirm.download.message %lld %@" = "%1$lld Elemente werden nach „%2$@“ heruntergeladen.";
+"browser.transferConfirm.download.messageWithFolders %lld %@" = "%1$lld Elemente, darunter Ordner mit ihrem gesamten Inhalt, werden nach „%2$@“ heruntergeladen.";
+"browser.pane.goUpHelp" = "Übergeordnetes Verzeichnis";
+"browser.pane.refreshHelp" = "Aktualisieren";
+"browser.pane.retry" = "Erneut versuchen";
+"browser.pathBar.copied" = "Kopiert!";
+"browser.pathBar.listingFailed %@" = "Das Verzeichnis konnte nicht aufgelistet werden: %@";
+"browser.pathBar.candidateCount %lld" = "%lld Treffer";
+
+/* Terminal-Panel */
+"terminal.ended" = "Shell beendet.";
+"terminal.reopen" = "Neu öffnen";
+
+/* Remote-Dateitabelle: Spalten */
+"filetable.column.name" = "Name";
+"filetable.column.size" = "Größe";
+"filetable.column.modified" = "Geändert";
+"filetable.column.permissions" = "Rechte";
+"filetable.column.owner" = "Besitzer";
+"filetable.column.group" = "Gruppe";
+"filetable.column.type" = "Typ";
+"filetable.column.checksum" = "Prüfsumme";
+"filetable.column.checksum.withAlgorithm %@" = "Prüfsumme (%@)";
+
+/* Symlink-Markierung (M11h/T1): Tooltip auf der Namens-Zelle einer
+   Symlink-Zeile, dient zugleich als Accessibility-Beschreibung des
+   Symbols. */
+"filetable.symlinkTooltip" = "Symbolischer Link";
+
+/* Bucket-Markierung (Browser Type Column, 2026-09-04): Tooltip auf der
+   Namens-Zelle einer Bucket-Zeile, dient zugleich als
+   Accessibility-Beschreibung des Symbols. */
+"filetable.bucketTooltip" = "Bucket";
+
+/* Platzhalter für eine leere Zelle in den Spalten "Rechte"/"Besitzer"/
+   "Gruppe" (M11m/T2) — ein nil-Wert, nie eine geratene Anzeige. */
+"filetable.cell.placeholder" = "—";
+
+/* Transfer-Warteschlangen-Leiste */
+"transfers.title" = "Übertragungen";
+"transfers.empty" = "Keine Übertragungen";
+"transfers.pending" = "Übertragungen — %lld ausstehend";
+"transfers.clear" = "Aufräumen";
+
+/* Cancelling transfers (2026-09-03): the bar's "Cancel all", and the
+   hover hint of the icon-only cancel on a queued or running row. */
+"transfers.cancelAll" = "Alle abbrechen";
+"transfers.cancel" = "Diese Übertragung abbrechen";
+"transfers.status.queued" = "wartet";
+"transfers.status.cancelled" = "abgebrochen";
+"transfers.status.skipped" = "übersprungen";
+"transfers.status.interrupted" = "unterbrochen";
+
+/* A transfer's failure, in the app's language (2026-09-25) — see the
+   English catalogue for why only these three exist. */
+"transfers.failure.connectionFailed" = "Die Verbindung zum Server ist fehlgeschlagen.";
+"transfers.failure.protocolError" = "Der Server hat eine Antwort gesendet, die nicht verwendet werden konnte.";
+"transfers.failure.unknown" = "Die Übertragung ist fehlgeschlagen.";
+"transfers.failure.detail %1$@ %2$@" = "%1$@ (technische Details: %2$@)";
+
+/* Resume-Banner (M5d/T4) */
+"transfers.interrupted.banner" = "Unterbrochene Übertragungen können fortgesetzt werden.";
+"transfers.interrupted.resume" = "Fortsetzen";
+
+/* Cross-backend resume warning (M16) — shown while a queued/running item's
+   destination backend cannot resume an interrupted upload/download. */
+"transfers.noResume.hint" = "Bei Abbruch startet dieser Upload von vorn.";
+
+/* Full paths on demand (2026-09-03): a row shows a file name and an
+   arrow, so its hover hint carries the whole source and destination,
+   and its context menu copies the same two paths. In the HINT a remote
+   path is qualified with the session it lives on (by macSCPCore); what
+   is COPIED is the raw path, because a pasted path has to be one. */
+"transfers.paths.hint %1$@ %2$@" = "Von: %1$@\nNach: %2$@";
+"transfers.paths.copy" = "Pfade kopieren";
+
+/* Editor integration (M5e/T4) */
+"edit.openFailed" = "Datei konnte nicht zum Bearbeiten geöffnet werden: %@";
+"edit.activeDocumentBlocked" = "Wähle ausdrücklich einen Editor aus, bevor du dieses entfernte ausführbare Dokument öffnest.";
+
+/* Connection form polish (design review 2026-07-10) */
+"common.ok" = "OK";
+"common.back" = "Zurück";
+"connection.error.title" = "Verbindung fehlgeschlagen";
+
+/* Session manager (M5f) */
+"sidebar.connect" = "Verbinden";
+"sidebar.openTerminal" = "Terminal öffnen";
+"sidebar.openExternalTerminal" = "In externem Terminal öffnen";
+"sidebar.edit" = "Bearbeiten…";
+"sidebar.rename" = "Umbenennen";
+"sidebar.duplicate" = "Duplizieren";
+"sidebar.auditLog" = "Audit-Log…";
+"sidebar.moveTo" = "Verschieben nach";
+"sidebar.moveTo.root" = "Oberste Ebene";
+"sidebar.noGroup" = "Keine Gruppe";
+"sidebar.newGroup" = "Neue Gruppe…";
+"sidebar.newGroup.title" = "Neue Gruppe";
+"sidebar.newGroup.title.inFolder %@" = "Neue Gruppe in „%@“";
+"sidebar.newGroup.placeholder" = "Gruppenname";
+"sidebar.newGroup.create" = "Anlegen";
+"sidebar.group.sortByName" = "Nach Namen sortieren";
+"sidebar.group.dissolve" = "Gruppe auflösen";
+"sidebar.delete.confirmTitle %@" = "„%@“ löschen?";
+"sidebar.delete.confirmMessage" = "Die gespeicherten Zugangsdaten werden mit entfernt.";
+"connection.editTitle" = "Session bearbeiten";
+"connection.field.password.unchanged" = "unverändert";
+"connection.field.group" = "Gruppe";
+"connection.field.group.new.help" = "Legt eine Gruppe in der gewählten an, oder auf oberster Ebene, wenn keine Gruppe gewählt ist";
+"connection.field.terminalType" = "Terminaltyp";
+"connection.field.terminalType.useGlobal %@" = "Globale Einstellung verwenden (%@)";
+"connection.field.terminalType.help" = "Der Name, den der Server für das Terminal dieser Sitzung erfährt (TERM). Das Terminal selbst ändert sich nicht.";
+"connection.saveAndConnect" = "Speichern & verbinden";
+
+/* Menü-Befehle (M7a/T4) */
+"menu.toggleHidden" = "Versteckte Dateien ein-/ausblenden";
+"menu.transfers.toggle" = "Übertragungen ein-/ausblenden";
+"common.save" = "Speichern";
+
+/* Browser-Kontextmenü (M7b/T2) */
+"menu.transfer" = "Übertragen";
+"menu.transfer.otherPane" = "Zum anderen Fenster";
+"menu.openEditor" = "Öffnen";
+"menu.rename" = "Umbenennen…";
+"menu.info" = "Informationen & Rechte…";
+"menu.infoOnly" = "Informationen…";
+"menu.newFolder" = "Neuer Ordner…";
+"menu.newFile" = "Neue Datei…";
+"menu.copyPath" = "Pfad kopieren";
+"menu.delete" = "Löschen…";
+"browser.action.presignedURL" = "Freigabe-Link…";
+
+/* Gemeinsam (M7b/T3) */
+"common.close" = "Schließen";
+"common.apply" = "Übernehmen";
+
+/* Umbenennen-/Neuer-Ordner-Sheet (M7b/T3) */
+"sheet.rename.title" = "Umbenennen";
+"sheet.rename.confirm" = "Umbenennen";
+"sheet.newFolder.title" = "Neuer Ordner";
+"sheet.newFolder.confirm" = "Erstellen";
+"sheet.newFolder.defaultName" = "unbenannter Ordner";
+
+/* Neue-Datei-Sheet (M18a/T4) */
+"sheet.newFile.title" = "Neue Datei";
+"sheet.newFile.confirm" = "Erstellen";
+"sheet.newFile.defaultName" = "unbenannt.txt";
+
+/* Info-&-Rechte-Sheet (M7b/T3) */
+"info.path" = "Pfad";
+"info.kind" = "Art";
+"info.size" = "Größe";
+"info.folderSize.calculating" = "Wird berechnet…";
+"info.folderSize.failed" = "Berechnung nicht möglich";
+"info.folderSize.hint" = "Gesamtgröße der Dateiinhalte einschließlich versteckter Dateien. Symbolische Links werden übersprungen. Dies ist nicht der belegte Speicherplatz.";
+"info.modified" = "Geändert";
+"info.permissions" = "Rechte";
+"info.octal" = "Oktal";
+"info.octalInvalid" = "Ungültiger Oktalwert";
+"info.permissionsUnavailable" = "Für diesen Eintrag sind keine Rechte verfügbar.";
+"info.permissionsUnavailableOnThisServer" = "Dieser Server kennt keine Dateirechte.";
+"info.kind.directory" = "Ordner";
+"info.kind.file" = "Datei";
+"info.kind.symlink" = "Symbolischer Link";
+"info.kind.other" = "Sonstiges";
+"info.perm.read" = "Lesen";
+"info.perm.write" = "Schreiben";
+"info.perm.execute" = "Ausführen";
+"info.perm.owner" = "Besitzer";
+"info.perm.group" = "Gruppe";
+"info.perm.other" = "Andere";
+
+/* Recursive permissions (M11c/T3) */
+"info.recursive.toggle" = "Auf alle Unterobjekte anwenden";
+"info.recursive.same" = "Gleiche Rechte";
+"info.recursive.separate" = "Getrennt";
+"info.recursive.filesLabel" = "Dateien";
+"info.recursive.directoriesLabel" = "Ordner";
+"info.recursive.applyButton" = "Rekursiv anwenden";
+"info.recursive.confirmTitle" = "Rekursiv anwenden?";
+"info.recursive.confirmMessage" = "Rechte auf alle Objekte in %@ anwenden? Das lässt sich nicht rückgängig machen.";
+"info.recursive.progressPrefix" = "Wird angewendet…";
+"info.recursive.resultFormat" = "%lld geändert, %lld übersprungen, %lld fehlgeschlagen";
+"info.recursive.skippedHint" = "Übersprungene Objekte sind Symlinks, die unangetastet bleiben.";
+"info.recursive.cancelledHint" = "Abgebrochen — einige Objekte wurden möglicherweise nicht aktualisiert.";
+
+/* Löschen-Bestätigung (M7b/T3) */
+"delete.trash.title" = "In den Papierkorb bewegen?";
+"delete.trash.confirm" = "In den Papierkorb";
+"delete.trash.message" = "Die ausgewählten Objekte einschließlich der Ordnerinhalte werden in den Papierkorb des Mac bewegt. Sie können sie im Finder wiederherstellen. Schlägt dies fehl, werden keine Objekte endgültig gelöscht.";
+"delete.title" = "Löschen?";
+"delete.confirm" = "Löschen";
+"delete.failedTitle" = "Löschen fehlgeschlagen";
+"delete.message.single" = "„%@“ wird gelöscht.";
+"delete.message.many" = "%lld Objekte werden gelöscht.";
+"delete.message.recursive" = "Ordner werden mit ihrem gesamten Inhalt gelöscht.";
+"delete.message.permanent" = "Diese Aktion kann nicht widerrufen werden.";
+
+/* Tabs (M8a) */
+"tabs.newConnection" = "Neue Verbindung";
+
+/* Tableiste (M8a/T4) */
+"tabs.newTabHelp" = "Neuer Tab (⌘N)";
+"tabs.closeTabHelp" = "Tab schließen (⌘W)";
+"tabs.a11y.uploading" = "wird hochgeladen";
+"tabs.a11y.downloading" = "wird heruntergeladen";
+"tabs.a11y.attention" = "erfordert Aufmerksamkeit";
+
+/* Verbindungspunkt in der Tableiste (connection-liveness plan, Task 5) */
+"tabs.liveness.connectingHelp" = "Verbindet…";
+"tabs.liveness.connectingA11y" = "wird verbunden";
+"tabs.liveness.connectedHelp" = "Verbunden";
+"tabs.liveness.connectedA11y" = "verbunden";
+"tabs.liveness.degradedHelp" = "Antwortet nicht — wird erneut geprüft…";
+"tabs.liveness.degradedA11y" = "antwortet nicht, wird erneut geprüft";
+"tabs.liveness.lostHelp" = "Verbindung verloren";
+"tabs.liveness.lostA11y" = "Verbindung verloren";
+
+"tabs.close.title" = "Tab schließen?";
+"tabs.close.activeTransfers" = "Laufende Übertragungen in diesem Tab werden abgebrochen.";
+"tabs.close.confirm" = "Schließen";
+
+/* Tab-Menübefehle (M8a/T4) */
+"menu.newTab" = "Neuer Tab";
+"menu.closeTab" = "Tab schließen";
+
+/* Sitzungsübergreifende Übertragung (M8b/T4) */
+"menu.transfer.toSession" = "Zu „%@“";
+/* Sitzungsübergreifendes Übertragungsziel mit Backend-Kürzel (M16/T4) */
+"menu.transfer.toSession.kind" = "Zu „%@“ · %@";
+
+/* Schließen-Warnung: eingehende sitzungsübergreifende Übertragungen (M8b/T4) */
+"tabs.close.incomingTransfers" = "Andere Tabs übertragen gerade zu dieser Session; Schließen bricht diese Übertragungen ab.";
+
+/* Schließen-Warnung: mehrere Tabs auf einmal schließen */
+"tabs.closeOthers.activeTransfers %1$lld %2$lld" = "Beim Schließen von %1$lld Tabs werden laufende Übertragungen in %2$lld von ihnen abgebrochen.";
+"tabs.closeOthers.incomingTransfers %lld" = "%lld davon empfangen Übertragungen aus anderen Tabs; das Schließen bricht diese ab.";
+
+/* Tab-Kontextmenü */
+"tabs.menu.close" = "Tab schließen";
+"tabs.menu.closeOthers" = "Andere Tabs schließen";
+"tabs.menu.moveLeft" = "Nach links";
+"tabs.menu.moveRight" = "Nach rechts";
+"tab.duplicate" = "Tab duplizieren";
+"tabs.menu.showFiles" = "Dateien einblenden";
+"tabs.menu.hideFiles" = "Dateien ausblenden";
+"tabs.menu.showTerminal" = "Terminal einblenden";
+"tabs.menu.hideTerminal" = "Terminal ausblenden";
+"tabs.menu.openExternalTerminal" = "In externem Terminal öffnen";
+"tabs.menu.saveAsSession" = "Als Sitzung speichern…";
+
+/* Windows: the tab strip's context menu and the Window menu
+   resolve this one key for the same action. */
+"window.moveTabToNewWindow" = "Tab in neues Fenster verschieben";
+"window.keepOnTop" = "Immer im Vordergrund";
+"tabs.closeOthers.title" = "Andere Tabs schließen?";
+"tabs.alreadyOpen.title" = "Diese Sitzung ist schon offen";
+"tabs.alreadyOpen.message %@" = "„%@“ ist bereits in einem Tab geöffnet.";
+"tabs.alreadyOpen.jump" = "Zum vorhandenen Tab";
+"tabs.alreadyOpen.openAnyway" = "Trotzdem öffnen";
+
+/* Sitzungs-Export/Import — Sidebar-Menüs (M9a/T3) */
+"export.menu.single" = "Exportieren…";
+"export.menu.group" = "Gruppe exportieren…";
+"export.menu.all" = "Alle exportieren…";
+"import.menu" = "Importieren…";
+
+/* Sitzungs-Export/Import — Export-Sheet */
+"export.sheet.title" = "Sitzungen exportieren";
+"export.summary %lld" = "%lld Verbindungen";
+"export.includeGroups" = "Gruppenzuordnung einschließen";
+"export.includePasswords" = "Passwörter einschließen";
+"export.encryptionLabel" = "Verschlüsselung";
+"export.encrypted" = "Verschlüsselt";
+"export.unencrypted" = "Unverschlüsselt";
+"export.password" = "Passwort";
+"export.passwordRepeat" = "Passwort wiederholen";
+"export.passwordHint" = "Ein langes Passwort erschwert das Knacken der Exportdatei, falls sie abgefangen wird.";
+"export.plaintextWarning" = "Passwörter werden in dieser Datei im Klartext gespeichert. Jeder, der sie erhält, kann sie lesen.";
+"export.confirmAnyway" = "Trotzdem exportieren…";
+"export.action" = "Exportieren…";
+
+/* Sitzungs-Export/Import — Export-Ergebnis/Fehler */
+"export.missingPasswords %lld" = "Ohne Passwort exportiert: %lld";
+"export.result.title" = "Export abgeschlossen";
+"export.error.title" = "Export fehlgeschlagen";
+"export.error.encodeFailed %@" = "Der Export konnte nicht vorbereitet werden: %@";
+"export.error.writeFailed %@" = "Die Exportdatei konnte nicht geschrieben werden: %@";
+
+/* Sitzungs-Export/Import — Import-Passwort-Sheet */
+"import.password.title" = "Passwort erforderlich";
+"import.password.wrong" = "Falsches Passwort oder die Datei ist beschädigt.";
+"import.password.unlock" = "Entsperren";
+
+/* Sitzungs-Export/Import — Import-Ergebnis/Fehler */
+"import.result.title" = "Import abgeschlossen";
+"import.result.body %lld %lld %lld" = "%lld importiert, %lld als Duplikate übersprungen, %lld Passwörter importiert";
+"import.result.passwordFailures %lld" = "Passwörter, die nicht gespeichert werden konnten: %lld";
+"import.result.storeFailures %lld" = "Wegen eines Fehlers nicht gespeichert: %lld";
+"import.result.rejected %lld" = "Wegen unvollständiger Angaben nicht importiert: %lld";
+"import.result.liftedGroups %lld" = "Ordner auf die oberste Ebene verschoben, weil die Verschachtelung der Datei beschädigt war: %lld";
+"import.result.plaintextNotice" = "Die Datei enthielt unverschlüsselte Passwörter.";
+"import.error.notExport" = "Keine macSCP-Sitzungsdatei.";
+"import.error.newerVersion" = "Diese Datei wurde mit einer neueren Version von MacSCP erstellt.";
+"import.error.readFailed %@" = "Die Datei konnte nicht gelesen werden: %@";
+"import.error.title" = "Import fehlgeschlagen";
+
+/* Geteiltes Import-Konflikt-Sheet (M19/T7) — beide Import-Flüsse (Sitzungen
+   und Login-Sets) führen Namenskollisionen über denselben
+   ImportConflictArbiter (Core, M19/T3); kindLabel ist ein stabiler
+   Bezeichner, hier auf Anzeigetext abgebildet, nicht der Rohwert selbst. */
+"import.conflict.title" = "Name bereits vorhanden";
+"import.conflict.message" = "„%@“ ist bereits vorhanden.";
+"import.conflict.connection.title" = "Verbindung bereits vorhanden";
+"import.conflict.connection.message" = "„%@“ zeigt auf denselben Server wie „%@“.";
+"import.conflict.kind.loginSet" = "Login-Set";
+"import.conflict.kind.session" = "Verbindung";
+"import.conflict.kind.other" = "Eintrag";
+"import.conflict.skip" = "Überspringen";
+"import.conflict.replace" = "Ersetzen";
+"import.conflict.rename" = "Umbenennen";
+"import.conflict.replaceNote" = "Ersetzen überschreibt auch das gespeicherte Passwort bzw. die Schlüssel-Passphrase.";
+"import.conflict.applyToAll" = "Für alle weiteren Konflikte übernehmen";
+"import.conflict.cancel" = "Import abbrechen";
+"import.conflict.cancelNote" = "Beim Abbrechen wird nichts importiert.";
+
+// Login-Sets: Export/Import (M19/T8)
+"import.result.resolved %lld %lld" = "%lld ersetzt, %lld umbenannt";
+"import.result.secretsRemoved %lld" = "Gespeicherte Passwörter entfernt, weil die Datei keine enthielt: %lld";
+"import.result.secretsRemoveFailed %lld" = "Gespeicherte Passwörter, die nicht entfernt werden konnten: %lld";
+"logins.export.title" = "Logins exportieren";
+"logins.export.summary %lld" = "%lld Logins werden in die Datei geschrieben.";
+"logins.export.action" = "Exportieren…";
+"logins.export.includeSecrets" = "Passwörter einschließen";
+"logins.export.includeKeyFiles" = "Schlüsseldateien einbetten";
+"logins.export.keyFilesHint" = "Nur von MacSCP verwaltete Schlüssel werden eingebettet. Schlüssel an anderen Orten reisen nur als Pfad mit.";
+"logins.export.plaintextWarning" = "Passwörter und private Schlüsseldateien werden unverschlüsselt in dieser Datei gespeichert. Wer sie erhält, kann diese Logins verwenden.";
+"logins.export.missingSecrets %lld" = "Ohne Passwort exportiert: %lld";
+"logins.export.externalKeys %lld" = "Schlüsseldateien nicht eingebettet (nicht von MacSCP verwaltet): %lld";
+"logins.export.keysWithoutPassphrase %lld" = "Schlüsseldateien ohne ihre Passphrase exportiert: %lld";
+"logins.export.keyErrors %@" = "Schlüsseldateien, die nicht gelesen werden konnten: %@";
+"logins.import.result %lld %lld %lld" = "%lld importiert, %lld ersetzt, %lld übersprungen";
+"logins.import.renamed %lld" = "Unter neuem Namen importiert: %lld";
+"logins.import.keysImported %lld" = "Importierte Schlüsseldateien: %lld";
+"logins.import.missingKeys %@" = "Schlüsseldatei auf diesem Mac nicht vorhanden: %@";
+"logins.import.keyFailures %@" = "Schlüsseldateien, die nicht importiert werden konnten: %@";
+"logins.import.secretsRemoved %lld" = "Gespeicherte Passwörter entfernt, weil die Datei keine enthielt: %lld";
+"logins.import.withoutPassword %lld" = "Ohne Passwort angekommen: %lld";
+"logins.import.notExport" = "Keine macSCP-Logins-Datei.";
+
+/* Audit-Log-Sheet (M9b/T3) */
+"audit.filter.all" = "Alle";
+"audit.filter.transfers" = "Transfers";
+"audit.filter.fileOps" = "Datei-Ops";
+"audit.filter.connection" = "Verbindung";
+"audit.filter.errors" = "Fehler";
+"audit.column.time" = "Zeit";
+"audit.column.kind" = "Ereignis";
+"audit.column.detail" = "Detail";
+"audit.empty" = "Noch keine Einträge.";
+"audit.noMatches" = "Keine Treffer.";
+"audit.count %lld" = "%lld Einträge";
+"audit.countFiltered %lld %lld" = "%lld von %lld";
+"audit.export" = "Als Text exportieren…";
+"audit.export.error %@" = "Die Exportdatei konnte nicht geschrieben werden: %@";
+"audit.clear" = "Log leeren…";
+"audit.clear.title" = "Audit-Log leeren?";
+"audit.clear.message" = "Dadurch werden alle Einträge dieses Sitzungsprotokolls entfernt. Dies kann nicht rückgängig gemacht werden.";
+"audit.clear.confirm" = "Leeren";
+
+/* Audit-Log — Ereignis-Label (M9b/T3) */
+"audit.kind.connected" = "Verbunden";
+"audit.kind.disconnected" = "Getrennt";
+"audit.kind.connectFailed" = "Verbindung fehlgeschlagen";
+"audit.kind.transferFinished" = "Übertragung abgeschlossen";
+"audit.kind.transferFailed" = "Übertragung fehlgeschlagen";
+"audit.kind.transferCancelled" = "Übertragung abgebrochen";
+"audit.kind.rename" = "Umbenannt";
+"audit.kind.delete" = "Gelöscht";
+"audit.kind.permissions" = "Rechte geändert";
+"audit.kind.newFolder" = "Neuer Ordner";
+"audit.kind.newFile" = "Neue Datei";
+"audit.kind.editUpload" = "Editor-Upload";
+"audit.kind.plaintextConfirmed" = "Unverschlüsselt verbunden";
+
+/* Sessions-Menü (M10a/T2, M10b/T3) */
+"menu.sessions" = "Sessions";
+"menu.knownHosts" = "Bekannte Hosts…";
+"menu.serverCertificates" = "Server-Zertifikate…";
+"menu.logins" = "Logins…";
+"menu.sshKeys" = "SSH-Schlüssel…";
+"menu.adHocAuditLog" = "Protokoll der Ad-hoc-Verbindungen…";
+"audit.adhoc.name" = "Ad-hoc-Verbindungen";
+"menu.hiddenImports" = "Ausgeblendete Importe…";
+"menu.hiddenImports %@" = "Ausgeblendete Importe (%@)…";
+"menu.exportAllSessions" = "Alle Sitzungen exportieren…";
+"menu.importSessions" = "Sitzungen importieren…";
+"menu.importLogins" = "Logins importieren…";
+"menu.terminal" = "Terminal";
+"menu.terminal.toggle" = "Terminal ein-/ausblenden";
+"menu.terminal.openExternal" = "Im externen Terminal öffnen";
+
+/* Bekannte-Hosts-Sheet (M10a/T2) */
+"knownHosts.title" = "Bekannte Hosts";
+"knownHosts.column.host" = "Host";
+"knownHosts.column.port" = "Port";
+"knownHosts.column.keyType" = "Schlüsseltyp";
+"knownHosts.column.fingerprint" = "Fingerprint";
+"knownHosts.column.added" = "Hinzugefügt";
+"knownHosts.count %lld" = "%lld Hosts";
+"knownHosts.countFiltered %lld %lld" = "%lld von %lld";
+"knownHosts.copyFingerprint" = "Fingerprint kopieren";
+"knownHosts.remove" = "Entfernen…";
+"knownHosts.remove.title" = "Bekannten Host entfernen?";
+"knownHosts.remove.message" = "Beim nächsten Verbinden wird der Host wie ein unbekannter behandelt (neuer Vertrauens-Prompt).";
+"knownHosts.remove.messageMany %lld" = "%lld Hosts werden beim nächsten Verbinden wie unbekannte behandelt (neue Vertrauens-Prompts).";
+"knownHosts.remove.confirm" = "Entfernen";
+"knownHosts.empty" = "Noch keine bekannten Hosts.";
+"knownHosts.noMatches" = "Keine Treffer.";
+"knownHosts.loadError %@" = "Bekannte Hosts konnten nicht geladen werden: %@";
+"knownHosts.removeError %@" = "Der Host-Schlüssel konnte nicht entfernt werden: %@";
+
+/* Bekannte-Hosts-Sheet — Abschnitt „vertrauenswürdige Server-Zertifikate" (M21/T10) */
+"knownHosts.section.certificates" = "Server-Zertifikate";
+"knownHosts.cert.column.host" = "Host";
+"knownHosts.cert.column.port" = "Port";
+"knownHosts.cert.column.subject" = "Betreff";
+"knownHosts.cert.column.fingerprint" = "Fingerabdruck";
+"knownHosts.cert.column.expires" = "Gültig bis";
+"knownHosts.cert.count %lld" = "%lld Zertifikate";
+"knownHosts.cert.countFiltered %lld %lld" = "%lld von %lld";
+"knownHosts.cert.remove" = "Entfernen…";
+"knownHosts.cert.remove.title" = "Vertrauenswürdiges Zertifikat entfernen?";
+"knownHosts.cert.remove.message" = "Das Zertifikat wird bei der nächsten Verbindung als unbekannt behandelt (neue Vertrauensabfrage).";
+"knownHosts.cert.remove.messageMany %lld" = "%lld Zertifikate werden bei der nächsten Verbindung als unbekannt behandelt (neue Vertrauensabfragen).";
+"knownHosts.cert.remove.confirm" = "Entfernen";
+"knownHosts.cert.empty" = "Noch keine vertrauenswürdigen Zertifikate.";
+"knownHosts.cert.noMatches" = "Keine Treffer.";
+"knownHosts.cert.loadError %@" = "Vertrauenswürdige Zertifikate konnten nicht geladen werden: %@";
+"knownHosts.cert.removeError %@" = "Das Zertifikat konnte nicht entfernt werden: %@";
+
+/* Sheet für ausgeblendete Importe (M11f/T2) */
+"hiddenImports.title" = "Ausgeblendete Importe";
+"hiddenImports.empty" = "Rechtsklick auf eine importierte Verbindung in der Seitenleiste und „Ausblenden“ wählen, damit sie hier erscheint.";
+"hiddenImports.noMatches" = "Keine Treffer.";
+"hiddenImports.orphaned" = "nicht mehr in ~/.ssh/config";
+"hiddenImports.unhide" = "Wieder einblenden";
+"hiddenImports.removeFromList" = "Aus der Liste entfernen";
+"hiddenImports.count %lld" = "%lld ausgeblendet";
+"hiddenImports.loadError %1$@ %2$@" = "Ausgeblendete Importe konnten nicht geladen werden: %1$@ — die Liste lässt sich zurücksetzen, indem %2$@ gelöscht wird.";
+"hiddenImports.unhideError %@" = "Der Import konnte nicht wiederhergestellt werden: %@";
+
+/* TOFU-Prompt-Fußnote (M10a/T2) */
+"tofu.manageKnownHosts" = "Bekannte Hosts verwalten…";
+
+/* Logins-Sheet (M10b/T3) */
+"loginSets.title" = "Logins";
+"loginSets.count %lld" = "%lld Logins";
+"loginSets.usage.one" = "1 Verbindung";
+"loginSets.usage.many %lld" = "%lld Verbindungen";
+"loginSets.new" = "Neu…";
+"loginSets.edit" = "Bearbeiten…";
+"loginSets.delete" = "Löschen…";
+"loginSets.delete.title" = "Diesen Login löschen?";
+"loginSets.delete.message %lld" = "%lld Verbindungen erhalten diese Zugangsdaten wieder direkt hinterlegt.";
+"loginSets.delete.confirm" = "Löschen";
+"loginSets.deleteError %lld" = "Das gespeicherte Passwort für %lld Verbindungen konnte nicht wiederhergestellt werden.";
+"loginSets.empty" = "Noch keine Logins.";
+"loginSets.noMatches" = "Keine Treffer.";
+"loginSets.subtitle.key %@ %@" = "%@ · SSH-Key (%@)";
+"loginSets.subtitle.password %@" = "%@ · Passwort";
+"loginSets.subtitle.agent %@" = "%@ · Agent";
+"loginSets.subtitle.kind %@ %@" = "%@ · %@";
+"loginSets.merge.banner %lld %@" = "%lld Verbindungen verwenden denselben Login „%@“.";
+"loginSets.merge.ignore" = "Ignorieren";
+"loginSets.merge.action" = "Zusammenfassen…";
+"loginSets.merge.confirmTitle" = "Diese Verbindungen zusammenfassen?";
+"loginSets.merge.confirm" = "Zusammenfassen";
+"loginSets.merge.confirmMessage %@ %@" = "%@ werden zum Login „%@“ zusammengefasst.";
+"loginSets.editor.titleNew" = "Neuer Login";
+"loginSets.editor.titleEdit" = "Login bearbeiten";
+"loginSets.editor.name" = "Name";
+"loginSets.editor.kind" = "Typ";
+"loginSets.missingSet" = "Das hinterlegte Login dieser Verbindung wurde nicht gefunden. Login wählen oder Zugangsdaten eingeben.";
+"form.loginSet.kindMismatch" = "Das gewählte gespeicherte Login gehört zu einem anderen Verbindungstyp. Login für dieses Protokoll wählen oder Zugangsdaten hier eingeben.";
+"loginSets.badge.key" = "KEY";
+"loginSets.badge.pass" = "PASS";
+"loginSets.badge.agent" = "AGENT";
+"loginSets.keyMissing" = "Schlüsseldatei fehlt";
+"loginSets.keyMissing.help" = "Diese Schlüsseldatei existiert auf diesem Mac nicht. Wähle im Editor einen Schlüssel.";
+
+/* Verbindungsformular — Dreiweg-Login-Umschalter (M10b/T3) */
+"form.loginMode.label" = "Login";
+"form.loginMode.set" = "Login-Set";
+"form.loginMode.manual" = "Manuell";
+"form.selectLogin" = "Login auswählen";
+"form.manageLogins" = "Logins verwalten…";
+"form.saveAsSet" = "Als neues Login-Set speichern";
+"form.saveAsSet.name" = "Name des Login-Sets";
+"audit.kind.crossSessionTransfer" = "Sitzungsübergreifende Übertragung";
+
+/* Verbindungsformular — Jump-Host-Block (M10c/T3, Mockup Abschnitt 2) */
+"form.jump.label" = "Jump-Host";
+"form.jump.toggle" = "Über einen Zwischenhost verbinden (ProxyJump)";
+"form.jump.host.placeholder" = "bastion.example.com";
+
+/* Verbindungsformular — Jump-Quellen-Umschalter: gespeicherte Verbindung (M11a/T3) */
+"form.jump.source.label" = "Quelle";
+"form.jump.source.session" = "Gespeicherte Verbindung";
+"form.jump.session.select" = "Verbindung auswählen";
+"form.jump.session.missing" = "Die als Zwischenhost genutzte Verbindung existiert nicht mehr.";
+"form.jump.session.chainNotSupported" = "Die gewählte Verbindung nutzt selbst einen Zwischenhost; Ketten werden nicht unterstützt.";
+"form.jump.session.notSSH" = "Als Zwischenhost können nur SSH-Verbindungen genutzt werden.";
+
+/* Zwischenhost an ein Login einer anderen Protokollart gebunden (M28/T7) */
+"form.jump.set.notSSH" = "Der Zwischenhost nutzt ein hinterlegtes Login, das kein SSH-Login ist. SSH-Login für den Zwischenhost wählen oder Benutzername und Passwort hier eingeben.";
+
+/* Sidebar-Lösch-Rückfrage — als Zwischenhost referenziert (M11a/T3) */
+"sidebar.delete.jumpUsage %lld" = "%lld Verbindungen nutzen diese Verbindung als Zwischenhost und behalten deren Daten direkt hinterlegt.";
+"sidebar.delete.jumpRestoreError %lld" = "Das gespeicherte Passwort für %lld Verbindungen konnte nicht wiederhergestellt werden.";
+
+/* Update-Prüfung — Menüeintrag + Ergebnis-Dialog (M11b/T2) */
+
+/* Einstellungen — Tab „Allgemein", Abschnitt „Jetzt prüfen" (M11h/T2) */
+"settings.general.currentVersion" = "Aktuelle Version";
+"settings.general.currentVersion.unknown" = "Unbekannt";
+
+/* Settings — General tab, diagnostic log (Diagnostic Log plan, Task 2) */
+"settings.general.diagnosticLog" = "Diagnoseprotokoll";
+"settings.general.diagnosticLog.off" = "Aus";
+"settings.general.diagnosticLog.errors" = "Fehler";
+"settings.general.diagnosticLog.info" = "Info";
+"settings.general.diagnosticLog.debug" = "Debug";
+"settings.general.diagnosticLog.reveal" = "Im Finder zeigen";
+"settings.general.diagnosticLogHint" = "Standardmäßig aus, einschließlich System- und Sitzungsprotokollen. Schreibt keine Passwörter, Schlüssel oder Dateiinhalte.";
+"sidebar.group.expanded" = "Ausgeklappt";
+"sidebar.group.collapsed" = "Eingeklappt";
+"group.cards.empty" = "Keine gespeicherten Sitzungen in dieser Gruppe.";
+
+/* Externes Terminal — Passwort-Hinweis + Start-Fehler (M11d/T2) */
+"externalTerminal.error.title" = "Externes Terminal konnte nicht geöffnet werden";
+"externalTerminal.error.applicationNotFound %@" = "„%@“ wurde nicht gefunden.";
+"externalTerminal.error.noCustomAppChosen" = "Es wurde noch keine App ausgewählt.";
+"externalTerminal.error.scriptWriteFailed %@" = "Das Start-Skript konnte nicht geschrieben werden: %@";
+"externalTerminal.error.launchFailed %@" = "Die App konnte nicht gestartet werden: %@";
+
+/* Datei-Suchleiste (M11k/T2) */
+"search.placeholder" = "Suchen";
+"search.mode.filter" = "Filtern";
+"search.mode.jump" = "Springen";
+"search.regexHelp" = "Regulärer Ausdruck";
+"search.close" = "Suche schließen";
+"search.count.filter %1$lld %2$lld" = "%1$lld von %2$lld";
+"search.count.jump %lld" = "%lld Treffer";
+"search.error.invalidRegex" = "Ungültiger regulärer Ausdruck";
+
+/* Geteiltes Sheet-Suchfeld (M18/T1) */
+"search.regex" = "Regex";
+"search.regex.help" = "Mit regulärem Ausdruck suchen";
+"search.regex.invalid" = "Ungültiger regulärer Ausdruck";
+
+/* Menüleisten-Statuselement (M11n/T2) */
+"menubar.connections.count" = "%d Verbindungen";
+"menubar.empty" = "Keine aktiven Verbindungen";
+"menubar.show.window" = "MacSCP anzeigen";
+"menubar.status.connected" = "Verbunden";
+"menubar.status.connecting" = "Verbindet…";
+"menubar.status.failed" = "Fehlgeschlagen";
+"menubar.status.ready" = "Bereit";
+"menubar.tooltip" = "MacSCP — Verbindungen und Tunnel";
+"menubar.transfer.running" = "%d überträgt";
+"menubar.transfer.queued" = "%d in Warteschlange";
+"settings.general.menubar" = "Menüleisten-Symbol anzeigen";
+
+/* Sprachumschalter in der App (M11p/T4) */
+"settings.general.language.header" = "Sprache";
+"settings.general.language.system" = "System";
+"settings.general.language.footer" = "Wird nach einem Neustart angewandt.";
+"settings.general.language.relaunch" = "MacSCP neu starten";
+
+/* Tastenkürzel-Übersicht (M11q) */
+"settings.tab.shortcuts" = "Tastenkürzel";
+
+/* "Neuigkeiten"-Bereich: das mitgelieferte Änderungsprotokoll, jederzeit durchsuchbar (What's New plan, Task 3) */
+"settings.tab.whatsNew" = "Neuigkeiten";
+"settings.shortcuts.group.tabs" = "Tabs & Fenster";
+"settings.shortcuts.group.view" = "Ansicht";
+"settings.shortcuts.group.sessions" = "Sitzungen";
+"settings.shortcuts.group.browser" = "Dateibrowser";
+"settings.shortcuts.group.pathbar" = "Pfadzeile";
+"settings.shortcuts.group.sheets" = "Dialoge";
+"settings.shortcuts.label.newTab" = "Neuer Tab";
+"settings.shortcuts.label.closeTab" = "Tab schließen";
+"settings.shortcuts.label.selectTab" = "Tab 1–9 wählen";
+"settings.shortcuts.label.settings" = "Einstellungen";
+"settings.shortcuts.label.hiddenFiles" = "Versteckte Dateien ein-/ausblenden";
+"settings.shortcuts.label.transfers" = "Übertragungen ein-/ausblenden";
+"settings.shortcuts.label.terminal" = "Externes Terminal öffnen";
+"settings.shortcuts.label.knownHosts" = "Known Hosts";
+"settings.shortcuts.label.logins" = "Logins";
+"settings.shortcuts.label.hiddenImports" = "Versteckte Importe";
+"settings.shortcuts.label.goUp" = "Zum übergeordneten Ordner";
+"settings.shortcuts.label.open" = "Öffnen";
+"settings.shortcuts.label.info" = "Infos & Rechte";
+"settings.shortcuts.label.delete" = "Löschen";
+"settings.shortcuts.label.transferItem" = "In das andere Pane übertragen";
+"settings.shortcuts.label.rename" = "Umbenennen";
+"settings.shortcuts.label.clearSelection" = "Auswahl aufheben";
+"settings.shortcuts.label.search" = "Suchen";
+"settings.shortcuts.label.complete" = "Pfad vervollständigen";
+"settings.shortcuts.label.cycleBack" = "Vorheriger Vorschlag";
+"settings.shortcuts.label.cancel" = "Abbrechen";
+"settings.shortcuts.label.navigate" = "Zum Pfad";
+"settings.shortcuts.label.confirm" = "Bestätigen";
+
+/* Freigabe-Link-Sheet (M14/T5) — Kontextmenü-Aktion „Freigabe-Link…" bei einer S3-Datei */
+"presigned.sheet.title" = "Freigabe-Link";
+"presigned.method.get" = "Herunterladen (GET)";
+"presigned.method.put" = "Hochladen (PUT)";
+"presigned.expiry.label" = "Läuft ab nach";
+"presigned.expiry.15min" = "15 Minuten";
+"presigned.expiry.1h" = "1 Stunde";
+"presigned.expiry.1d" = "1 Tag";
+"presigned.expiry.7d" = "7 Tagen";
+"presigned.put.targetKey" = "Ziel-Schlüssel";
+"presigned.put.overwriteWarning" = "Wer diesen Link besitzt, kann diesen Schlüssel bis zum Ablauf überschreiben.";
+"presigned.url.label" = "Link";
+"presigned.generate" = "Erzeugen";
+"presigned.copy" = "Kopieren";
+"presigned.copied" = "Kopiert";
+"presigned.error" = "Der Link konnte nicht erzeugt werden.";
+
+/* SSH-Schlüssel-Sheet (M17/T4, M18/T5) — macSCP-verwaltete SSH-Schlüssel erzeugen/verwalten */
+"keys.load.error" = "Die Schlüsseldatei konnte nicht gelesen werden. Sie ist vorhanden, lässt sich aber nicht decodieren — es ging kein Schlüssel verloren, und es wird nichts darüber geschrieben.";
+"keys.empty" = "Noch keine Schlüssel. Erzeuge einen, um loszulegen.";
+"keys.generate" = "Erzeugen…";
+"keys.generate.title" = "SSH-Schlüssel erzeugen";
+"keys.generate.name" = "Name";
+"keys.generate.comment" = "Kommentar";
+"card.login" = "Anmeldung";
+"session.appearance.icon" = "Symbol";
+"session.appearance.color" = "Symbolfarbe";
+"session.icon.automatic" = "Automatisch";
+"session.icon.server" = "Server";
+"session.icon.database" = "Datenbank";
+"session.icon.bastion" = "Bastion";
+"session.icon.firewall" = "Firewall";
+"session.icon.router" = "Router";
+"session.icon.networkSwitch" = "Netzwerk-Switch";
+"session.icon.ai" = "KI-Server";
+"session.icon.web" = "Webserver";
+"session.icon.storage" = "Speicher / NAS";
+"session.icon.cloud" = "Cloud";
+"session.icon.desktop" = "PC / Arbeitsplatz";
+"session.icon.laptop" = "Laptop";
+"session.icon.backup" = "Sicherung";
+"session.icon.mail" = "Mailserver";
+"session.icon.container" = "Container";
+"session.icon.api" = "API-Server";
+"session.icon.dns" = "DNS-Server";
+"session.icon.media" = "Medienserver";
+"session.icon.device" = "Gerät / Appliance";
+"session.icon.honeypot" = "Honeypot";
+"session.icon.analyzer" = "Analysegerät";
+"session.icon.mobile" = "Mobilgerät";
+"session.icon.robot" = "Roboter / Automatisierung";
+"session.tint.blue" = "Blau";
+"session.tint.teal" = "Blaugrün";
+"session.tint.green" = "Grün";
+"session.tint.orange" = "Orange";
+"session.tint.red" = "Rot";
+"session.tint.purple" = "Violett";
+"session.tint.pink" = "Rosa";
+"session.tint.gray" = "Grau";
+"keys.generate.type" = "Typ";
+"keys.generate.bits" = "Schlüssellänge";
+"keys.generate.passphrase" = "Passphrase (optional)";
+"keys.generate.passphrase.confirm" = "Passphrase bestätigen";
+"keys.generate.passphrase.mismatch" = "Die Passphrasen stimmen nicht überein.";
+"keys.generate.submit" = "Erzeugen";
+"keys.generate.error" = "Der Schlüssel konnte nicht erzeugt werden.";
+"keys.generate.error.timedOut" = "Das Erzeugen des Schlüssels hat zu lange gedauert und wurde abgebrochen. Es wurde nichts gespeichert.";
+"keys.passphrase.notStored" = "Der Schlüssel wurde gespeichert, seine Passphrase jedoch nicht. Sie wird bei der nächsten Verbindung abgefragt.";
+"keys.type.ed25519" = "ED25519";
+"keys.type.rsa" = "RSA";
+"keys.type.ecdsa" = "ECDSA";
+"keys.notConnectable" = "Nicht als macSCP-Login verwendbar (nur Public-Key-Export)";
+"keys.hasPassphrase" = "Passphrase-geschützt";
+"keys.copyPublic" = "Public Key kopieren";
+"keys.exportPublic" = "Public Key exportieren…";
+"keys.export.error %@" = "Die Exportdatei konnte nicht geschrieben werden: %@";
+"keys.delete" = "Löschen";
+"keys.delete.title" = "Diesen Schlüssel löschen?";
+"keys.delete.confirm %lld" = "%lld gespeicherte Verbindungen verweisen auf diesen Schlüssel.";
+"keys.delete.error" = "Der Schlüssel konnte nicht gelöscht werden.";
+"keys.picker.managed" = "Verwalteter Schlüssel";
+"keys.picker.manage" = "Schlüssel verwalten…";
+"keys.sheet.title" = "SSH-Schlüssel";
+"keys.noMatches" = "Keine Treffer.";
+"keys.import.title" = "SSH-Schlüssel importieren";
+"keys.import.file" = "Datei";
+"keys.import.submit" = "Importieren";
+"keys.import.error" = "Der Schlüssel konnte nicht importiert werden.";
+"keys.import.error.timedOut" = "Das Lesen des Schlüssels hat zu lange gedauert und wurde abgebrochen. Der Schlüssel wurde nicht importiert.";
+"keys.import.error.conversionTimedOut" = "Das Konvertieren des Schlüssels hat zu lange gedauert und wurde abgebrochen. Der Schlüssel wurde nicht importiert.";
+"keys.exportPrivate" = "Privaten Schlüssel exportieren…";
+"keys.exportPrivate.title" = "Privaten Schlüssel exportieren?";
+"keys.exportPrivate.warn" = "Der private Schlüssel verlässt den geschützten Speicher. Fortfahren?";
+"keys.exportPrivate.confirm" = "Exportieren";
+"keys.exportPrivate.error" = "Die private Schlüsseldatei konnte nicht gelesen werden.";
+"keys.rename" = "Umbenennen…";
+"keys.rename.title" = "Schlüssel umbenennen";
+"keys.rename.error" = "Der Schlüssel konnte nicht umbenannt werden.";
+"keys.passphrase.field" = "Passphrase";
+"keys.passphrase.correct" = "Gespeicherte Passphrase korrigieren…";
+"keys.passphrase.correct.title" = "Gespeicherte Passphrase korrigieren";
+"keys.passphrase.correct.explain" = "Gib die Passphrase ein, die diesen Schlüssel öffnet. MacSCP prüft sie vor dem Speichern; die Schlüsseldatei selbst wird nicht verändert.";
+"keys.passphrase.correct.error.notStored" = "Die Passphrase stimmt, konnte aber nicht gespeichert werden. Die Schlüsseldatei wurde nicht verändert — versuche es noch einmal.";
+"keys.passphrase.change" = "Passphrase des Schlüssels ändern…";
+"keys.passphrase.change.title" = "Passphrase des Schlüssels ändern";
+"keys.passphrase.change.explain" = "Dabei wird die Schlüsseldatei neu geschrieben. Danach öffnet nur noch die neue Passphrase den Schlüssel, und MacSCP merkt sich die neue.";
+"keys.passphrase.change.old" = "Aktuelle Passphrase";
+"keys.passphrase.change.new" = "Neue Passphrase";
+"keys.passphrase.change.confirm" = "Neue Passphrase bestätigen";
+"keys.passphrase.change.submit" = "Ändern";
+"keys.passphrase.change.error.oldDoesNotOpen" = "Die aktuelle Passphrase öffnet diesen Schlüssel nicht. Es wurde nichts geändert.";
+"keys.passphrase.change.notStored" = "Die Schlüsseldatei nutzt jetzt die neue Passphrase — ab sofort öffnet nur noch diese den Schlüssel. MacSCP konnte sie nicht fertig speichern und fragt womöglich bei der nächsten Verbindung danach.";
+"keys.passphrase.error.doesNotOpen" = "Diese Passphrase öffnet den Schlüssel nicht. Es wurde nichts gespeichert.";
+"keys.passphrase.error.notManaged" = "Die Datei dieses Schlüssels liegt nicht im eigenen Schlüsselordner von MacSCP — MacSCP fasst sie nicht an.";
+"keys.passphrase.correct.error.timedOut" = "Die Prüfung des Schlüssels hat zu lange gedauert und wurde abgebrochen. Es wurde nichts geändert.";
+"keys.passphrase.change.error.timedOut" = "Das Schlüsselwerkzeug hat zu lange gedauert und wurde abgebrochen. Prüfe, ob die aktuelle Passphrase den Schlüssel noch öffnet, bevor du es erneut versuchst.";
+"keys.passphrase.correct.error.failed" = "Da ist etwas schiefgegangen. Es wurde nichts geändert.";
+"keys.passphrase.change.error.failed" = "Da ist etwas schiefgegangen. Prüfe, ob die aktuelle Passphrase den Schlüssel noch öffnet, bevor du es erneut versuchst.";
+"keys.passphrase.error.keyFileMissing" = "MacSCP findet die Datei dieses Schlüssels nicht. Sie wurde vielleicht verschoben oder gelöscht.";
+"keys.passphrase.error.notEncrypted" = "Diese Schlüsseldatei ist nicht durch eine Passphrase geschützt, es gibt also keine zu merken. Gib ihr über „Passphrase des Schlüssels ändern…“ eine.";
+
+/* Einstellungen — Bereich „Kommandozeile" (macscp-cli-Verknüpfung) */
+"settings.section.cli" = "Kommandozeile";
+"settings.cli.header" = "Kommandozeilen-Werkzeug";
+"settings.cli.status.notInstalled" = "Nicht installiert.";
+"settings.cli.status.installed %@" = "Installiert unter %@";
+"settings.cli.status.stale" = "Installiert, verweist aber auf eine andere macSCP-Kopie.";
+"settings.cli.status.stale.detail %@" = "Verweist derzeit auf: %@";
+"settings.cli.status.occupied %@" = "Unter %@ liegt bereits etwas, das keine Verknüpfung ist.";
+"settings.cli.status.occupied.detail" = "MacSCP überschreibt es nicht. Verschiebe oder entferne es selbst und installiere dann erneut.";
+"settings.cli.install" = "Installieren";
+"settings.cli.repair" = "Reparieren";
+"settings.cli.footer" = "Legt eine Verknüpfung namens macscp-cli in ~/.local/bin an. Befehle in diesem Ordner werden nur gefunden, wenn er Teil des PATH deiner Shell ist — MacSCP ändert deine Shell-Konfiguration nicht.";
+"settings.cli.error.title" = "Installation fehlgeschlagen";
+"settings.cli.systemWide.header" = "Systemweite Installation";
+"settings.cli.systemWide.intro" = "Um stattdessen nach /usr/local/bin zu installieren, kopiere diesen Befehl und führe ihn im Terminal aus:";
+"settings.cli.systemWide.copy" = "Befehl kopieren";
+"settings.cli.systemWide.footer" = "Dieser Ordner gehört dem System, deshalb fragt der Befehl nach deinem Administratorkennwort. MacSCP selbst fordert nie Administratorrechte an.";
+"settings.cli.status.translocated" = "MacSCP läuft von einem temporären Ort.";
+"settings.cli.status.translocated.detail" = "macOS startet Apps, die von einem Image oder aus dem Ordner „Downloads“ geöffnet werden, aus einer temporären Kopie, die beim Beenden verschwindet. Verschiebe MacSCP in deinen Programme-Ordner, öffne es von dort und installiere erneut.";
+
+/* Shell completion (Shell Completion plan, Task 1) */
+"settings.cli.completion.header" = "Shell-Vervollständigung";
+"settings.cli.completion.intro" = "Um Befehle und Optionen von macscp-cli mit der Tab-Taste zu vervollständigen, füge diese Zeile in die Startdatei deiner Shell ein:";
+"settings.cli.completion.shell" = "Shell";
+"settings.cli.completion.copy" = "Befehl kopieren";
+"settings.cli.completion.where.zsh" = "Trag sie in ~/.zshrc ein. Die Zeile holt bei jedem Start deiner Shell die aktuelle Vervollständigung vom installierten Werkzeug, ein Update von MacSCP braucht also keinen zweiten Schritt.";
+"settings.cli.completion.where.bash" = "Trag sie in ~/.bashrc ein — oder in ~/.bash_profile, das Terminal für Login-Shells liest. Die Zeile holt bei jedem Start deiner Shell die aktuelle Vervollständigung vom installierten Werkzeug, ein Update von MacSCP braucht also keinen zweiten Schritt.";
+"settings.cli.completion.where.fish" = "Trag sie in ~/.config/fish/config.fish ein. Die Zeile holt bei jedem Start deiner Shell die aktuelle Vervollständigung vom installierten Werkzeug, ein Update von MacSCP braucht also keinen zweiten Schritt.";
+"settings.cli.completion.zshCompinit" = "zsh braucht außerdem ein gestartetes Vervollständigungssystem: autoload -Uz compinit && compinit, das schreibst du vor diese Zeile. Die Standardkonfiguration von macOS erledigt das bereits.";
+"settings.cli.completion.footer.installed" = "Die Zeile ruft die Verknüpfung macscp-cli beim Namen auf und funktioniert deshalb auch nach einem Update oder einem Verschieben von MacSCP — solange ~/.local/bin Teil des PATH deiner Shell ist, wie im Hinweis oben.";
+"settings.cli.completion.footer.notInstalled" = "Ohne die Verknüpfung muss die Zeile das Werkzeug im App-Bundle benennen. Installiere die Verknüpfung oben, um sie zu kürzen — und damit sie auch nach einem Verschieben von MacSCP funktioniert.";
+"settings.cli.completion.translocated" = "MacSCP läuft aus einer temporären Kopie, und deren Pfad ist weg, sobald MacSCP beendet wird — eine Startdatei würde ihn für immer behalten. Verschiebe MacSCP in deinen Programme-Ordner und öffne es von dort, dann zeigt dieser Abschnitt eine Zeile, die du behalten kannst.";
+
+
+
+
+
+
+
+
+
+
+/* Connecting attempt surface (connection-liveness plan, Task 6) */
+"connection.connecting.title" = "Verbindet…";
+"connection.connecting.body" = "MacSCP wartet auf eine Antwort vom Host.";
+
+/* Lost-connection surface (connection-liveness plan, Task 7) */
+"connection.lost.title" = "Verbindung verloren";
+"connection.lost.body.probe" = "Der Host hat nicht mehr geantwortet, deshalb hat MacSCP die Sitzung geschlossen.";
+"connection.lost.body.retryFailed" = "MacSCP hat den Host nicht wieder erreicht.";
+"connection.lost.body.needsPerson" = "Der letzte Versuch endete bei einer Frage, die nur du beantworten kannst.";
+"connection.lost.detail.timeout" = "Auf die letzten Prüfungen kam nicht rechtzeitig eine Antwort.";
+"connection.lost.detail.closed" = "Die Verbindung wurde vom Server oder vom Netzwerk geschlossen.";
+"connection.lost.detail.other" = "Die letzte Prüfung ist mit einem Fehler geendet.";
+"connection.lost.hint.noSavedSession" = "Diese Verbindung war nicht gespeichert; zum Wiederverbinden füllst du das Formular erneut aus.";
+"connection.lost.hint.stopped" = "MacSCP versucht es nicht von selbst erneut, solange die Frage offen ist.";
+"connection.lost.hint.automatic" = "MacSCP versucht es von selbst weiter, mit wachsendem Abstand.";
+"connection.lost.hint.onceUpcoming" = "MacSCP versucht es gleich einmal von selbst.";
+"connection.lost.hint.onceDone" = "MacSCP hat es bereits einmal von selbst versucht.";
+"connection.lost.reconnect" = "Erneut verbinden";
+"connection.lost.dismiss" = "Zurück zum Formular";
+
+/* Failed-connect surface (failed-connect surface plan, Task 3) */
+"connection.failed.title" = "Keine Verbindung möglich";
+"connection.failed.body" = "MacSCP konnte den Host nicht erreichen.";
+"connection.failed.body.adHoc" = "MacSCP konnte den Host nicht erreichen. Bearbeite die Verbindung, um die Angaben zu prüfen und erneut zu verbinden.";
+"connection.failed.retry" = "Erneut versuchen";
+"connection.failed.edit" = "Bearbeiten";
+"connection.failed.editSession" = "Sitzung bearbeiten";
+"connection.failed.close" = "Schließen";
+"connection.failed.details" = "Details…";
+"connection.failed.details.title" = "Verbindungsdetails";
+"connection.failed.convertKey" = "Schlüssel konvertieren…";
+"connection.failed.copyCommand" = "Befehl kopieren";
+"connection.convertKey.repoint.title %@" = "Login-Set „%@“ aktualisieren?";
+"connection.convertKey.repoint.message %lld %@" = "Dieses Login-Set wird von %1$lld Sitzungen verwendet, direkt oder für ihren Jump-Host. Sein Schlüssel zeigt dann für alle auf den konvertierten Schlüssel „%2$@“.";
+"connection.convertKey.repoint.confirm" = "Login-Set aktualisieren";
+"connection.convertKey.repoint.thisAttempt" = "Nur für diesen Versuch";
+
+// Verwaltungs-Sheets: Überlaufmenü in der Fußzeile (Backlog 2026-08-20, Punkt 5)
+"sheets.moreActions" = "Weitere Aktionen";
+"sheets.export" = "Exportieren…";
+"sheets.import" = "Importieren…";
+
+// Verwaltungs-Sheets: der Facetten-Schnellfilter (Facetten-Entwurf 2026-08-29)
+"sheet.facet.all" = "Alle";
+"sheet.empty.noFacetMatches" = "Keine Einträge dieser Art.";
+"sheet.empty.noMatchesInFacet" = "Kein Eintrag dieser Art passt zur Suche.";
+"sheet.empty.showAll" = "Alle anzeigen";
+"knownHosts.facet.algorithm" = "Algorithmus";
+"keys.facet.type" = "Schlüsseltyp";
+"loginSets.facet.kind" = "Backend";
+
+// Datei-Prüfsummen (Entwurf 2026-08-31): auf Anforderung, und stets mit der Herkunft des Werts
+"menu.checksum" = "Prüfsumme berechnen…";
+"info.checksum" = "Prüfsumme";
+"info.checksum.compute" = "%@ berechnen";
+"checksum.computing" = "Wird berechnet…";
+"checksum.unavailable" = "Dieser Server liefert keine Prüfsummen.";
+"checksum.failed" = "Die Prüfsumme konnte nicht berechnet werden. %@";
+"checksum.origin.remote" = "%@, auf dem Server berechnet.";
+"checksum.origin.local" = "%@, auf diesem Mac berechnet.";
+"checksum.origin.etag" = "%@, aus dem ETag des Objektspeichers — die Prüfsumme der gespeicherten Datei.";
+"checksum.origin.etagMultipart" = "%@, aus dem ETag des Objektspeichers für einen mehrteilig eingetroffenen Upload. Das ist nicht die Prüfsumme der Datei und stimmt mit keiner überein.";
+"checksum.batch.title" = "Prüfsummen";
+"checksum.batch.cancelled" = "Abgebrochen. Die bereits berechneten Prüfsummen bleiben stehen.";
+"settings.checksum.header" = "Prüfsummen";
+"settings.checksum.algorithm" = "Prüfsummen-Verfahren";
+"settings.checksum.forComparisonOnly" = "nur zum Abgleich";
+"settings.checksum.footer" = "SHA-256 ist voreingestellt. MD5 und SHA-1 stehen zur Wahl, weil eine anderswo veröffentlichte Angabe oft eine davon ist: zum Abgleich gegen eine solche Angabe taugen sie, als Nachweis, dass zwei Dateien gleich sind, nicht.";
+// Verbindungsdiagnose (Design 2026-09-02): ein Panel hinter drei Türen, Lauf nur per Knopf
+"diagnostics.menu" = "Diagnose…";
+"diagnostics.menuHelp" = "Diese Verbindung prüfen und einen Bericht kopieren";
+"diagnostics.title" = "Verbindungsdiagnose";
+"diagnostics.running" = "Messung läuft…";
+"diagnostics.run" = "Prüfung starten";
+"diagnostics.copy" = "Bericht kopieren";
+"diagnostics.copy.plainText" = "Als reinen Text";
+"diagnostics.copy.markdown" = "Als Markdown";
+"diagnostics.duration" = "%@ ms";
+"diagnostics.outcome.ok" = "OK";
+"diagnostics.outcome.failed" = "Fehlgeschlagen";
+"diagnostics.outcome.timedOut" = "Zeitüberschreitung";
+"diagnostics.outcome.unavailable" = "Nicht verfügbar";
+"diagnostics.outcome.skipped" = "Übersprungen";
+"diagnostics.outcome.notStarted" = "Nicht gestartet";
+"diagnostics.step.resolve" = "Namensauflösung";
+"diagnostics.step.tcp" = "Erreichbarkeit des TCP-Ports";
+"diagnostics.step.icmp" = "Ping";
+"diagnostics.step.dial" = "Verbinden";
+"diagnostics.step.trace" = "Route";
+"diagnostics.step.sshConnect" = "SSH-Verbindung";
+"diagnostics.step.s3Endpoint" = "Endpunkt";
+"diagnostics.step.webdavOptions" = "Serverfähigkeiten";
+"diagnostics.step.jump.resolve" = "Jump-Host: Namensauflösung";
+"diagnostics.step.jump.tcp" = "Sprungserver: TCP-Port";
+"diagnostics.step.jump.icmp" = "Jump-Host: Ping";
+"diagnostics.step.jump.dial" = "Jump-Host: SSH-Verbindung";
+"diagnostics.step.jump.trace" = "Jump-Host: Route";
+"diagnostics.step.target.tcpViaJump" = "Ziel über Sprungserver: TCP-Port";
+"diagnostics.step.target.dialViaJump" = "Ziel über den Jump-Host: SSH-Verbindung";
+"diagnostics.step.target.resolveOnJump" = "Ziel über den Jump-Host: Namensauflösung";
+"diagnostics.step.target.icmpFromJump" = "Ziel über den Jump-Host: Ping";
+"diagnostics.step.target.traceFromJump" = "Ziel über den Jump-Host: Route";
+"diagnostics.contribution.s3Access" = "Zugriffsrechte des Schlüssels";
+"diagnostics.contribution.webdavClaims" = "Angaben des Servers";
+// Hop-Tabelle des Routenschritts (2026-09-03): die vier Spaltenüberschriften, die das Panel zeichnet. Die Zellen sind die Messung aus Core und werden nie übersetzt.
+"diagnostics.trace.column.hop" = "Hop";
+"diagnostics.trace.column.address" = "Adresse";
+"diagnostics.trace.column.rtt" = "RTT";
+"diagnostics.trace.column.outcome" = "Ergebnis";
+"diagnostics.scope.complete" = "Alles";
+"diagnostics.scope.ping" = "Ping";
+"diagnostics.scope.trace" = "Trace";
+"diagnostics.scope.dial" = "Verbinden";
+"diagnostics.scope.contributions" = "Protokollproben";
+"diagnostics.trace.outcome.answered" = "beantwortet";
+"diagnostics.trace.outcome.silent" = "stumm";
+"diagnostics.trace.outcome.destination" = "Ziel";
+"diagnostics.trace.outcome.unreachable" = "nicht erreichbar (Code %@)";
+// Namenstabelle des Auflösungsschritts (2026-09-19): drei Spaltenüberschriften und die Wörter der Prüfspalte. Ein Name, der nicht zurückführt, wird berichtet, nie bewertet; Namen und Adressen werden nie übersetzt.
+"diagnostics.names.column.address" = "Adresse";
+"diagnostics.names.column.name" = "Name";
+"diagnostics.names.column.check" = "Prüfung";
+"diagnostics.names.check.resolvesBack" = "Reverse-DNS-Name verweist auf diese IP";
+"diagnostics.names.check.doesNotResolveBack" = "Reverse-DNS-Name verweist auf eine andere IP";
+"diagnostics.names.check.notAName" = "Adresse statt Name";
+"diagnostics.names.check.noName" = "kein Name";
+"diagnostics.names.check.noAnswer" = "keine Antwort";
+"diagnostics.reason.probeNotStarted" = "Dein Mac war zu ausgelastet, um diese Messung zu starten – an den Server wurde nichts gesendet. Versuch es noch einmal, wenn weniger läuft.";
+"diagnostics.reason.noHost" = "Diese Verbindung nennt keinen Host.";
+"diagnostics.reason.nothingResolvedToProbe" = "Der Name löste zu keiner Adresse auf, es gab also nichts zu prüfen.";
+"diagnostics.reason.noSecret" = "Für diese Verbindung sind keine Zugangsdaten gespeichert. Speichere sie und starte die Prüfung erneut.";
+"diagnostics.reason.secretSourceFailed" = "Das Passwort konnte nicht aus dem Schlüsselbund gelesen werden.";
+"diagnostics.reason.noEndpoint" = "Diese Verbindung nennt keinen Endpunkt.";
+"diagnostics.reason.noServerURL" = "Diese Verbindung nennt keine Serveradresse.";
+"diagnostics.reason.noIPv6Route" = "Dieser Mac hat keine IPv6-Route.";
+"diagnostics.reason.ipv6TraceUnmeasured" = "Die Routenprüfung deckt IPv6 noch nicht ab — sie wurde nie auf einem Mac mit IPv6-Route gemessen.";
+"diagnostics.reason.traceNeedsIPv4" = "Die Routenprüfung braucht eine IPv4-Adresse.";
+"diagnostics.reason.traceStoppedByBudget" = "Die Routenprüfung hat nach Hop %@ ihr eigenes Zeitbudget erreicht — der Weg geht möglicherweise weiter.";
+"diagnostics.reason.traceHopLimitReached" = "Die Routenprüfung hat nach Hop %@ ihre eigene Hop-Grenze erreicht — der Weg geht möglicherweise weiter.";
+"diagnostics.reason.jumpUnresolvable" = "Der Jump-Host ließ sich aus den Einstellungen dieser Verbindung nicht ermitteln — die Verbindung oder Anmeldung, auf die er verweist, gibt es vielleicht nicht mehr.";
+"diagnostics.reason.jumpNotReached" = "Nicht gemessen: Der Jump-Host wurde nicht erreicht.";
+"diagnostics.reason.noJumpSecret" = "Für den Jump-Host sind keine Zugangsdaten gespeichert. Speichere sie und starte die Prüfung erneut.";
+"diagnostics.reason.jumpManagedKeyStoreUnreadable" = "Die Passphrase des Schlüssels für den Jump-Host konnte nicht nachgeschlagen werden: Die Liste der verwalteten Schlüssel konnte nicht gelesen werden. Prüfe ~/Library/Application Support/macSCP/managed_keys.json und starte die Prüfung erneut.";
+"diagnostics.reason.managedKeyStoreUnreadable" = "Die Passphrase des Schlüssels konnte nicht nachgeschlagen werden: Die Liste der verwalteten Schlüssel konnte nicht gelesen werden. Prüfe ~/Library/Application Support/macSCP/managed_keys.json und starte die Prüfung erneut.";
+"diagnostics.reason.jumpForwardingProhibited" = "Der Jump-Host leitet für diese Anmeldung keine Verbindungen weiter.";
+"diagnostics.reason.jumpCouldNotConnect" = "Der Jump-Host konnte das Ziel nicht erreichen — der Name löst sich dort nicht auf, oder auf dem Port nimmt niemand an.";
+"diagnostics.reason.jumpProbeHostRefused" = "Die Adresse des Ziels ist weder ein einfacher Hostname noch eine IP-Adresse, deshalb wurde damit auf dem Jump-Host nichts ausgeführt.";
+"diagnostics.reason.jumpExecRefused" = "Der Jump-Host hat den Befehl nicht ausgeführt — vielleicht erlaubt er nur Weiterleitungen.";
+"diagnostics.reason.jumpHasNoGetent" = "Auf dem Jump-Host gibt es kein getent.";
+"diagnostics.reason.jumpHasNoPing" = "Auf dem Jump-Host gibt es kein ping.";
+"diagnostics.reason.jumpHasNoTraceTool" = "Auf dem Jump-Host gibt es weder traceroute noch tracepath.";
+"diagnostics.reason.jumpResolveUnreadable" = "getent auf dem Jump-Host lieferte keine Antwort, die diese Prüfung lesen kann.";
+"diagnostics.reason.jumpPingUnreadable" = "ping auf dem Jump-Host lieferte keine Antwort, die diese Prüfung lesen kann.";
+"diagnostics.reason.jumpTraceUnreadable" = "Kein Routenwerkzeug auf dem Jump-Host lieferte eine Antwort, die diese Prüfung lesen kann.";
+"diagnostics.reason.jumpCouldNotResolve" = "Der Jump-Host konnte den Namen des Ziels nicht auflösen.";
+"diagnostics.reason.targetIsAnAddress" = "Das Ziel ist über seine IP-Adresse angegeben, es gibt also keinen Namen aufzulösen.";
+// Der Durchsatztest (2026-09-19): Umfang und Schritt, die fünf Spaltenköpfe und zwei Richtungswörter seiner Tabelle, seine drei Gründe und der Hinweis im Panel. Bytezahlen, Zeiten, Raten und Limits sind Messwerte und werden nie übersetzt.
+"diagnostics.scope.throughput" = "Durchsatz";
+"diagnostics.step.throughput" = "Durchsatz";
+"diagnostics.throughput.column.direction" = "Richtung";
+"diagnostics.throughput.column.bytes" = "Bytes";
+"diagnostics.throughput.column.duration" = "Zeit";
+"diagnostics.throughput.column.rate" = "Rate";
+"diagnostics.throughput.column.limit" = "Limit";
+"diagnostics.throughput.direction.up" = "Upload";
+"diagnostics.throughput.direction.down" = "Download";
+"diagnostics.reason.throughputNeedsAFolder" = "Diese Verbindung beginnt bei der Bucket-Liste, und dort gibt es keinen Ordner für eine Testdatei.";
+"diagnostics.reason.throughputBytesDiffer" = "Die zurückgelesene Datei ist nicht die geschriebene.";
+"diagnostics.reason.throughputFileLeftBehind" = "Die Testdatei ist möglicherweise auf dem Server geblieben – ihr Name steht in den Details. Der nächste Durchsatztest versucht, sie zu entfernen; lehnt der Server erneut ab, entferne sie von Hand.";
+// Der Internet-Geschwindigkeitstest (2026-09-20): Bereich und Schritt, die vier Spaltentitel seiner Tabelle, seine drei Gründe und die zwei Hinweise des Panels. Die Richtungswörter sind die des Durchsatztests. Byte-Zahlen, Zeiten und Raten sind Messwerte und werden nie übersetzt.
+
+/* Import aus einem anderen Programm — Cyberduck (2026-09-03). Menüeintrag,
+   Vorschau-Sheet, die beiden Schalter und die Gruppenauswahl, dazu die
+   Feldnamen, aus denen die Änderungsliste einer „Geändert:“-Zeile besteht
+   (die Schlüssel kommen aus ImportPreviewPlanner.FieldKey im Core, der keine
+   eigene Oberflächensprache hat). */
+"menu.importFromCyberduck" = "Aus Cyberduck…";
+"import.source.cyberduck" = "Cyberduck";
+"import.cyberduck.title %@" = "Aus %@ importieren";
+"import.cyberduck.count %lld" = "%lld Lesezeichen";
+"import.cyberduck.empty" = "In diesem Ordner wurden keine Lesezeichen gefunden.";
+"import.cyberduck.error.folder %@" = "Der Ordner konnte nicht gelesen werden: %@";
+"import.cyberduck.selectAll" = "Alle auswählen";
+"import.cyberduck.selectNone" = "Keine auswählen";
+"import.cyberduck.status.new" = "Neu";
+"import.cyberduck.status.unchanged" = "Vorhanden, unverändert";
+"import.cyberduck.status.changed %@" = "Geändert: %@";
+"import.cyberduck.status.unsupported" = "Noch nicht unterstützt";
+"import.cyberduck.status.unreadable" = "Nicht lesbar";
+"import.cyberduck.change %1$@ %2$@ %3$@" = "%1$@ %2$@ → %3$@";
+"import.cyberduck.target.s3 %1$@ %2$@" = "%1$@ · %2$@";
+"import.cyberduck.target.allBuckets" = "alle Buckets";
+"import.cyberduck.takeSecrets" = "Passwörter und S3-Secrets aus dem Schlüsselbund mitnehmen (macOS fragt pro Eintrag)";
+"import.cyberduck.takeGroup" = "Neue Sitzungen in einer Gruppe ablegen";
+"import.cyberduck.group" = "Gruppe";
+"import.cyberduck.group.none" = "Keine Gruppe";
+"import.cyberduck.group.create %@" = "Neue Gruppe „%@“";
+"import.cyberduck.summary %1$lld %2$lld %3$lld %4$lld" = "%1$lld werden importiert, davon %2$lld Aktualisierungen · %3$lld übersprungen · %4$lld nicht unterstützt";
+"import.cyberduck.action" = "Importieren";
+"import.field.host" = "Host";
+"import.field.port" = "Port";
+"import.field.username" = "Benutzername";
+"import.field.keyPath" = "Schlüsseldatei";
+"import.field.authKind" = "Anmeldeart";
+"import.field.endpoint" = "Endpunkt";
+"import.field.bucket" = "Bucket";
+"import.field.name" = "Name";
+"import.field.labels" = "Labels";
+"import.result.updated %lld" = "Aktualisierte vorhandene Sitzungen: %lld";
+"import.result.secretsNotRead %lld" = "Passwörter, die nicht aus dem Schlüsselbund gelesen werden konnten: %lld";
+
+/* Session overview (session overview plan, Task 2) */
+"overview.section.facts" = "Details";
+"overview.section.history" = "Letzte Verbindungen";
+"overview.fact.username" = "Benutzername";
+"overview.fact.authentication" = "Anmeldeart";
+"overview.fact.keyPath" = "Schlüsseldatei";
+"overview.fact.loginSet" = "Login";
+"overview.fact.jump" = "Jump-Host";
+"overview.fact.bucket" = "Bucket";
+"overview.fact.region" = "Region";
+"overview.fact.endpoint" = "Endpunkt";
+"overview.fact.pathStyle" = "Path-Style-Adressierung";
+"overview.fact.baseURL" = "Server-URL";
+"overview.fact.nextcloudPath" = "Nextcloud-Pfad";
+"overview.fact.group" = "Gruppe";
+"overview.fact.panes" = "Öffnet mit";
+"overview.hostKey" = "Host-Key";
+"overview.hostKey.unknown" = "Noch nicht bekannt — wird beim nächsten Verbinden gefragt";
+"overview.secret" = "Passwort";
+"overview.secret.stored" = "Im Schlüsselbund gespeichert";
+"overview.secret.missing" = "Nicht gespeichert — wird beim Verbinden gefragt";
+"overview.history.empty" = "Für diese Verbindung ist noch nichts aufgezeichnet.";
+"overview.history.column.started" = "Beginn";
+"overview.history.column.outcome" = "Ergebnis";
+"overview.history.column.transfers" = "Übertragungen";
+"overview.history.noEnd" = "Kein Trennen aufgezeichnet";
+"overview.history.diagnose" = "Diagnose öffnen";
+"overview.history.transfers %1$lld %2$lld %3$lld" = "↑%1$lld ↓%2$lld ✗%3$lld";
+
+"whatsNew.title" = "Neu in %@";
+"whatsNew.close" = "Schließen";
+"whatsNew.none" = "Diesem Build liegt kein Änderungsprotokoll bei.";
+
+/* Portweiterleitung (Port-Forwarding-Plan, Task 6) */
+"tunnel.menu" = "Portweiterleitung";
+"tunnel.menu.startAll" = "Alle starten";
+"tunnel.menu.stopAll" = "Alle stoppen";
+"tunnel.menu.manage" = "Weiterleitungen verwalten…";
+"tunnel.sheet.title" = "Portweiterleitung";
+"tunnel.column.name" = "Name";
+"tunnel.column.kind" = "Art";
+"tunnel.column.listen" = "Lauscht auf";
+"tunnel.column.target" = "Ziel";
+"tunnel.column.autoStart" = "Startet";
+"tunnel.column.state" = "Status";
+"tunnel.column.action" = "Aktion";
+"tunnel.kind.local" = "Lokal (-L)";
+"tunnel.kind.remote" = "Entfernt (-R)";
+"tunnel.kind.dynamic" = "Dynamisch (SOCKS5)";
+"tunnel.target.negotiated" = "Pro Verbindung ausgehandelt";
+"tunnel.autoStart.off" = "Aus";
+"tunnel.autoStart.appStart" = "Beim Start";
+"tunnel.autoStart.login" = "Bei der Anmeldung";
+"tunnel.state.stopped" = "Gestoppt";
+"tunnel.state.connecting" = "Verbinde…";
+"tunnel.state.active" = "Aktiv";
+"tunnel.state.activeConnections %lld" = "Aktiv (%lld)";
+"tunnel.state.activeWithFailures %lld" = "Aktiv · %lld Verbindungen fehlgeschlagen";
+"tunnel.state.degraded %lld" = "Beeinträchtigt · %lld Verbindungen in Folge fehlgeschlagen";
+"tunnel.state.lastFailure %@" = "Letzter Fehler: %@";
+"tunnel.state.reconnecting %lld" = "Neuer Versuch, Nr. %lld";
+"tunnel.state.needsConfirmation" = "Verbinde diese Sitzung einmal von Hand";
+"tunnel.failure.hostKeyMismatch %@" = "Der Host-Schlüssel von %@ hat sich geändert";
+"tunnel.failure.hostKeyNotAccepted" = "Der Host-Schlüssel wurde nicht akzeptiert";
+"tunnel.failure.authenticationFailed" = "Anmeldung fehlgeschlagen";
+"tunnel.failure.keyFileNotFound %@" = "Keine Schlüsseldatei unter %@";
+"tunnel.failure.keyPassphraseRequired" = "Der Schlüssel braucht eine Passphrase, und es ist keine gespeichert";
+"tunnel.failure.keyPassphraseRejected" = "Die Passphrase des Schlüssels ist falsch";
+"tunnel.failure.keyUnparsable" = "Die Schlüsseldatei konnte nicht gelesen werden";
+"tunnel.failure.keyTypeNotLoadable %@" = "Schlüssel vom Typ %@ werden nicht unterstützt";
+"tunnel.failure.keyPEMNotReadable" = "Der PEM-Schlüssel nutzt eine Funktion, die nicht unterstützt wird";
+"tunnel.failure.managedKeyStoreUnreadable" = "Der Schlüssel braucht eine Passphrase, aber die Liste der verwalteten Schlüssel (~/Library/Application Support/macSCP/managed_keys.json) konnte nicht gelesen werden";
+"tunnel.failure.agentUnavailable" = "Kein SSH-Agent hat geantwortet";
+"tunnel.failure.agentHasNoIdentities" = "Der SSH-Agent enthält keine Schlüssel";
+"tunnel.failure.agentHasNoUsableIdentity" = "Der SSH-Agent enthält keinen Schlüssel eines unterstützten Typs";
+"tunnel.failure.agentRefusedEveryIdentity" = "Kein Schlüssel aus dem SSH-Agent wurde akzeptiert";
+"tunnel.failure.agentMisbehaved" = "Der SSH-Agent hat nicht wie erwartet geantwortet";
+"tunnel.failure.keychainUnreadable" = "Der Schlüsselbund konnte nicht gelesen werden";
+"tunnel.failure.connectionFailed" = "Keine Verbindung zum Server möglich";
+"tunnel.failure.serverAnswerUnusable" = "Der Server hat eine unbrauchbare Antwort gesendet";
+"tunnel.failure.sessionUsesLoginSet %@" = "„%@“ nutzt ein Login-Set; Weiterleitungen brauchen den eigenen Login der Verbindung";
+"tunnel.failure.sessionUsesJumpHost %@" = "„%@“ nutzt einen Jump-Host; Weiterleitungen können keinen nutzen";
+"tunnel.failure.sessionIsNotSSH %@" = "„%@“ ist keine SSH-Verbindung; Weiterleitungen brauchen SSH";
+"tunnel.failure.sessionMissing" = "Die Verbindung dieser Weiterleitung existiert nicht mehr";
+"tunnel.failure.portInUse %@" = "Port %@ ist bereits belegt";
+"tunnel.failure.bindAddressUnavailable %@" = "Dieser Mac hat keine Adresse %@";
+"tunnel.failure.bindPermissionDenied %@" = "Dieser Mac erlaubt nicht, an dieser Adresse auf Port %@ zu lauschen";
+"tunnel.failure.bindFailed" = "Die Weiterleitung konnte nicht auf Verbindungen lauschen";
+"tunnel.failure.channelOpenFailed" = "Der Server hat keinen Kanal für die Weiterleitung geöffnet";
+"tunnel.state.destinationUnreachable %@ %@" = "Ziel nicht erreichbar · %@:%@";
+"tunnel.failure.destinationUnreachable %@ %@" = "SSH ist verbunden, aber %@:%@ ist vom SSH-Server aus nicht erreichbar. Prüfe, ob der Dienst läuft und auf seinem Port lauscht, sowie DNS und Netzwerkzugriff.";
+"tunnel.failure.connectFailed" = "Eine Verbindung für die Weiterleitung ist fehlgeschlagen";
+"tunnel.failure.pumpFailed" = "Eine weitergeleitete Verbindung konnte nicht eingerichtet werden";
+"tunnel.failure.alreadyStarted" = "Die Weiterleitung war bereits gestartet";
+"tunnel.failure.remotePortZeroRefused" = "Eine entfernte Weiterleitung muss den Port auf dem Server nennen; Port 0 wird nicht unterstützt";
+"tunnel.failure.remoteBindRefused" = "Der Server hat es abgelehnt, für die Weiterleitung zu lauschen";
+"tunnel.failure.remoteBindRefused.gatewayPorts" = "Der Server hat es abgelehnt, für die Weiterleitung zu lauschen; eine andere Adresse als Loopback braucht die Server-Einstellung GatewayPorts";
+"tunnel.failure.remoteForwardUnanswered" = "Der Server hat auf die Weiterleitungsanfrage nicht geantwortet";
+"tunnel.failure.connectionLost" = "Verbindung verloren";
+"tunnel.failure.unknown" = "Die Weiterleitung ist fehlgeschlagen";
+"tunnel.form.name" = "Name";
+"tunnel.form.kind" = "Art";
+"tunnel.form.bind" = "Lauschadresse";
+"tunnel.form.listenPort" = "Port";
+"tunnel.form.targetHost" = "Zielhost";
+"tunnel.form.targetPort" = "Port";
+"tunnel.form.autoStart" = "Automatisch starten";
+"tunnel.form.reconnects" = "Neu verbinden";
+"tunnel.form.reconnects.footer" = "Nach einem Verbindungsabbruch erneut wählen, mit 2, 4, 8 … bis zu 60 Sekunden Wartezeit";
+"tunnel.action.new" = "Neue Weiterleitung";
+"tunnel.action.delete" = "Löschen";
+"tunnel.action.save" = "Sichern";
+"tunnel.action.start" = "Starten";
+"tunnel.action.stop" = "Stoppen";
+"tunnel.error.name" = "Gib der Weiterleitung einen Namen.";
+"tunnel.error.listenPort" = "Der Lauschport muss zwischen 1 und 65535 liegen.";
+"tunnel.error.targetHost" = "Nenne den Host, den diese Weiterleitung erreicht.";
+"tunnel.error.targetPort" = "Der Zielport muss zwischen 1 und 65535 liegen.";
+"tunnel.error.save %@" = "Konnte nicht gesichert werden: %@";
+"tunnel.error.delete %@" = "Konnte nicht gelöscht werden: %@";
+"tunnel.store.unreadable" = "Die Liste der Weiterleitungen konnte nicht gelesen werden und wurde deshalb nicht geändert. Prüfe %@.";
+"tunnel.empty" = "Für diese Verbindung gibt es noch keine Weiterleitung.";
+"tunnel.help.unsupportedSessions" = "Für Verbindungen mit Jump-Host oder gespeichertem Login gibt es keine Weiterleitungen: eine Weiterleitung öffnet ihre eigene Verbindung, und dieser Weg unterstützt beides nicht.";
+"tunnel.help.externalEdits" = "Eine Weiterleitung, die außerhalb der App geändert wurde, läuft unverändert weiter, bis du sie stoppst und wieder startest.";
+"tunnel.hostkey.subtitle" = "Eine Weiterleitung öffnet gerade eine eigene Verbindung zu diesem Server.";
+"tunnel.menu.autostart" = "Weiterleitungen beim Start …";
+"tunnel.glyph.tooltip %@" = "Portweiterleitung: %@";
+"tunnel.dock.empty" = "Keine Weiterleitungen eingerichtet";
+"tunnel.dock.running %lld" = "%lld Weiterleitungen aktiv";
+"tunnel.autostart.title" = "Weiterleitungen beim Start";
+"tunnel.autostart.loginItem" = "MacSCP bei der Anmeldung öffnen";
+"tunnel.autostart.loginItem.enabled" = "macOS öffnet MacSCP bei der Anmeldung.";
+"tunnel.autostart.loginItem.notRegistered" = "macOS öffnet MacSCP nicht bei der Anmeldung.";
+"tunnel.autostart.loginItem.requiresApproval" = "MacSCP hat gefragt. Erlaube es in den Systemeinstellungen › Allgemein › Anmeldeobjekte.";
+"tunnel.autostart.loginItem.notFound" = "Öffne MacSCP.app aus Programme, um den Start bei der Anmeldung zu aktivieren.";
+"tunnel.autostart.loginItem.unknown" = "macOS meldet einen Zustand, den diese Version von MacSCP nicht kennt.";
+"tunnel.autostart.loginItem.error %@" = "Anmeldeobjekt konnte nicht geändert werden: %@";
+"tunnel.autostart.column.session" = "Verbindung";
+"tunnel.autostart.empty" = "Keine Weiterleitung startet von selbst.";
+"tunnel.autostart.footer" = "„Beim Start“ startet eine Weiterleitung jedes Mal, wenn MacSCP geöffnet wird. „Bei der Anmeldung“ startet eine nur dann, wenn macOS MacSCP selbst bei der Anmeldung geöffnet hat. Beide fragen nie nach: Eine Verbindung, deren Hostschlüssel noch unbekannt ist, wartet, bis du sie einmal von Hand verbindest. MacSCP kann nicht immer erkennen, ob macOS es als Anmeldeobjekt gestartet hat; wenn eine Weiterleitung nicht von selbst startet, starte sie einmal über das Menü.";
+
+/* Notifications (next build of 2026-09-17, Task 7) */
+"notifications.connectionLost.title" = "Verbindung verloren";
+"notifications.transferFailed.title" = "Übertragung fehlgeschlagen";
+"notifications.forwardingFailed.title" = "Portweiterleitung fehlgeschlagen";
+"notifications.body.unsavedConnection" = "Nicht gespeicherte Verbindung";
+"form.jump.session.tlsRoute" = "TLS über %@:%@";
+"settings.connection.tlsKeepAlive" = "TLS-Verbindungen senden immer alle 10 Sekunden eine schreibgeschützte SFTP-Keep-Alive-Anfrage, auch über einen TLS-Sprunghost.";
+"commander.upload" = "Hochladen";
+"commander.download" = "Herunterladen";
+"commander.edit" = "Bearbeiten";
+"commander.rename" = "Umbenennen";
+"commander.delete" = "Löschen";
+"commander.properties" = "Eigenschaften";
+"commander.newFolder" = "Neuer Ordner";
+"commander.newFile" = "Neue Datei";
+"commander.new" = "Neu";
+"commander.find" = "Dateien suchen";
+"commander.selection" = "Ausgewählt: %lld · Gesamt: %lld";
+"commander.active" = "Aktiver Bereich";
+"credentials.settings.title" = "Sicherheit";
+"credentials.settings.done" = "%lld Zugangsdaten aktualisiert.";
+"credentials.settings.failed" = "Der Vorgang wurde nicht abgeschlossen. Bereits migrierte Einträge bleiben nutzbar; verbleibende Originale wurden nicht entfernt. Versuche es erneut.";
+"credentials.settings.protected" = "Touch-ID-Schutz aktiviert";
+"credentials.settings.standard" = "Standard-macOS-Schlüsselbund";
+"credentials.settings.disable" = "Zum Standard-Schlüsselbund wechseln…";
+"credentials.settings.enable" = "Gespeicherte Zugangsdaten mit Touch ID schützen…";
+"credentials.settings.signing" = "Touch ID benötigt eine signierte Anwendung mit Schlüsselbund-Berechtigungen. In Ad-hoc- oder swift-run-Builds ist es nicht verfügbar. Es wurden keine Zugangsdaten automatisch migriert.";
+"credentials.settings.enroll" = "Richte zunächst Touch ID in den macOS-Systemeinstellungen ein.";
+"credentials.settings.authentication" = "Authentifizierung für Zugangsdaten";
+"credentials.settings.details" = "macOS erzwingt den Schutz beim Lesen des Geheimnisses, nicht nur auf einem App-Sperrbildschirm. Als Ersatz kann macOS dein Anmeldepasswort anbieten. Aktive SSH-Verbindungen werden nicht erneut authentifiziert.";
+"credentials.settings.confirmTitle" = "Schutz der Zugangsdaten ändern?";
+"credentials.settings.confirm" = "Zugangsdaten migrieren";
+"credentials.settings.confirmDetails" = "Der gemeinsame Tresor wird kopiert, authentifiziert und geprüft, bevor die vorherige Kopie entfernt wird. Beim Wechsel zum Standardspeicher entfällt Touch ID. Migriere vor einem Wechsel der Signaturidentität.";
+"settings.terminal.externalOnly.footer" = "SSH-Sitzungen werden in einer externen Anwendung geöffnet. Schrift und Farben werden dort eingestellt.";
+
+"externalTerminal.askpass.title" = "SSH-Authentifizierung";
+"externalTerminal.askpass.hostKey" = "SSH-Hostschlüssel überprüfen";
+"externalTerminal.askpass.accept" = "Akzeptieren";
+"externalTerminal.askpass.continue" = "Weiter";
+/* About window */
+"about.title" = "Über MacSCP";
+"about.appName" = "MacSCP";
+"about.subtitle" = "Sichere Dateiübertragung für macOS";
+"about.development" = "Entwicklungsversion";
+"about.version %@" = "Version %@";
+"about.license" = "MacSCP-Lizenz";
+"about.thirdParty" = "Drittanbieterlizenzen";
+/* Shared credential vault */
+"vault.startup.title" = "Zugangsdaten-Tresor gesperrt";
+"vault.startup.failure" = "MacSCP konnte den Tresor nicht öffnen. Du kannst die macOS-Autorisierung ohne Neustart erneut versuchen.";
+"vault.startup.quit" = "MacSCP beenden";
+"vault.startup.opening" = "Zugangsdaten-Tresor wird geöffnet…";
+"vault.startup.retry" = "Autorisierung wiederholen";
+/* Actionable connection failures */
+"connection.failed.authentication.title" = "Authentifizierung fehlgeschlagen";
+"connection.failed.authentication.body" = "Der Server hat die Zugangsdaten abgelehnt. Prüfe Benutzername, Passwort oder SSH-Schlüssel.";
+"connection.failed.jumpAuthentication.title" = "Authentifizierung am Zwischenhost fehlgeschlagen";
+"connection.failed.jumpAuthentication.body" = "Der Zwischenhost hat die Zugangsdaten abgelehnt. Prüfe dessen Benutzername, Passwort oder SSH-Schlüssel.";
+"connection.failed.network.title" = "Server nicht erreichbar";
+"connection.failed.network.body" = "Die Verbindung konnte nicht hergestellt werden. Prüfe Host, Port, Netzwerk und konfigurierte Tunnel.";
+"connection.failed.timeout.title" = "Zeitüberschreitung beim Verbindungsaufbau";
+"connection.failed.timeout.body" = "Der Server hat nicht rechtzeitig geantwortet. Prüfe Netzwerk, Firewall und konfigurierte Tunnel.";
+"connection.failed.nameResolution.title" = "Servername nicht gefunden";
+"connection.failed.nameResolution.body" = "Der Servername konnte nicht aufgelöst werden. Prüfe Hostname und DNS- oder VPN-Verbindung.";
+"connection.failed.tls.title" = "TLS-Verbindung fehlgeschlagen";
+"connection.failed.tls.body" = "Die sichere Verbindung konnte nicht hergestellt werden. Prüfe Gateway, Zertifikat und Servername.";
+"connection.failed.hostKey.title" = "SSH-Hostschlüssel nicht bestätigt";
+"connection.failed.hostKey.body" = "Die SSH-Identität des Servers wurde nicht akzeptiert. Prüfe den Hostschlüssel vor einer erneuten Verbindung.";
+"connection.failed.key.title" = "SSH-Schlüssel nicht verfügbar";
+"connection.failed.key.body" = "Der SSH-Schlüssel konnte nicht verwendet werden. Prüfe Pfad, Passphrase und SSH-Agent.";
+"connection.failed.keychain.title" = "Gespeicherte Zugangsdaten nicht verfügbar";
+"connection.failed.keychain.body" = "Auf den Zugangsdaten-Tresor konnte nicht zugegriffen werden. Prüfe die macOS-Autorisierung.";
+
+"transfer.export" = "Exportieren…";
+"sidebar.settings" = "Einstellungen";
+"transfer.import" = "Importieren…";
+"transfer.import.prompt" = "Importieren";
+"transfer.import.invalid" = "Wähle eine MacSCP-, WinSCP.ini- oder Cyberduck-Lesezeichendatei (maximal 16 MiB).";
+"transfer.format" = "Format";
+"transfer.macscp" = "MacSCP (Standard)";
+"transfer.winscp" = "WinSCP";
+"transfer.import.supported" = "Unterstützt MacSCP, WinSCP.ini und Cyberduck (.duck-Datei oder Lesezeichenordner). Das Format wird automatisch erkannt.";
+/* Independent tunnel workspace. */
+"workspace.sessions" = "Sitzungen";
+"workspace.tunnels" = "Tunnel";
+"tunnels.pool" = "Alle Tunnel";
+"tunnels.independent" = "Unabhängige Verbindungen. Deine Sitzungen bleiben geöffnet.";
+"tunnels.empty" = "Noch keine Tunnel";
+"tunnels.empty.detail" = "Erstelle eine Zuordnung und wähle die gespeicherte SSH-Verbindung.";
+"tunnels.new" = "Neuer Tunnel…";
+"tunnels.noCarriers" = "Erstelle zuerst eine SCP-Sitzung für die SSH-Verbindung.";
+"tunnels.delete.confirm" = "Diesen Tunnel löschen? Er wird beendet.";
+"tunnels.error" = "Tunnel konnte nicht gespeichert werden";
+"tunnels.subtitle" = "Lokale, entfernte und SOCKS-Weiterleitungen über deine SSH-Verbindungen.";
+"tunnels.startAll" = "Alle starten";
+"tunnels.stopAll" = "Alle stoppen";
+"tunnels.missingCarrier" = "Verbindung fehlt";
+"tunnels.reconnect" = "Nach Unterbrechung neu verbinden";
+"tunnels.open" = "Im Browser öffnen";
+"tunnels.more" = "Weitere Aktionen";
+"tunnels.edit" = "Tunnel bearbeiten";
+"tunnels.carrier" = "SSH-Verbindung";
+"tunnels.choose" = "Verbindung auswählen";
+"tunnels.jump" = "Sprungserver";
+"tunnels.jump.inherit" = "Sprungeinstellungen der Verbindung verwenden";
+"tunnels.credentials" = "Gespeicherte Zugangsdaten, SSH-Hostschlüssel und TLS-Einstellungen werden verwendet. Ein SSH-Sprung wird unterstützt.";
+"tunnels.direction" = "Richtung";
+"tunnels.local" = "Lokal → entfernt";
+"tunnels.remote" = "Entfernt → lokal";
+"tunnels.socks" = "SOCKS5-Proxy";
+"tunnels.bind" = "Lauschadresse";
+"tunnels.listen" = "Lauschport";
+"tunnels.destination" = "Zielhost";
+"tunnels.destinationPort" = "Zielport";
+"tunnels.protocol" = "Anwendungsprotokoll";
+"tunnels.autostart" = "Automatischer Start";
+"tunnels.saveStops" = "Das Speichern eines bearbeiteten Tunnels beendet ihn. Starte ihn erneut, um Änderungen anzuwenden.";
+"tunnels.jump.self" = "Die SSH-Verbindung kann nicht ihr eigener Sprungserver sein.";
+"tunnels.portConflict %@" = "Lauschadresse und Port überschneiden sich mit „%@“. Wähle einen anderen Port oder eine andere Adresse.";
+
+"tunnels.nestedTLS" = "TLS wird auf dem ersten SSH-Hop unterstützt, nicht innerhalb eines weiteren Sprungs. Wähle den TLS-Bastion als Sprungserver.";
+"tunnels.invalidRoute" = "Wähle eine vorhandene SSH-Verbindung und einen gültigen Sprungserver. Dieser darf keinen weiteren Sprung verwenden.";
+"tunnels.tls.unverified" = "TLS · Zertifikat nicht geprüft";
+"tunnels.flow.remoteListener" = "Am SSH-Server lauschen";
+"tunnels.flow.localListener" = "Auf diesem Mac lauschen";
+"tunnels.flow.route" = "SSH-Route";
+"tunnels.flow.gateway" = "Über den Bastion";
+"tunnels.flow.then" = "Danach verbinden mit";
+"tunnels.flow.direct" = "Direkte SSH-Verbindung";
+"tunnels.flow.endpoint" = "SSH-Server";
+"tunnels.flow.tls" = "TLS-Gateway · Zertifikatsprüfung aktiviert";
+"tunnels.flow.override" = "Dieser Tunnel behält eine eigene gespeicherte Route.";
+"tunnels.flow.reset" = "Route der Sitzung verwenden";
+"tunnels.flow.destination" = "Ziel erreichen";
+"tunnels.flow.remoteHelp" = "Der SSH-Server lauscht; das Ziel wird von diesem Mac aus erreicht.";
+"tunnels.flow.localHelp" = "Das Ziel wird vom gewählten SSH-Server aus erreicht, nicht von diesem Mac. Gespeicherter Bastion, TLS und Zugangsdaten werden verwendet.";
+"tunnels.flow.traffic" = "Datenfluss";
+"tunnel.action.dismiss" = "Verwerfen";
+"tunnel.action.dismissHelp" = "Letzten Fehler löschen und den Tunnel ohne Neustart auf Gestoppt setzen.";
+"tunnels.group" = "Gruppe";
+"tunnels.group.ungrouped" = "Ohne Gruppe";
+"tunnels.group.new" = "Neue Gruppe…";
+"tunnels.group.name" = "Gruppenname";
+"tunnels.group.rename" = "Gruppe umbenennen…";
+"tunnels.group.dissolveConfirm" = "Diese Gruppe auflösen? Ihre Tunnel bleiben ohne Gruppe erhalten und ihre Untergruppen werden eine Ebene nach oben verschoben. Kein Tunnel wird gestoppt.";
+"tunnels.group.start" = "Gruppe starten";
+"tunnels.group.stop" = "Gruppe stoppen";
+"tunnels.group.error" = "Gruppe konnte nicht gespeichert werden";
+"tunnels.group.nameRequired" = "Gib einen Gruppennamen ein.";
+"tunnels.group.duplicate" = "Eine Gruppe mit diesem Namen existiert bereits.";
+"tunnels.group.missing" = "Diese Gruppe existiert nicht mehr. Wähle eine andere Gruppe.";
+"tunnels.group.disclosure" = "Gruppe auf- oder zuklappen";
+"tunnels.group.parent" = "Übergeordnete Gruppe";
+"sidebar.allConnections" = "Alle Verbindungen";
+"menu.settings" = "Einstellungen…";
+"menubar.scp.count" = "%d SCP-Verbindungen";
+"menubar.tunnels.count" = "%d aktive Tunnel";
+"menubar.tunnels.stopAll" = "Alle Tunnel stoppen";
+"menubar.connections.stopAll" = "Alle Verbindungen trennen";
+"menubar.tunnels.startAutomated" = "Alle automatischen Tunnel starten";
+"tunnels.group.invalidParent" = "Eine Gruppe kann nicht in sich selbst oder eine ihrer Untergruppen verschoben werden.";
+"tunnels.portSuggestionHelp" = "Ein freier lokaler Port wird ab 65534 abwärts vorgeschlagen. Du kannst einen anderen Port eingeben.";
+"tunnel.appearance" = "Dienstsymbol und Farbe";
+"tunnel.icon.automatic" = "Tunnel (Standard)";
+"tunnel.icon.web" = "Web · HTTP";
+"tunnel.icon.secureWeb" = "Web · HTTPS";
+"tunnel.icon.database" = "Datenbank";
+"tunnel.icon.remoteDesktop" = "Remotedesktop · RDP/VNC";
+"tunnel.icon.ssh" = "SSH / SFTP";
+"tunnel.icon.api" = "API";
+"tunnel.icon.dns" = "DNS";
+"tunnel.icon.mail" = "E-Mail";
+"tunnel.icon.files" = "Dateidienst · SMB/NFS";
+"tunnel.icon.media" = "Medien";
+"tunnel.icon.monitoring" = "Überwachung";
+"tunnel.icon.logs" = "Protokolle";
+"tunnel.icon.directory" = "Verzeichnis · LDAP";
+"tunnel.icon.messaging" = "Nachrichten / Warteschlangen";
+"tunnel.icon.backup" = "Sicherung";
+"session.icon.secureWeb" = "Web · HTTPS";
+"session.icon.remoteDesktop" = "Remotedesktop · RDP/VNC";
+"session.icon.ssh" = "SSH / SFTP";
+"session.icon.files" = "Dateidienst · SMB/NFS";
+"session.icon.monitoring" = "Überwachung";
+"session.icon.logs" = "Protokolle";
+"session.icon.directory" = "Verzeichnis · LDAP";
+"session.icon.messaging" = "Nachrichten / Warteschlangen";
+"session.icon.vmwareESXi" = "ESXi";
+"session.icon.internetBox" = "Internetbox";
+"session.icon.ghost" = "Geist";
+"session.icon.kibana" = "Kibana";
+"session.icon.redis" = "Redis";
+"session.icon.mysql" = "MySQL";
+"session.icon.apache" = "Apache HTTP Server";
+"session.icon.php" = "PHP";
+"session.icon.tomcat" = "Apache Tomcat";
+"session.icon.nginx" = "NGINX";
+"session.icon.postgresql" = "PostgreSQL";
+"session.icon.mongodb" = "MongoDB";
+"session.icon.elasticsearch" = "Elasticsearch";
+"session.icon.grafana" = "Grafana";
+"session.icon.prometheus" = "Prometheus";
+"session.icon.docker" = "Docker";
+"session.icon.kubernetes" = "Kubernetes";
+"session.icon.gitlab" = "GitLab";
+"session.icon.jenkins" = "Jenkins";
+"appearance.search" = "Symbole nach Namen suchen";
+"appearance.empty" = "Keine passenden Symbole";
+"settings.general.appStoreUpdates" = "Installationen aus dem Mac App Store werden über den Store aktualisiert, entsprechend seinen Einstellungen für automatische Updates.";
+"settings.general.language.en" = "English";
+"settings.general.language.de" = "Deutsch";
+"settings.general.language.fr" = "Français";
+"settings.general.language.pl" = "Polski";
+"settings.general.language.es" = "Español";
+"settings.general.language.ro" = "Română";
+"settings.general.language.it" = "Italiano";
+"overview.history.disabled" = "Der Verbindungsverlauf wird nur aufgezeichnet, wenn die Diagnoseprotokollierung in den Einstellungen aktiviert ist.";
+// Built-in file tools
+"filetools.unsupported" = "Dieser Server unterstützt keinen dateifensterweisen Zugriff.";
+"filetools.textOnly" = "Binärer oder nicht UTF-8-kodierter Inhalt: Verwende die Hexadezimalansicht.";
+"filetools.editLimit" = "Der Texteditor ist auf 8 MiB begrenzt. Verwende für größere Dateien die Fensteransicht.";
+"filetools.changed" = "Die Datei wurde auf dem Server geändert. Öffne sie vor dem Speichern erneut.";
+"filetools.resultsLimit" = "Zu viele Ergebnisse. Grenze die Suche ein oder wähle einen kleineren Ordner.";
+"filetools.failed" = "Der Vorgang ist fehlgeschlagen. Prüfe Verbindung, Pfad und Berechtigungen.";
+"filetools.found %@" = "An Byte %@ gefunden";
+"filetools.notFound" = "Keine Übereinstimmung gefunden.";
+"filetools.previous" = "Zurück";
+"filetools.next" = "Weiter";
+"filetools.offset" = "Byteposition";
+"filetools.go" = "Los";
+"filetools.hex" = "Hexadezimal";
+"filetools.search" = "Text suchen";
+"filetools.findNext" = "Weitersuchen";
+"filetools.discard" = "Ungespeicherte Änderungen verwerfen?";
+"filetools.discardAction" = "Änderungen verwerfen";
+"filetools.remoteSearch" = "Entfernten Ordner durchsuchen";
+"filetools.searchMode" = "Suchen nach";
+"filetools.searchNames" = "Dateiname enthält";
+"filetools.searchContents" = "Dateiinhalt enthält";
+"filetools.view" = "Anzeigen";
+
+"filetools.externalEditor" = "Im externen Editor öffnen";
+"filetools.searching" = "Suche…";
+"filetools.findPrevious" = "Vorherige Fundstelle";
+"filetools.searchUnavailable" = "Die Dateisuche auf dem SSH-Server benötigt Python 3. Es gibt keinen Rückfall auf einen lokalen Download.";
+"group.color" = "Gruppenfarbe";
+"filetools.searchWrapped" = "Suche am anderen Ende fortgesetzt: Treffer gefunden.";
+"filetools.matchFound" = "Treffer gefunden.";
+"settings.navigation.application" = "Anwendung";
+"settings.navigation.workflow" = "Arbeitsablauf";
+"settings.navigation.protocols" = "Protokolle";
+"settings.navigation.maintenance" = "Wartung";
+"group.color.custom" = "Eigene Farbe…";
+"sidebar.groups.collapseAll" = "Gruppeninhalte einklappen";
+"sidebar.groups.expandAll" = "Alle Gruppen ausklappen";
+"group.color.use" = "Farbe verwenden";
+"settings.appearance.groupColors" = "Gruppenhintergründe einfärben";
+"settings.appearance.groupColors.footer" = "Bei deaktivierter Option verwenden Gruppenhintergründe und Karten abwechselnd transparente Grautöne. Gespeicherte Farben bleiben erhalten.";
+"updates.check" = "Nach Updates suchen…";
+"updates.automatic" = "Automatisch nach Updates suchen";
+"updates.footer" = "Updates werden von GitHub geladen und vor der Installation geprüft. Installation und Neustart erfordern deine Bestätigung.";
+"updates.unconfigured" = "Der Aktualisierungsdienst konnte nicht gestartet werden. Lade die neueste Version von GitHub herunter.";
+"updates.title" = "Updates";
+"updates.download" = "Versionen auf GitHub ansehen";
+"updates.localBuild" = "Dies ist ein lokaler Build. Erstelle ihn erneut aus dem Quellcode oder installiere die GitHub-Version, um Updates zu erhalten.";
+
+"whatsNew.highlights" = "Highlights";
+"whatsNew.1.0.transfers" = "Übertrage Dateien und Ordner mit SFTP über SSH, S3 oder WebDAV, mit Warteschlangen, Konfliktbehandlung, Bandbreitenlimits und Prüfsummen.";
+"whatsNew.1.0.connections" = "Organisiere gespeicherte Verbindungen und wiederverwendbare Zugangsdaten in verschachtelten Gruppen mit durchsuchbaren Symbolen und eigenen Farben.";
+"whatsNew.1.0.tunnels" = "Verwalte lokale und entfernte SSH-Weiterleitungen und SOCKS5 mit Sprungservern, TLS-Gateways, automatischem Start und Wiederverbindung.";
+"whatsNew.1.0.files" = "Bearbeite UTF-8-Dokumente, betrachte Text und Hexdaten in begrenzten Ausschnitten und durchsuche SSH-Ordner ohne vollständigen Download.";
+"whatsNew.1.0.workflows" = "Kopple zwei SCP-Tabs für Kopien zwischen Servern über den Mac oder serverseitige Kopien auf demselben SSH-Endpunkt. Öffne externe Editoren und SSH-Terminals.";
+"whatsNew.1.0.security" = "Speichere Passwörter und Passphrasen im macOS-Schlüsselbund. Bestätige unbekannte SSH-Schlüssel; geänderte Schlüssel stoppen die Verbindung.";
+"whatsNew.1.0.languages" = "Nutze MacSCP auf Englisch, Französisch, Deutsch, Spanisch, Italienisch, Rumänisch oder Polnisch.";
+"whatsNew.1.0.updates" = "Installiere direkte Updates über signierte Sparkle-Feeds und Archive, mit ausdrücklicher Bestätigung der Installation und des Neustarts.";
+
+"settings.diagnostics.system" = "Server-Systeminformationen erfassen";
+"settings.diagnostics.public" = "Öffentliche IPv4 / IPv6 des Servers ermitteln";
+"settings.diagnostics.footer" = "Schreibgeschützte Prüfungen nutzen den verbundenen Server ohne Administratorrechte. Die optionale öffentliche IP-Suche kontaktiert ipify, OpenDNS oder Google DNS; es werden keine Zugangsdaten gesendet.";
+"diagnostics.running.step" = "Messung: %@";
+"diagnostics.transferTest" = "Durchsatztest";
+"diagnostics.transferTest.notice" = "Lädt eine temporäre Datei hoch, liest sie zurück und löscht sie. Ihre Transferlimits gelten.";
+"diagnostics.outcome.partial" = "Unvollständig";
+"diagnostics.step.sessionAccess" = "Verbindung";
+"diagnostics.step.serverInformation" = "Serverinformationen";
+"diagnostics.system.field" = "Information";
+"diagnostics.system.value" = "Wert";
+"diagnostics.system.os" = "Betriebssystem";
+"diagnostics.system.kernel" = "Kernel";
+"diagnostics.system.uptime" = "Betriebszeit";
+"diagnostics.system.load" = "Systemlast";
+"diagnostics.system.memory" = "Verfügbarer Speicher";
+"diagnostics.system.disk" = "Freier Speicherplatz";
+"diagnostics.system.public4" = "Öffentliche IPv4";
+"diagnostics.system.public6" = "Öffentliche IPv6";
+"diagnostics.reason.routeIncomplete" = "Die Routenmessung ist unvollständig.";
+"diagnostics.reason.systemUnavailable" = "Keine unterstützten Systemwerkzeuge haben geantwortet.";
+"diagnostics.reason.commandsUnavailable" = "Entfernte Befehle sind nicht verfügbar oder haben das Zeitlimit überschritten.";
+
+"settings.section.startup" = "Start";
+"settings.startup.tunnels" = "Automatische Tunnel";
+"settings.startup.tunnels.configure" = "Automatische Tunnel konfigurieren…";
+"settings.startup.tunnels.footer" = "Wähle, welche Tunnel beim Öffnen von MacSCP oder bei dessen automatischem Start zur Anmeldung starten. Dies aktiviert nicht den Start von MacSCP bei der Anmeldung.";
+
+"diagnostics.system.users" = "Aktive Benutzer / Konten";
+"diagnostics.reason.connectionUnresponsive" = "Die bestehende Verbindung hat nicht geantwortet.";
+"diagnostics.trace.notReached" = "Ziel nicht erreicht";
+
+"diagnostics.ready" = "Bereit für die Diagnose";
+"diagnostics.section.system" = "System";
+"diagnostics.section.network" = "Netzwerk";
+"diagnostics.users.help" = "Angemeldete Benutzer / Anmeldekonten; erkennbare Dienstkonten werden ausgeschlossen.";
+"diagnostics.speed.upload" = "Upload";
+"diagnostics.speed.download" = "Download";
+"diagnostics.speed.cleanup" = "Testdatei wird entfernt…";
+"diagnostics.speed.preparing" = "Test wird vorbereitet…";
+
+"menu.previousTab" = "Vorheriger Tab";
+"menu.nextTab" = "Nächster Tab";
+"menu.keyboardShortcuts" = "Tastaturkurzbefehle…";
+
+/* Paired remote sessions. */
+"remotePair.route" = "Übertragungen über diesen Mac";
+"remotePair.unlink" = "Lokale / entfernte Ansicht";
+"remotePair.unlinkHelp" = "Ansichten trennen, ohne die Serververbindungen zu schließen";
+"remotePair.copy" = "Auf den anderen Server kopieren";
+"remotePair.dropHelp" = "Einen SCP-Tab in der Mitte ablegen, um entfernte Ansichten zu verbinden; am Rand werden Tabs neu angeordnet";
+"remotePair.sameLocation" = "Eine Datei kann nicht auf sich selbst und ein Ordner nicht in sich selbst auf demselben Server kopiert werden.";
+"remotePair.serverRoute" = "Kopien auf dem Server";
+"remotePair.serverCopyUnavailable" = "Serverseitiges Kopieren ist für diese Verbindung nicht verfügbar.";
+"whatsNew.1.0.diagnostics" = "Prüfe den konfigurierten Verbindungsweg, verfolge fehlgeschlagene Verbindungen und lies Serverinformationen und Übertragungsraten in Mbit/s.";

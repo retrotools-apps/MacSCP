@@ -1,0 +1,649 @@
+import Foundation
+import Observation
+import SwiftUI
+import macSCPCore
+
+struct BrowserSession {
+    /// Identifies this tab's edit-session temp subtree (M5e/T4) — shared
+    /// with `editManager`'s `sessionID` so both name the same directory.
+    let id: UUID
+    let localFS: LocalFileSystem
+    let remoteFS: any RemoteFileSystem
+    let local: RemoteBrowserViewModel
+    let remote: RemoteBrowserViewModel
+    let terminal: TerminalPanelViewModel
+    /// Whether this session's local/remote file panes are shown (P2
+    /// terminal-chrome milestone; moved here from `SessionTab` by the
+    /// whole-phase review's Fix 1).
+    ///
+    /// It lives on the SESSION, not on the tab, because that is what makes
+    /// "a connect with nothing saved starts from the default" true on EVERY
+    /// connect path rather than on the paths someone remembered to reset.
+    /// Every connect builds a fresh `BrowserSession` (`ContentView.
+    /// startSession` is the only place one is constructed), so this starts
+    /// at `true` again by construction — exactly like the terminal half,
+    /// whose `TerminalPanelViewModel.isVisible` is `false` again for the
+    /// same structural reason. The two halves were asymmetric before: this
+    /// one outlived the session on the tab, and a stale `false` survived a
+    /// disconnect into the next, unrelated connection.
+    ///
+    /// Read and written through `SessionTab.showsFiles`, never directly —
+    /// see that property.
+    var showsFiles = true
+    /// Owns "open in external editor" sessions for remote files double-clicked
+    /// in this tab. Lifecycle is UI-owned like everything else here: see
+    /// `ContentView.teardown(_:)`'s ordering (`stopAll` after `cancelAll`,
+    /// before `terminal.shutdown`).
+    let editManager: EditSessionManager
+    /// The remote home-directory path resolved once at connect (connection-
+    /// liveness plan, Task 4). `ContentView.startSession`'s two callers
+    /// already run `homeDirectoryPath()` before building this session and
+    /// hand the result in as `startPath` — storing it here too lets the
+    /// liveness probe `stat` it without a second round trip to find its own
+    /// target.
+    let homePath: String
+    /// What the user has asked this session to compute, one ledger per pane
+    /// (2026-09-02, review I2). The checksum column reads these and nothing
+    /// else.
+    ///
+    /// They live on the SESSION for the same reason `showsFiles` does, and
+    /// the argument is stronger here: every value in one cost a server-side
+    /// hash of a whole file, and the pane that showed it is remounted by
+    /// things that have nothing to do with the file — switching tabs (the
+    /// detail subtree carries `.id(tab.id)`, deliberately, so no pane state
+    /// crosses tabs), hiding the Files pane, entering terminal-only mode. As
+    /// view state those digests died on every one of those; here they die
+    /// only with the connection they were computed over, which is the one
+    /// event that makes them meaningless.
+    ///
+    /// Two, not one: two panes are two file systems, and a path means
+    /// nothing across them. A shared ledger could show a local file the
+    /// digest of a remote file of the same size and date.
+    var localChecksums = ChecksumLedger()
+    var remoteChecksums = ChecksumLedger()
+}
+
+/// One window tab (M8a): bundles what used to be window-wide state, per
+/// tab. Reference type — background tabs stay alive in `TabsViewModel`
+/// while only the active tab is mounted. Per-window scope: this type and
+/// everything it stores (`liveness` included) belongs to one window's tab,
+/// never to an app-wide singleton — this project's standing invariant for
+/// connection/session state.
+@MainActor
+@Observable
+final class SessionTab: Identifiable {
+    let id = UUID()
+    let fileWindows = FileInspectionWindows()
+    let connectionViewModel: ConnectionViewModel
+    var isNewConnectionFormDismissed = false
+
+    /// Cancel is not a submit: incomplete fields and secrets are discarded
+    /// without validation, saving, Keychain access or network activity.
+    func dismissNewConnectionForm() {
+        connectionViewModel.cancelConnecting()
+        connectionViewModel.endEditing()
+        isNewConnectionFormDismissed = true
+    }
+    var session: BrowserSession?
+    /// A presentation link only. Each tab continues to own its own connection.
+    var remotePair: RemotePanePair?
+    var isDisconnecting = false
+    var remoteTransferErrorMessage: String?
+    @ObservationIgnored var disconnectionWaiters: [CheckedContinuation<Void, Never>] = []
+    let transferQueue = TransferQueueViewModel()
+    let conflictBridge = ConflictPromptBridge()
+    /// Drives the certificate-trust prompt for this tab's WebDAV/S3 connect
+    /// attempts (M21/T10) — see `CertificatePromptBridge`'s own doc comment
+    /// for why it is constructed OUTSIDE this initializer and simply handed
+    /// in, unlike `conflictBridge` above.
+    let certificateBridge: CertificatePromptBridge
+    /// Drives the "send credentials unencrypted?" confirmation for this
+    /// tab's connect attempts (M21/T10): `true` while
+    /// `PlaintextTransportGate.requiresConfirmation` is true and the App is
+    /// waiting for the user's answer. Same single-continuation shape as
+    /// `CertificatePromptBridge` above, but plain properties on the tab
+    /// itself rather than a separate bridge type: the dialog needs no
+    /// candidate payload (its text is the same for every plaintext
+    /// endpoint), so there is nothing a separate type would encapsulate that
+    /// isn't already just "is one pending, and how do I resolve it".
+    var plaintextConfirmationPending = false
+    private var plaintextContinuation: CheckedContinuation<Bool, Never>?
+    /// Set by the connector closure right before dispatching a connect whose
+    /// transport is plaintext AND the user just confirmed the risk dialog;
+    /// reset to `false` at the START of every connect attempt (before the
+    /// gate is even consulted), so a previous connect's confirmation — even
+    /// an ad-hoc one, which has no audit trail to write it into (see
+    /// `attachAuditRecorder`'s own doc comment) — can never leak into a
+    /// later, unrelated connect's audit record. Consumed (read and reset) by
+    /// `ContentView.attachAuditRecorder`, the one place a `sessionID` (and
+    /// with it, an `AuditRecorder` to write to) exists.
+    var pendingPlaintextConfirmation = false
+    /// Whether the transfer bar is shown for this tab (M11o). Per-tab and
+    /// in-memory, mirroring `TerminalPanelViewModel.isVisible` — the toolbar
+    /// icon / menu / ⌘⇧Y toggle it, and a newly enqueued transfer auto-reveals
+    /// it (see `ContentView`). Not persisted.
+    var transfersPanelVisible = false
+    /// Whether the local/remote file panes are shown (P2 terminal-chrome
+    /// milestone, Task 3). In-memory and per SESSION: the value itself lives
+    /// on `BrowserSession.showsFiles` and this is the only way in and out of
+    /// it. Unlike `transfersPanelVisible` above — which is genuinely per-tab
+    /// and deliberately survives a reconnect — a hidden files pane belongs
+    /// to the connection the user hid it in.
+    ///
+    /// That storage location is the whole point (whole-phase review, Fix 1):
+    /// a connect with no saved state starts from the default on EVERY
+    /// connect path, including the ad-hoc one that never reaches
+    /// `ContentView.restorePaneVisibility`, because a fresh session cannot
+    /// carry the previous one's value in the first place. There is no reset
+    /// call a future connect path could forget to make. `ContentView.
+    /// restorePaneVisibility` still writes the SAVED value in afterwards for
+    /// a stored session — that write lands on the new session and is kept.
+    ///
+    /// While no session is attached this reads the default; a write in that
+    /// state is a programming error and trips `assertionFailure` rather than
+    /// being dropped silently (re-review, item 4). With nothing connected
+    /// there are no panes to show or hide, and both writers (the Files
+    /// toolbar button and `applyRestoredPaneVisibility`) run only on a
+    /// connected tab — a write that arrives anyway means a new call site got
+    /// the order wrong, which is exactly the "it compiles and does nothing"
+    /// shape this phase has already paid for twice. In release builds the
+    /// write is still dropped rather than trapping: a lost pane preference
+    /// is not worth killing the app over.
+    ///
+    /// This is HALF of `PaneVisibility`'s two facts (`showsFiles`); the
+    /// other half, `showsTerminal`, is deliberately not a second stored
+    /// property here. `TerminalPanelViewModel.isVisible` — the terminal
+    /// panel's own, pre-existing visibility flag — already answers that
+    /// question and stays its only owner; `effectivePaneVisibility(
+    /// terminalIsVisible:hasShell:)` below takes it as a parameter, read
+    /// fresh from `session.terminal.isVisible` at the call site, instead of
+    /// mirroring it into a property this type also owns and could drift
+    /// out of sync with. This raw value, taken alone, is NOT the render
+    /// decision — see `effectivePaneVisibility`'s doc comment for why
+    /// reading it directly (as `ContentView+Detail.swift` used to) can
+    /// disagree with the toolbar.
+    var showsFiles: Bool {
+        get { session?.showsFiles ?? true }
+        set {
+            guard session != nil else {
+                assertionFailure("pane visibility written on a tab with no session")
+                return
+            }
+            session?.showsFiles = newValue
+        }
+    }
+    /// Display name while connected (stored session name or "user@host").
+    /// The tab strip and the window title read it through
+    /// `ContentView.tabTitle(for:)`, where it is the first rule of
+    /// `TabTitlePlan.title`; `displayTitle` below reads it directly.
+    var titleName: String?
+    /// Transient error from a failed "open in editor" attempt (M5e/T4) —
+    /// cleared on the next successful open or dismissed via its close button.
+    var editErrorMessage: String?
+    /// Stored session this tab is connected to (sidebar highlight).
+    var activeStoredSessionID: UUID?
+    /// The pane visibility this tab was DESCRIBED with, when it came back
+    /// from a restored window (Detachable Tabs plan, Task 5) — `nil` for
+    /// every tab that was made any other way.
+    ///
+    /// It has to wait here rather than being applied when the tab is
+    /// built, because a restored tab is disconnected: `showsFiles` writes
+    /// through to `BrowserSession.showsFiles` and there is no session, and
+    /// the terminal half belongs to a `TerminalPanelViewModel` that no
+    /// shell is behind. The first moment there is anything to apply it to
+    /// is the connect, which reads it through
+    /// `WindowRestorationPlan.paneVisibility(override:restored:stored:)`
+    /// and clears it there — one use, so a later connect on the same tab
+    /// gets the ordinary answer.
+    var restoredPaneVisibility: PaneVisibility?
+    /// The stored session this tab was pointed at when it came back from a
+    /// restored window (Detachable Tabs plan, Task 5 fix round 1) — `nil`
+    /// for every tab that was made any other way.
+    ///
+    /// Per TAB, deliberately, where `ContentView.overviewSessionID` is per
+    /// WINDOW. The window-wide one matches where the sidebar is: one
+    /// sidebar, one selection. A restored window has N tabs that were each
+    /// pointed at a different session, and one window-wide pointer could
+    /// only show them all the same overview — so the overview branch in
+    /// `ContentView+Detail.swift` reads this FIRST and falls back to the
+    /// sidebar's selection.
+    ///
+    /// An id, not a `StoredSession`, for the same reason
+    /// `overviewSessionID` is one: it is resolved against the live list on
+    /// every render, so a session deleted or renamed since the description
+    /// was written disappears or updates without a second clearing rule.
+    ///
+    /// Cleared in the two places this tab stops being "a restored pointer
+    /// at a session": when it connects (`ContentView.connect(in:stored:
+    /// paneVisibility:)`, alongside `restoredPaneVisibility`), and when
+    /// the sidebar reports a new selection, which is the user pointing
+    /// this window's front tab somewhere else.
+    var restoredSessionID: UUID?
+    /// Folder browsing belongs to this tab, not to other windows or tabs.
+    var overviewGroupID: UUID?
+    /// Per-session audit recorder (M9b) — set only when this tab connects to
+    /// a STORED session (never for an ad-hoc connect), alongside
+    /// `activeStoredSessionID`; nilled in `teardown(_:)` after the final
+    /// `recordDisconnected()` call. See `ContentView.attachAuditRecorder`.
+    var auditRecorder: AuditRecorder?
+    var isReconnecting = false
+    /// Identifies the current reconnect attempt for THIS tab (connection-
+    /// liveness plan, Task 6 fix round 1) — the App-layer counterpart of
+    /// `ConnectionViewModel.currentAttempt` (Core), for the identical
+    /// reason: `isReconnecting` locks the sidebar and rejects a double-
+    /// click reconnect (`ContentView.connect(in:stored:)`'s own top-of-
+    /// function guard), and it must be released the moment Cancel runs —
+    /// see `ConnectingAttemptView`'s `onCancel` in `ContentView+Detail
+    /// .swift` — not only once the abandoned attempt's own wrapping `Task`
+    /// finally reaches its `defer`. Reassigned both there and at the start
+    /// of `connect(in:stored:)`, so a Task whose own attempt is no longer
+    /// current cannot clear a NEWER attempt's `isReconnecting` flag out
+    /// from under it when its own deferred cleanup finally runs.
+    var reconnectAttempt = UUID()
+    /// Last-seen value of `transferQueue.totalFailureCount` while this tab was
+    /// active — the attention indicator (T4) lights up when
+    /// `totalFailureCount` exceeds it. `totalFailureCount` is monotonic (it
+    /// never decreases, unlike the old item-based `failedCount`), so this
+    /// watermark correctly detects a NEW failure even after a background
+    /// tab's completed items were swept by `clearCompleted()` (M8a T5 review,
+    /// finding 2).
+    var seenFailureCount = 0
+
+    /// This tab's "transfer failed" notification state (next build of
+    /// 2026-09-17, Task 7; a latch since fix round 1): the failures it has
+    /// answered for, and whether a posted notification is still unseen —
+    /// see `ErrorNotificationPlan.TransferFailureLatch` and
+    /// `ContentView.notifyTransferFailures()`. On the tab rather than on a
+    /// window, so a tab that moves to another window does not notify again
+    /// about failures it already had.
+    var transferFailureLatch = ErrorNotificationPlan.TransferFailureLatch()
+
+    var isConnected: Bool { session != nil }
+
+    /// Whether this tab is the window's reusable, unsaved connection draft.
+    /// Typed form values deliberately do not disqualify it: pressing New Tab
+    /// again must return to that draft rather than create a second tab and
+    /// abandon what the user already entered.
+    var isReusableNewConnectionDraft: Bool {
+        !isConnected
+            && !isReconnecting
+            && connectionViewModel.mode == .new
+            && connectionViewModel.state == .idle
+            && connectionViewModel.hostKeyPrompt == nil
+            && liveness == nil
+            && lostConnection == nil
+            && connectFailure == nil
+            && activeStoredSessionID == nil
+            && restoredSessionID == nil
+            && overviewGroupID == nil
+    }
+    var commanderActiveSide: BrowserPaneSide = .local
+
+    /// This tab's connection liveness (Task 4; fix round 1 moved it here
+    /// from `BrowserSession`). `nil` before the first connect attempt.
+    ///
+    /// Stored directly on the TAB, not on the session, and that is the
+    /// whole fix: `ContentView.teardown(_:)` nils `session`, and if
+    /// `liveness` had stayed a read-through onto `session?.liveness` (as it
+    /// did before fix round 1), tearing a session down would ALWAYS have
+    /// erased its own liveness in the same breath — `.lost`, the state
+    /// `ContentView.handleLivenessGiveUp(_:)` sets after calling
+    /// `teardown(_:)`, could never have been observed by anything that
+    /// reads this property afterward. `.lost` is precisely the state in
+    /// which there is no session anymore, so the value has to be able to
+    /// outlive the session it describes.
+    ///
+    /// Seven writers, recounted while writing this sentence, at the
+    /// whole-branch final review's finding I-1, which split the probe's own
+    /// write off into a function that can refuse it (six as of Task 7, five
+    /// as of Task 6 fix round 1, four as of Task 4 fix round 3) —
+    /// `LivenessGiveUpOrderingTests` pins the second of these by mutation,
+    /// since a comment describing this order is exactly what went stale
+    /// between fix rounds 1 and 2 (a swapped pair of statements in a file
+    /// this list does not name):
+    /// - `ContentView.startSession` resets this to `.connected` on every
+    ///   fresh connect.
+    /// - `ContentView.handleLivenessGiveUp(_:)` sets `.lost` AFTER calling
+    ///   `teardown(_:)`, not before — seeing `.lost` at all depends on that
+    ///   order.
+    /// - `ContentView.teardown(_:)` itself resets this to `nil`
+    ///   unconditionally, for its five other callers (`disconnectToForm`,
+    ///   `performClose`, `performCloseOthers`, the reconnect-in-place branch
+    ///   of `connect(in:stored:)`, and Cancel's `onCancel` in
+    ///   `ContentView+Detail.swift`; recounted at the tab-context-menu
+    ///   plan's final review) — every one of them is a deliberate "leave
+    ///   this connection", with nothing left for a stale dot to describe.
+    /// - `ContentView.dismissLostConnection(_:)` (Task 7) resets it to
+    ///   `nil` when the user leaves the lost surface for the form, and
+    ///   clears `lostConnection` in the same breath.
+    /// - `LivenessProbeRunner`'s probe loop writes `.connected` directly
+    ///   for a lap it SKIPPED because the queue was busy — running traffic
+    ///   is its own proof, and no probe was issued to answer for it.
+    /// - `LivenessProbeStep.perform` writes `.connected`/`.degraded` for a
+    ///   probe that actually ran — but only if the probing task is still
+    ///   live and still on the same session, since the race it waits on
+    ///   cannot be cut short and would otherwise answer for a connection
+    ///   that is already gone. See that type's own doc comment.
+    /// - `ConnectAttemptLivenessMirror` (Task 6, extended in Task 7) writes
+    ///   `.connecting` when this tab's own `connectionViewModel.state`
+    ///   reaches `.connecting`, and, on `.failed` while this tab has no
+    ///   session, either `.lost` again (when `lostConnection` says this tab
+    ///   is describing a dropped connection) or `nil`. Which of the two is
+    ///   `ConnectAttemptLivenessPlan.write`'s answer, not the view's — see
+    ///   that type's doc comment in `ContentView+Detail.swift`.
+    ///
+    /// No getter/setter indirection the way `showsFiles` has: `showsFiles`
+    /// is per-SESSION and needs the session to route writes into,
+    /// `liveness` is per-TAB and is exactly what must keep working once the
+    /// session it was describing is gone.
+    var liveness: ConnectionLiveness?
+
+    /// Why the last liveness probe on this tab's current session failed, or
+    /// `nil` when it came back alive or none has failed yet (lost-connection
+    /// cause, 2026-09-19).
+    ///
+    /// Two writers: `LivenessProbeStep.perform` writes each probe's answer
+    /// here, under the same guard as its `liveness` write, and
+    /// `ContentView.startSession` clears it for a fresh session.
+    /// `ContentView.handleLivenessGiveUp(_:)` reads it — the probe that
+    /// failed last is the one the give-up follows — into its log line and
+    /// into `LostConnection.probeFailure`.
+    var lastProbeFailure: LivenessProbeFailure?
+
+    /// What the lost-connection surface describes and offers while
+    /// `liveness` is `.lost` (connection-liveness plan, Task 7).
+    ///
+    /// Separate from `liveness` and not derived from it: `.lost` says THAT
+    /// the connection is gone, this says what happened and — the part that
+    /// cannot be recovered afterwards — WHICH stored session to redial.
+    /// `ContentView.teardown(_:)` clears `activeStoredSessionID` along with
+    /// the session itself, so by the time `.lost` is written there is no
+    /// longer anything on this tab naming the connection that just dropped;
+    /// `ContentView.handleLivenessGiveUp(_:)` captures it BEFORE calling
+    /// teardown and writes this afterwards, in the same order and for the
+    /// same reason `.lost` itself is written afterwards.
+    ///
+    /// Seven writers, counted while writing this sentence (the first
+    /// version of this comment named four of them, which is how a reviewer
+    /// found it):
+    /// - `ContentView.handleLivenessGiveUp(_:)` opens an episode, after
+    ///   `teardown(_:)` has run and for the same reason `.lost` is written
+    ///   there rather than before it.
+    /// - `ContentView.teardown(_:)` clears it, unconditionally, for its
+    ///   other callers — every one of them a deliberate "leave this
+    ///   connection", with no drop left to describe.
+    /// - `ContentView.startSession` clears it: the tab has a live session
+    ///   again, so the record of the one that dropped goes with it, attempt
+    ///   counter included.
+    /// - `ContentView.dismissLostConnection(_:)` clears it together with
+    ///   `liveness`, when the user leaves the surface for the form.
+    /// - `ContentView.connect(in:stored:)` clears it when the connect names
+    ///   a DIFFERENT stored session — the user has moved on, and that
+    ///   attempt's failure belongs to what they just asked for.
+    /// - `ConnectAttemptLivenessMirror` writes back the `reason` a failed
+    ///   attempt earned (`ConnectAttemptLivenessPlan.write`'s answer), in
+    ///   the same step as the `liveness` it explains.
+    /// - `ReconnectRunner` increments `automaticAttempts`, before the dial
+    ///   it is about to start.
+    ///
+    /// Five of those seven also write `liveness`, in the same step, and
+    /// the overlap was recounted here rather than carried over:
+    /// `handleLivenessGiveUp`, `teardown`, `startSession`,
+    /// `dismissLostConnection` and the mirror. That is what keeps the two
+    /// values from drifting into describing different realities. The two
+    /// that do not — `connect(in:stored:)`'s conditional clear and the
+    /// runner's counter — touch nothing `liveness` describes.
+    var lostConnection: LostConnection?
+
+    /// This tab's failed connect ATTEMPT (failed-connect surface plan,
+    /// Task 3) — the sibling of `lostConnection` above, and deliberately a
+    /// separate value rather than a fifth `ConnectionLiveness` case: a
+    /// connection that never existed is a different thing from one that
+    /// dropped, and the tab-strip dot reads `liveness` for a tab that has
+    /// no connection either way.
+    ///
+    /// Three writers, counted while writing this sentence:
+    /// - `ConnectAttemptLivenessMirror` SETS it, from
+    ///   `ConnectAttemptLivenessPlan.write`'s `.failedConnect` answer, and
+    ///   clears it on `.connecting` (a new attempt speaks for the tab now)
+    ///   and on `.clear`.
+    /// - `ContentView.dismissConnectFailure(_:)` clears it — the way off
+    ///   this surface back to the form, from the surface's own Edit control
+    ///   and from the sidebar commands that fill the form.
+    /// - `ContentView.teardown(_:reason:)` clears it, for the same reason
+    ///   it clears `liveness` and `lostConnection`: every caller of that
+    ///   function is leaving this connection on purpose.
+    ///
+    /// The third one was missing until review round 1, and the sentence
+    /// that stood here is why. It argued that `teardown(_:)` cannot matter
+    /// because "a tab whose session is being torn down HAD a session, so
+    /// its next failure is a `lostConnection`, not this" — true of the
+    /// tab's next failure, and irrelevant to the one already on record.
+    /// `performClose` tears a tab down and, on the LAST tab, does not
+    /// remove it; the failed-connect surface therefore survived its own
+    /// Close button, measured, while the window shrank around it. A
+    /// premise that is true about the future and silently read as a claim
+    /// about the present is the shape of that mistake.
+    ///
+    /// `ContentView.newConnection()` and `formTarget()` reach it only
+    /// THROUGH `dismissConnectFailure(_:)`, which is why they are not a
+    /// fourth and fifth writer.
+    var connectFailure: ConnectFailure?
+
+    /// "Connected or not": the connected name, or "New Connection". The
+    /// tab strip and the window title no longer read this — they draw
+    /// `ContentView.tabTitle(for:)`, which also names a tab that is
+    /// dialing, editing or showing a session's overview. It stays for the
+    /// seven reads outside those two, counted 2026-09-18: four with no
+    /// window state to hand that plan (`MenuBarController`'s two, the
+    /// status menu's item title and attributed title; `CrossSessionTargets
+    /// .targets`; the audit sink in `ContentView.attachAuditRecorder`,
+    /// which resolves through `TabRegistry` and captures nothing of the
+    /// window), two that only ever see a connected tab (the terminal panel
+    /// header, `ContentView.saveAsSession(from:)`), and
+    /// `ContentView.showDiagnostics(for:)`'s `.tab` case, which can see an
+    /// unconnected one. Rendered through `TabTitle`, so the fallback is
+    /// spelled once.
+    var displayTitle: String {
+        (titleName.map(TabTitle.named) ?? .newConnection).tabLabel
+    }
+
+    /// Wires the tab-owned queue on construction: shared limiter, initial
+    /// concurrency, and the conflict decider onto the tab's OWN bridge —
+    /// exactly once per tab (no re-wiring per connect).
+    init(
+        connectionViewModel: ConnectionViewModel,
+        certificateBridge: CertificatePromptBridge,
+        limiter: BandwidthLimiter,
+        maxConcurrent: Int
+    ) {
+        self.connectionViewModel = connectionViewModel
+        self.certificateBridge = certificateBridge
+        transferQueue.limiter = limiter
+        transferQueue.maxConcurrent = maxConcurrent
+        let bridge = conflictBridge
+        transferQueue.conflictDecider = { conflict in await bridge.ask(conflict) }
+    }
+
+    /// Decider side of the plaintext-transport confirmation (M21/T10):
+    /// presents the dialog and suspends until `resolvePlaintextConfirmation`
+    /// answers it. Cancellation-safe, same shape as
+    /// `CertificatePromptBridge.ask(_:)`.
+    func confirmPlaintext() async -> Bool {
+        plaintextConfirmationPending = true
+        return await withTaskCancellationHandler {
+            await withCheckedContinuation { continuation in
+                if Task.isCancelled {
+                    plaintextConfirmationPending = false
+                    continuation.resume(returning: false)
+                    return
+                }
+                plaintextContinuation = continuation
+            }
+        } onCancel: {
+            Task { @MainActor [weak self] in
+                self?.resolvePlaintextConfirmation(confirmed: false)
+            }
+        }
+    }
+
+    /// Called by the UI once the user answers the plaintext confirmation.
+    func resolvePlaintextConfirmation(confirmed: Bool) {
+        guard let continuation = plaintextContinuation else { return }
+        plaintextContinuation = nil
+        plaintextConfirmationPending = false
+        continuation.resume(returning: confirmed)
+    }
+
+    /// Resets `pendingPlaintextConfirmation` — called by the connector
+    /// closure at the START of every connect attempt, before the gate is
+    /// even consulted. A plain `@MainActor`-isolated method (not a direct
+    /// property write from the closure) so the cross-actor call goes through
+    /// the normal `await`-hop instead of a bare assignment, which the
+    /// connector closure — a `@Sendable` value handed to Core — cannot
+    /// perform directly. See the property's own doc comment.
+    func resetPendingPlaintextConfirmation() { pendingPlaintextConfirmation = false }
+
+    /// Marks that this connect's plaintext confirmation was answered "yes" —
+    /// called by the connector closure right before dispatching the actual
+    /// connect. Same "isolated method, not a bare write" reasoning as
+    /// `resetPendingPlaintextConfirmation()` above.
+    func markPlaintextConfirmed() { pendingPlaintextConfirmation = true }
+
+    /// THE single rule (P2 terminal-chrome milestone, Task 3 review round
+    /// 1): the one place this tab assembles a `PaneVisibility` out of
+    /// `showsFiles` and `terminalIsVisible` (always `session.terminal.
+    /// isVisible` at the call site — see `showsFiles`'s doc comment on why
+    /// that is a parameter here, not a second stored property).
+    /// `terminalIsVisible` is folded with `hasShell` first, exactly the way
+    /// `PaneVisibility.toggleState` folds it internally, and the result
+    /// goes through `PaneVisibility`'s repairing initializer — so this
+    /// NEVER returns "neither visible", regardless of what `showsFiles`
+    /// and `terminalIsVisible` happen to be right now.
+    ///
+    /// `paneToggleState` (the toolbar's answer) and `detail`'s two render
+    /// conditions in `ContentView+Detail.swift` both read THIS, instead of
+    /// two independent raw booleans that only happen to agree most of the
+    /// time. Before this method existed, `detail` read `tab.showsFiles`/
+    /// `session.terminal.isVisible` directly: hide Files while Terminal is
+    /// shown (allowed), disconnect (`shutdown()` sets `isVisible = false`,
+    /// nothing resets `showsFiles`), reconnect (a fresh
+    /// `TerminalPanelViewModel` defaults `isVisible` to `false` again) —
+    /// now BOTH raw booleans are `false`, the repair never ran because
+    /// nothing ever constructed a `PaneVisibility` from them, and the
+    /// `VSplitView` rendered neither half while the toolbar's Files button
+    /// (which DID go through the repair via `paneToggleState`) showed
+    /// itself as on-and-locked. Routing both the toolbar and the render
+    /// through this one method closes that gap: they can no longer
+    /// disagree, because they are no longer two computations.
+    ///
+    /// The repair stayed necessary after Fix 1 moved `showsFiles` onto the
+    /// session (a `hasShell` fold and a hand-edited stored value can still
+    /// produce "neither visible"), but it is no longer the only thing
+    /// standing between a reconnect and an empty window: the sequence above
+    /// no longer PRODUCES two stale `false`s, because the fresh session
+    /// brings a fresh `showsFiles` with it. Fix 1 exists because relying on
+    /// the repair there was masking the stale value rather than clearing it
+    /// — with the terminal half back on screen, the mask came off and the
+    /// file panes disappeared for a user who never hid them.
+    func effectivePaneVisibility(terminalIsVisible: Bool, hasShell: Bool) -> PaneVisibility {
+        PaneVisibility(showsFiles: showsFiles, showsTerminal: terminalIsVisible && hasShell)
+    }
+
+    /// `toggle`'s on/enabled state, read from `effectivePaneVisibility`
+    /// above rather than assembling its own `PaneVisibility` — see that
+    /// method's doc comment for why there must be only one assembly point.
+    func paneToggleState(
+        for toggle: PaneToggle, terminalIsVisible: Bool, hasShell: Bool
+    ) -> PaneToggleState {
+        effectivePaneVisibility(terminalIsVisible: terminalIsVisible, hasShell: hasShell)
+            .toggleState(for: toggle, hasShell: hasShell)
+    }
+
+    /// Applies a stored session's SAVED pane visibility to this tab and
+    /// answers whether the terminal panel has to be revealed for it
+    /// (P2 terminal-chrome milestone; whole-phase re-review, item 2).
+    ///
+    /// The decision lives here, not in `ContentView.restorePaneVisibility`,
+    /// for the reason this whole phase is about: a decision that only exists
+    /// inside a SwiftUI view is a decision no test can reach — this project
+    /// has no view-instantiation tool, so the restore path had source
+    /// scanners and nothing else. What stays in `ContentView` is the part
+    /// that is not a decision: calling `TerminalPanelViewModel.toggle()` on
+    /// the session it just built.
+    ///
+    /// Answering a `Bool` rather than opening the terminal itself keeps this
+    /// type's existing rule intact — it never writes
+    /// `TerminalPanelViewModel.isVisible`, see `applyFilesToggleClick`
+    /// below.
+    ///
+    /// `saved.showsFiles` is written RAW, as everywhere else in this type;
+    /// the terminal half goes through `effectivePaneVisibility`, the single
+    /// assembly point, which folds in `hasShell` — so a session saved with a
+    /// terminal on a backend that no longer has one opens no terminal, and
+    /// files are promoted back on by the repair.
+    ///
+    /// A session with no recorded preference does not reach this with
+    /// "both visible": `StoredSession` resolves a missing key to
+    /// `PaneVisibility.filesOnly` (maintainer ruling, see that constant), so
+    /// an old `sessions.json` opens no shell on its next connect.
+    func applyRestoredPaneVisibility(_ saved: PaneVisibility, hasShell: Bool) -> Bool {
+        showsFiles = saved.showsFiles
+        return effectivePaneVisibility(
+            terminalIsVisible: saved.showsTerminal, hasShell: hasShell).showsTerminal
+    }
+
+    func applyFilesToggleClick(terminalIsVisible: Bool, hasShell: Bool) {
+        let next = effectivePaneVisibility(terminalIsVisible: terminalIsVisible, hasShell: hasShell)
+            .applyingClick(on: .files, hasShell: hasShell)
+        showsFiles = next.showsFiles
+    }
+}
+
+extension SessionTab {
+    /// A write path to one side's checksum ledger, naming the session it
+    /// belongs to at the moment it is made (re-review N2).
+    ///
+    /// The naming is the whole point. A digest arrives long after it was
+    /// asked for — that is what a hash of a large file over a connection
+    /// is — and the surfaces that ask do not stop when the pane goes away:
+    /// the info sheet's compute runs in an unstructured task nothing
+    /// cancels, and a row of a run that is already awaiting still finishes.
+    /// A write that resolved `session` at the moment it lands would
+    /// therefore drop a digest of the OLD connection's bytes into the ledger
+    /// of whatever session happens to be current, i.e. into the new one
+    /// after a reconnect — and two hosts can easily hold a file at the same
+    /// path with the same size and the same whole-second timestamp.
+    ///
+    /// So both halves compare `id` first: a stale binding writes nothing,
+    /// and reads as empty rather than as the new connection's values. This
+    /// is the same defence, for the same reason, that the liveness probe
+    /// already applies to its own in-flight answers.
+    ///
+    /// It exists as a named method rather than as two closure literals at
+    /// the call sites so that "the pane's ledger comes from a session" is a
+    /// property a test can hold — and does, in `SessionTabTests` — instead
+    /// of a shape someone has to re-read a view body to check.
+    func checksumLedgerBinding(
+        for side: BrowserPaneSide, in session: BrowserSession
+    ) -> Binding<ChecksumLedger> {
+        let sessionID = session.id
+        return Binding(
+            get: { [weak self] in
+                guard let current = self?.session, current.id == sessionID else {
+                    return ChecksumLedger()
+                }
+                switch side {
+                case .local: return current.localChecksums
+                case .remote: return current.remoteChecksums
+                }
+            },
+            set: { [weak self] newValue in
+                guard let self, self.session?.id == sessionID else { return }
+                switch side {
+                case .local: self.session?.localChecksums = newValue
+                case .remote: self.session?.remoteChecksums = newValue
+                }
+            })
+    }
+}

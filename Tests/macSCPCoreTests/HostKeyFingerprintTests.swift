@@ -1,0 +1,53 @@
+import Foundation
+import Testing
+@testable import macSCPCore
+
+/// The fingerprint contract is verified against the system's ssh-keygen —
+/// runtime-generated keys, no key material in the repo.
+@Suite("HostKeyFingerprint")
+struct HostKeyFingerprintTests {
+    /// Generates an ed25519 key and returns (Base64 blob, ssh-keygen fingerprint).
+    private func makeReference() async throws -> (blob: String, expected: String) {
+        let dir = URL(fileURLWithPath: NSTemporaryDirectory())
+            .appendingPathComponent("macscp-fp-\(UUID().uuidString)")
+        try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: dir) }
+        let keyURL = dir.appendingPathComponent("id_ed25519")
+
+        let keygenResult = try await SubprocessRunner.run(
+            URL(fileURLWithPath: "/usr/bin/ssh-keygen"),
+            arguments: ["-t", "ed25519", "-f", keyURL.path(percentEncoded: false),
+                        "-N", "", "-q", "-C", "fp-test"])
+        #expect(keygenResult.status == 0)
+
+        let pubLine = try String(
+            contentsOfFile: keyURL.path(percentEncoded: false) + ".pub", encoding: .utf8)
+        let blob = pubLine.split(separator: " ")[1]
+
+        let lfResult = try await SubprocessRunner.run(
+            URL(fileURLWithPath: "/usr/bin/ssh-keygen"),
+            arguments: ["-lf", keyURL.path(percentEncoded: false) + ".pub"])
+        let out = lfResult.stdoutText
+        // Format: "256 SHA256:xxxx fp-test (ED25519)"
+        let expected = out.split(separator: " ")
+            .first { $0.hasPrefix("SHA256:") }.map(String.init) ?? ""
+        return (String(blob), expected)
+    }
+
+    @Test func matchesSshKeygenFingerprint() async throws {
+        let (blob, expected) = try await makeReference()
+        #expect(!expected.isEmpty)
+        #expect(HostKeyFingerprint.sha256(ofKeyBlobBase64: blob) == expected)
+    }
+
+    @Test func invalidBase64YieldsNil() {
+        #expect(HostKeyFingerprint.sha256(ofKeyBlobBase64: "kein base64 !!!") == nil)
+    }
+
+    @Test func fingerprintHasNoPadding() async throws {
+        let (blob, _) = try await makeReference()
+        let fp = HostKeyFingerprint.sha256(ofKeyBlobBase64: blob)
+        #expect(fp?.hasSuffix("=") == false)
+        #expect(fp?.hasPrefix("SHA256:") == true)
+    }
+}

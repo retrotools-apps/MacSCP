@@ -1,0 +1,4258 @@
+{
+  "Package.resolved": {
+    "executable": false,
+    "sha256": "84f16ae41ac1d58313d535be019557e28c3b4e40b06af86d9006cf3f82007c40"
+  },
+  "README.md": {
+    "executable": false,
+    "sha256": "f97d6cfbca4451727ec91072189792bd6cb826dfc11bf55ca1f6b338a7154405"
+  },
+  "bigint/.codecov.yml": {
+    "executable": false,
+    "sha256": "44cfd4a756cf840837e4340402e60a02d1eb698a5922dc62eb8ae075317611a1"
+  },
+  "bigint/.devcontainer/Dockerfile": {
+    "executable": false,
+    "sha256": "6f21a8179243a8a14e7c273a9356a156e09dccb66d1a5f7664d9b23dbefbfc6f"
+  },
+  "bigint/.devcontainer/devcontainer.json": {
+    "executable": false,
+    "sha256": "f0fb4aa59c0048faed458c7c6e8a3acf7a04fc884a8b4280fb61ee78bfa6c963"
+  },
+  "bigint/.github/workflows/jazzy.yml": {
+    "executable": false,
+    "sha256": "e02e22f30792971cf1f46df31ca61b637d6c020b7dffb11fdba9fc3aafe5eeb0"
+  },
+  "bigint/.github/workflows/swift.yml": {
+    "executable": false,
+    "sha256": "74554ca0888b91f573bb05716cfe6daeb73c8de2dbccfa85a68863bbc9d6ac4e"
+  },
+  "bigint/.gitignore": {
+    "executable": false,
+    "sha256": "8a62b6454ae8ee386aa398ef800ef2cca9a3a14d9508144cad175107f4a374db"
+  },
+  "bigint/.jazzy.yml": {
+    "executable": false,
+    "sha256": "131519e51332ee67c1ec3ccaa8ac97ec9c64654bca2e1b9043195482213b3989"
+  },
+  "bigint/.spi.yml": {
+    "executable": false,
+    "sha256": "9e85350f5a6ea484d9f323674f7822f72a675b4b904d4719511fe9c6653df4dd"
+  },
+  "bigint/CHANGELOG.md": {
+    "executable": false,
+    "sha256": "9c10a71f85c51c8ebf1d96412b56cf340df4a29629e3aa9792f0a974193feaee"
+  },
+  "bigint/Demo.playground/Contents.o": {
+    "executable": false,
+    "sha256": "a52d4fae2549df226f2190eb4ac7734560eeca9dca7bc2a8d5bfe902b624764f"
+  },
+  "bigint/Demo.playground/Pages/Digits of Pi.xcplaygroundpage/Contents.swift": {
+    "executable": false,
+    "sha256": "c556318d1957ece44d4ff7f274bf8f4884cbb3163115aa6d8f4c7f92109aeeac"
+  },
+  "bigint/Demo.playground/Pages/Digits of Pi.xcplaygroundpage/timeline.xctimeline": {
+    "executable": false,
+    "sha256": "18f2decd929bdd08248137436fcc33b55d726b1d877e6e20241c2cd95a2f85d7"
+  },
+  "bigint/Demo.playground/Pages/Factorials.xcplaygroundpage/Contents.swift": {
+    "executable": false,
+    "sha256": "4456991e47a94ad0c4a299ed11a21bd79082a39ab35c38d247f57903b64ea1c1"
+  },
+  "bigint/Demo.playground/Pages/Generating Large Primes.xcplaygroundpage/Contents.swift": {
+    "executable": false,
+    "sha256": "a5481fce14418857d959677a657dac940392d9b088e0441d33b713e8c1e83fbe"
+  },
+  "bigint/Demo.playground/Pages/Introduction.xcplaygroundpage/Contents.swift": {
+    "executable": false,
+    "sha256": "152791cb9b4c16db428f49d43df3e9b20cd6e631892c625cd3f880f9ed222e76"
+  },
+  "bigint/Demo.playground/Pages/The RSA algorithm.xcplaygroundpage/Contents.swift": {
+    "executable": false,
+    "sha256": "c23d68de3b78d4d649ff18ef0d77de1e32736a5663bee8b3b8352fa88589de53"
+  },
+  "bigint/Demo.playground/Pages/The RSA algorithm.xcplaygroundpage/timeline.xctimeline": {
+    "executable": false,
+    "sha256": "fab5fd6eb028875c8a28004e4badc3408a778500f6a5c5ed4c0fc5ab07e98ae4"
+  },
+  "bigint/Demo.playground/contents.xcplayground": {
+    "executable": false,
+    "sha256": "5712f8522b8e48dc61625ab1e2632d2599f53101f9886233686aceb5c9c02db1"
+  },
+  "bigint/LICENSE.md": {
+    "executable": false,
+    "sha256": "c3dfd0dca467f6d198bf365a954d4be6cb6b0e3d848ec724f86e5f579ca38d9e"
+  },
+  "bigint/Package.swift": {
+    "executable": false,
+    "sha256": "92ebf21d75df81b3dac052b2dc5550988e3d46ab7527447b346ba85526b261c1"
+  },
+  "bigint/README.md": {
+    "executable": false,
+    "sha256": "708e9790c83106ca73030a743c6216920e5f9fdcfaf06c9d481ea0c15ad4379f"
+  },
+  "bigint/Sources/Addition.swift": {
+    "executable": false,
+    "sha256": "3844578b9ed01481d36aaad060892490b787b6344cba26af0dd8b70c034893be"
+  },
+  "bigint/Sources/BigInt.swift": {
+    "executable": false,
+    "sha256": "75d8beca9644705a1238cf8264a575caf8e8bae567e1cc43bcd7cd4ee585c102"
+  },
+  "bigint/Sources/BigUInt.swift": {
+    "executable": false,
+    "sha256": "cb18978f29b9fa2a06ab574c22646543ef809ebe3e2bd5e52aee9b5384a72725"
+  },
+  "bigint/Sources/Bitwise Ops.swift": {
+    "executable": false,
+    "sha256": "1f8cfe317305c3fe863a3dcbb7a1980fa9b386946034b7ed1ea2b7d19eaca1a7"
+  },
+  "bigint/Sources/Codable.swift": {
+    "executable": false,
+    "sha256": "404010db1175905c29eca9eb1b431a5fca13a72aede2e7a6820a5e9295ab4de1"
+  },
+  "bigint/Sources/Comparable.swift": {
+    "executable": false,
+    "sha256": "58634c62811e8d6efdaa9026bc43d0522f3afa83257661ad24846301df231a09"
+  },
+  "bigint/Sources/Data Conversion.swift": {
+    "executable": false,
+    "sha256": "71ee4906e2afd9a2c3ae513ca1aa7b7d2a6d02f35f565bffcb1281bebfa53e2a"
+  },
+  "bigint/Sources/Division.swift": {
+    "executable": false,
+    "sha256": "dcdc05fd86be2c9a64df83e5cfa4aea7b5288239d785bf8961ee62f22d102c44"
+  },
+  "bigint/Sources/Exponentiation.swift": {
+    "executable": false,
+    "sha256": "c7d07e6442e415e73d35961cc0a30a22a3449716bf4c3a3ed126c1b48954c574"
+  },
+  "bigint/Sources/Floating Point Conversion.swift": {
+    "executable": false,
+    "sha256": "a84b1a27d98993e9ed5db03d119f99e18e896f59850835d1d9869d0ec6287233"
+  },
+  "bigint/Sources/GCD.swift": {
+    "executable": false,
+    "sha256": "b215224497def8493107c18c9deb5c1f1541c2fe8a8f4c814d76749b31b7df90"
+  },
+  "bigint/Sources/Hashable.swift": {
+    "executable": false,
+    "sha256": "549bd2bc14d5738604d731c770d9b15606a9af3ab2467f4992185a6cf0646006"
+  },
+  "bigint/Sources/Integer Conversion.swift": {
+    "executable": false,
+    "sha256": "e42ebb39189653c1e4c489cff4e0f0023558d56b798735565f225f5b1f3e99f3"
+  },
+  "bigint/Sources/Multiplication.swift": {
+    "executable": false,
+    "sha256": "f16169e19685f313d0d5ec7c845d8faffa67b71daadccc8fc842efaba6398f83"
+  },
+  "bigint/Sources/Prime Test.swift": {
+    "executable": false,
+    "sha256": "ac3c08dd182892530dbf8a25df302ed1c389c7a1be846a1be16b0bf48cf8e9ea"
+  },
+  "bigint/Sources/Random.swift": {
+    "executable": false,
+    "sha256": "1cb0f5b2a62e479bb1f18fa302c4aa5b78603a7de6da9f843b0b6795088b8bd8"
+  },
+  "bigint/Sources/Shifts.swift": {
+    "executable": false,
+    "sha256": "aafafd376078df8d819eea83033763c5a85da9118525854213f2de287bde0008"
+  },
+  "bigint/Sources/Square Root.swift": {
+    "executable": false,
+    "sha256": "47042e2b31f16a3182aa2c34ee978baebd2c26704a2dde5d7b6ea7aca0fea14a"
+  },
+  "bigint/Sources/Strideable.swift": {
+    "executable": false,
+    "sha256": "f266c62ad009ade70475c34eaf4bd4851aef55ae95807768f3023f921e75056c"
+  },
+  "bigint/Sources/String Conversion.swift": {
+    "executable": false,
+    "sha256": "9646da588706057ca0a3bc26557ec99431bb3b1772485f77dc5200d260f10144"
+  },
+  "bigint/Sources/Subtraction.swift": {
+    "executable": false,
+    "sha256": "109baeb5d8699886a17524ec309a08e97a63ef7ae81f50935eaed9f1c39f976c"
+  },
+  "bigint/Sources/Words and Bits.swift": {
+    "executable": false,
+    "sha256": "54d49458dd53619b6ff14077bf76cfa322d3bb154febba3c90f67ff6f52b669e"
+  },
+  "bigint/Tests/BigIntTests/BigIntTests.swift": {
+    "executable": false,
+    "sha256": "1e63946f64b79cee5e7b7d1bdcbb4c7fb8af6df33399fdd7f6dfa24629763728"
+  },
+  "bigint/Tests/BigIntTests/BigUIntTests.swift": {
+    "executable": false,
+    "sha256": "2e65eca9b41f7f1cfc7eef5e174344f6fccada30ea49ba0b93c89d083cdbb372"
+  },
+  "bigint/Tests/BigIntTests/ProfileTests.swift": {
+    "executable": false,
+    "sha256": "9baf6d2db9b1f0f4360075c25488e4d25b2f3d7d41591d2e038ee075915186b6"
+  },
+  "bigint/Tests/BigIntTests/Tools.swift": {
+    "executable": false,
+    "sha256": "68050f83fec24f45bea8f8dc9e3b9e5310a259b4438329410bd963bae58e7347"
+  },
+  "bigint/Tests/BigIntTests/Violet - Helpers/BitWidthTestCases.swift": {
+    "executable": false,
+    "sha256": "8241bbaf4f94d09cf529962f909523ea95574203c25563738171f0a1f11ec20a"
+  },
+  "bigint/Tests/BigIntTests/Violet - Helpers/GenerateValues.swift": {
+    "executable": false,
+    "sha256": "07175bf8c8e7aeaabf6f9e4f13ff41fd0b40456dddfc01add5e5e8b076c5bdec"
+  },
+  "bigint/Tests/BigIntTests/Violet - Helpers/GlobalFunctions.swift": {
+    "executable": false,
+    "sha256": "0416abcb3661b660c3488e203acb78cac00a4510e004ece0a90d1c184c1218e8"
+  },
+  "bigint/Tests/BigIntTests/Violet - Helpers/StringTestCases.swift": {
+    "executable": false,
+    "sha256": "4d3a22406a8d24461210ce5e47d0381961b8509979640c4d838eb862521d3da7"
+  },
+  "bigint/Tests/BigIntTests/Violet - Helpers/WordsTestCases.swift": {
+    "executable": false,
+    "sha256": "6cb4339b3a0e9c7683e90ac8f502a05995e5c40dc334db928be6c447fbfff9d5"
+  },
+  "bigint/Tests/BigIntTests/Violet - Property testing/ApplyA_ApplyB_Equals_ApplyAB.swift": {
+    "executable": false,
+    "sha256": "30e7fe4557efae92a83370ed65b6958f108b1f435140801569f30c75292a4667"
+  },
+  "bigint/Tests/BigIntTests/Violet - Property testing/ApplyA_UndoA.swift": {
+    "executable": false,
+    "sha256": "fcec59dd60143b52b9bbb0b77825158bcacbd44d73ec206cccdda8cdc298c2aa"
+  },
+  "bigint/Tests/BigIntTests/Violet/BigIntCOWTests.swift": {
+    "executable": false,
+    "sha256": "c12f5fa31c89ed0405e7bb73befa0a1760a98bb8e25125e9346c5f27e5284809"
+  },
+  "bigint/Tests/BigIntTests/Violet/BigIntHashTests.swift": {
+    "executable": false,
+    "sha256": "9e9c3971611436cbf97757c687a04a5d712ced86faed891b087ffcca2ceaf263"
+  },
+  "bigint/Tests/BigIntTests/Violet/BigIntIntegerInitTests.swift": {
+    "executable": false,
+    "sha256": "d3fae28a9672bf82bbf75a2ce1041fe7fdc5dbbe6316dad51081030b531a96a2"
+  },
+  "bigint/Tests/BigIntTests/Violet/BigIntPowerTests.swift": {
+    "executable": false,
+    "sha256": "99d7c3e21ee3b033f46d11a03688fa1b34356c3c769999616707d349be4f4616"
+  },
+  "bigint/Tests/BigIntTests/Violet/BigIntPropertyTests.swift": {
+    "executable": false,
+    "sha256": "a8182909c4be0624a88e6e4e552e83e1279754ac8b5daf22c918f2524349c2ee"
+  },
+  "bigint/Tests/BigIntTests/Violet/BigIntStringInitTests.swift": {
+    "executable": false,
+    "sha256": "2d729bed26db595914dcf8e72a3dd5b529f31fa5d6608b19855b6e356419c50d"
+  },
+  "bigint/Tests/BigIntTests/WordTests.swift": {
+    "executable": false,
+    "sha256": "77c0c78f1cf634130766ecb8805537a27fe1449ed716459da6b327ae755ec86c"
+  },
+  "bigint/docs/Extensions.html": {
+    "executable": false,
+    "sha256": "4d22d77274ce288611ea9c6cde2846f70ac8a2a7853b2c9d8e91155ed5acf229"
+  },
+  "bigint/docs/Extensions/BinaryFloatingPoint.html": {
+    "executable": false,
+    "sha256": "44dcc22615185a0cca5ea7de8254f36f0e3373e69177de523200d2fcc09235a8"
+  },
+  "bigint/docs/Extensions/String.html": {
+    "executable": false,
+    "sha256": "2857275dd01d0c6dc07b8d2af50d60cbe0e4dccf9734b37bab113083d195682a"
+  },
+  "bigint/docs/Structs.html": {
+    "executable": false,
+    "sha256": "6819a860fee93be6040c9f4713a5aa49237daec88ed8ddb416783b6bf1531935"
+  },
+  "bigint/docs/Structs/BigInt.html": {
+    "executable": false,
+    "sha256": "6dd31c0647e246d924977b1d5dcfda43e59a9d8d84e6922cc77f9fe54ee48cda"
+  },
+  "bigint/docs/Structs/BigInt/Sign.html": {
+    "executable": false,
+    "sha256": "0af4368d2f75a464d73f493eebaae6005e16a688030a422ba469c121fb625eb9"
+  },
+  "bigint/docs/Structs/BigInt/Words.html": {
+    "executable": false,
+    "sha256": "9eb24869890fe1ff3d5320f2b29d9b65e7246fa8d64f1b7c4b7daff818dd1648"
+  },
+  "bigint/docs/Structs/BigUInt.html": {
+    "executable": false,
+    "sha256": "8cbb1e925f75ef876949e4756b6946de78bb94bb164742c55ab180e38c088d59"
+  },
+  "bigint/docs/Structs/BigUInt/Words.html": {
+    "executable": false,
+    "sha256": "5d1f401698849e5ac7edc9feea366da8fb2cca27b7a892a03dfb1edecaf0b54e"
+  },
+  "bigint/docs/badge.svg": {
+    "executable": false,
+    "sha256": "a8bd53284e1d01232a9a24b98091599beb4a37c4fdb71675ec6f6d01660e7b25"
+  },
+  "bigint/docs/css/highlight.css": {
+    "executable": false,
+    "sha256": "45ff817fed804cb42b37b69b52686164a72bed9ac647d063b0ac166ff5807c4e"
+  },
+  "bigint/docs/css/jazzy.css": {
+    "executable": false,
+    "sha256": "52a40492dadeca09e6dcbb6098672b3a7a31c838431f233b145ef86ee94a3e2d"
+  },
+  "bigint/docs/docsets/BigInt.docset/Contents/Info.plist": {
+    "executable": false,
+    "sha256": "8653ef193dd3bf9e5595454125314ee9361d12faa6eb021ec08937ee81907604"
+  },
+  "bigint/docs/docsets/BigInt.docset/Contents/Resources/Documents/Extensions.html": {
+    "executable": false,
+    "sha256": "4d22d77274ce288611ea9c6cde2846f70ac8a2a7853b2c9d8e91155ed5acf229"
+  },
+  "bigint/docs/docsets/BigInt.docset/Contents/Resources/Documents/Extensions/BinaryFloatingPoint.html": {
+    "executable": false,
+    "sha256": "44dcc22615185a0cca5ea7de8254f36f0e3373e69177de523200d2fcc09235a8"
+  },
+  "bigint/docs/docsets/BigInt.docset/Contents/Resources/Documents/Extensions/String.html": {
+    "executable": false,
+    "sha256": "2857275dd01d0c6dc07b8d2af50d60cbe0e4dccf9734b37bab113083d195682a"
+  },
+  "bigint/docs/docsets/BigInt.docset/Contents/Resources/Documents/Structs.html": {
+    "executable": false,
+    "sha256": "6819a860fee93be6040c9f4713a5aa49237daec88ed8ddb416783b6bf1531935"
+  },
+  "bigint/docs/docsets/BigInt.docset/Contents/Resources/Documents/Structs/BigInt.html": {
+    "executable": false,
+    "sha256": "6dd31c0647e246d924977b1d5dcfda43e59a9d8d84e6922cc77f9fe54ee48cda"
+  },
+  "bigint/docs/docsets/BigInt.docset/Contents/Resources/Documents/Structs/BigInt/Sign.html": {
+    "executable": false,
+    "sha256": "0af4368d2f75a464d73f493eebaae6005e16a688030a422ba469c121fb625eb9"
+  },
+  "bigint/docs/docsets/BigInt.docset/Contents/Resources/Documents/Structs/BigInt/Words.html": {
+    "executable": false,
+    "sha256": "9eb24869890fe1ff3d5320f2b29d9b65e7246fa8d64f1b7c4b7daff818dd1648"
+  },
+  "bigint/docs/docsets/BigInt.docset/Contents/Resources/Documents/Structs/BigUInt.html": {
+    "executable": false,
+    "sha256": "8cbb1e925f75ef876949e4756b6946de78bb94bb164742c55ab180e38c088d59"
+  },
+  "bigint/docs/docsets/BigInt.docset/Contents/Resources/Documents/Structs/BigUInt/Words.html": {
+    "executable": false,
+    "sha256": "5d1f401698849e5ac7edc9feea366da8fb2cca27b7a892a03dfb1edecaf0b54e"
+  },
+  "bigint/docs/docsets/BigInt.docset/Contents/Resources/Documents/css/highlight.css": {
+    "executable": false,
+    "sha256": "45ff817fed804cb42b37b69b52686164a72bed9ac647d063b0ac166ff5807c4e"
+  },
+  "bigint/docs/docsets/BigInt.docset/Contents/Resources/Documents/css/jazzy.css": {
+    "executable": false,
+    "sha256": "52a40492dadeca09e6dcbb6098672b3a7a31c838431f233b145ef86ee94a3e2d"
+  },
+  "bigint/docs/docsets/BigInt.docset/Contents/Resources/Documents/img/carat.png": {
+    "executable": true,
+    "sha256": "da50df46aa5237ea92d1f084865e399b496776902a5dc57c63349e7aec9c35cd"
+  },
+  "bigint/docs/docsets/BigInt.docset/Contents/Resources/Documents/img/dash.png": {
+    "executable": true,
+    "sha256": "1d5b0c0245b2b4698808aa3c82c54258c4f4186b27d08cd95eb4201228c0b196"
+  },
+  "bigint/docs/docsets/BigInt.docset/Contents/Resources/Documents/img/gh.png": {
+    "executable": true,
+    "sha256": "6b4582ced3c5b039423243207f470dcba7288918131657f89e9bdcada6fa8a40"
+  },
+  "bigint/docs/docsets/BigInt.docset/Contents/Resources/Documents/img/spinner.gif": {
+    "executable": false,
+    "sha256": "51da4df6f7869c8d984e9f9d647d38f0474faa1700b4ae053db0eafcd5efa81a"
+  },
+  "bigint/docs/docsets/BigInt.docset/Contents/Resources/Documents/index.html": {
+    "executable": false,
+    "sha256": "2ad5e5cb7dbc4d63e07a7dbf367e4ed2dbc0efd16ca96b014230db29c8e1a91c"
+  },
+  "bigint/docs/docsets/BigInt.docset/Contents/Resources/Documents/js/jazzy.js": {
+    "executable": true,
+    "sha256": "a88bd925d8f2c6cc2f5b6853a6782f654f828969e2b8b6c1adb803fbfcf9e529"
+  },
+  "bigint/docs/docsets/BigInt.docset/Contents/Resources/Documents/js/jazzy.search.js": {
+    "executable": false,
+    "sha256": "292c30673a85b0edabd88c3d3f81abd03aedc1e37ad8938ec6467bffe5cab6c2"
+  },
+  "bigint/docs/docsets/BigInt.docset/Contents/Resources/Documents/js/jquery.min.js": {
+    "executable": false,
+    "sha256": "ff1523fb7389539c84c65aba19260648793bb4f5e29329d2ee8804bc37a3fe6e"
+  },
+  "bigint/docs/docsets/BigInt.docset/Contents/Resources/Documents/js/lunr.min.js": {
+    "executable": false,
+    "sha256": "0c50d9002b85780a842afffb567bb54ede402dae7c6dc5997a018614d8044fc8"
+  },
+  "bigint/docs/docsets/BigInt.docset/Contents/Resources/Documents/js/typeahead.jquery.js": {
+    "executable": false,
+    "sha256": "67d0fa8f38bb7df9f13c44cb1d0fe4fa7d541b2991a05710b515e000cc7e0eb7"
+  },
+  "bigint/docs/docsets/BigInt.docset/Contents/Resources/Documents/search.json": {
+    "executable": false,
+    "sha256": "24d9105e9f89ba7925aca141bc4f4cbc8f124ce37c9186fa92fd2593e11d3bbd"
+  },
+  "bigint/docs/docsets/BigInt.docset/Contents/Resources/docSet.dsidx": {
+    "executable": false,
+    "sha256": "4ec38dbca81bbdc69876aa4a63e6bb44f7ff1847c3e405d0d91214cc8f184f8c"
+  },
+  "bigint/docs/docsets/BigInt.tgz": {
+    "executable": false,
+    "sha256": "16094506190bc8c387ac4f7cc501f0e9e2f2a13c4350f0df84baa84c1ffeb6bc"
+  },
+  "bigint/docs/docsets/BigInt.xml": {
+    "executable": false,
+    "sha256": "dec7bc9bf53837f6f387f5045617b481b096c1d100e9048d86738ba5141c9299"
+  },
+  "bigint/docs/img/carat.png": {
+    "executable": true,
+    "sha256": "da50df46aa5237ea92d1f084865e399b496776902a5dc57c63349e7aec9c35cd"
+  },
+  "bigint/docs/img/dash.png": {
+    "executable": true,
+    "sha256": "1d5b0c0245b2b4698808aa3c82c54258c4f4186b27d08cd95eb4201228c0b196"
+  },
+  "bigint/docs/img/gh.png": {
+    "executable": true,
+    "sha256": "6b4582ced3c5b039423243207f470dcba7288918131657f89e9bdcada6fa8a40"
+  },
+  "bigint/docs/img/spinner.gif": {
+    "executable": false,
+    "sha256": "51da4df6f7869c8d984e9f9d647d38f0474faa1700b4ae053db0eafcd5efa81a"
+  },
+  "bigint/docs/index.html": {
+    "executable": false,
+    "sha256": "2ad5e5cb7dbc4d63e07a7dbf367e4ed2dbc0efd16ca96b014230db29c8e1a91c"
+  },
+  "bigint/docs/js/jazzy.js": {
+    "executable": true,
+    "sha256": "a88bd925d8f2c6cc2f5b6853a6782f654f828969e2b8b6c1adb803fbfcf9e529"
+  },
+  "bigint/docs/js/jazzy.search.js": {
+    "executable": false,
+    "sha256": "292c30673a85b0edabd88c3d3f81abd03aedc1e37ad8938ec6467bffe5cab6c2"
+  },
+  "bigint/docs/js/jquery.min.js": {
+    "executable": false,
+    "sha256": "ff1523fb7389539c84c65aba19260648793bb4f5e29329d2ee8804bc37a3fe6e"
+  },
+  "bigint/docs/js/lunr.min.js": {
+    "executable": false,
+    "sha256": "0c50d9002b85780a842afffb567bb54ede402dae7c6dc5997a018614d8044fc8"
+  },
+  "bigint/docs/js/typeahead.jquery.js": {
+    "executable": false,
+    "sha256": "67d0fa8f38bb7df9f13c44cb1d0fe4fa7d541b2991a05710b515e000cc7e0eb7"
+  },
+  "bigint/docs/search.json": {
+    "executable": false,
+    "sha256": "24d9105e9f89ba7925aca141bc4f4cbc8f124ce37c9186fa92fd2593e11d3bbd"
+  },
+  "bigint/docs/undocumented.json": {
+    "executable": false,
+    "sha256": "9f3f3e3b2de4948e8d8916b01b761ea7b98eafe8745bf5df43893ac06d66d5a5"
+  },
+  "bigint/images/BigInt.sketch": {
+    "executable": false,
+    "sha256": "0a21c8f3e9d78ccf4cc4807a8508a323780c5625c310b9e5353034387530f43d"
+  },
+  "bigint/images/banner.png": {
+    "executable": false,
+    "sha256": "7743446fe6ff5b56542153e144324980df0c5b2bdee9f19c03153c5f04ff0095"
+  },
+  "citadel/.github/FUNDING.yml": {
+    "executable": false,
+    "sha256": "855c41b1bf757dcec8e09b94c3e58bdf2e549784d697c77dee8b5d60afeadb42"
+  },
+  "citadel/.github/ISSUE_TEMPLATE/bug_report.md": {
+    "executable": false,
+    "sha256": "b711b751a70223536dac691f67f97bf40a8110bcbcc2b52f5afeda5b37bc2436"
+  },
+  "citadel/.github/ISSUE_TEMPLATE/feature_request.md": {
+    "executable": false,
+    "sha256": "aea29a9a3e3ce7ad0dd50c5dbabb5055018f94d7c5c0b0b5ffe764f9bf3219f5"
+  },
+  "citadel/.github/workflows/test.yml": {
+    "executable": false,
+    "sha256": "c5cfb05414bc1ccde98117d6a791db64d3947445621961bc47c430c9502b6927"
+  },
+  "citadel/.gitignore": {
+    "executable": false,
+    "sha256": "3cd63139ef09a7f63d0358eaa05da8257ab67a80d5310383533b914f14b4cce5"
+  },
+  "citadel/.spi.yml": {
+    "executable": false,
+    "sha256": "e3d35860057cc6c96c4e70dac52f81da4197291211c366e2428e0fdacbef2c2e"
+  },
+  "citadel/Dockerfile": {
+    "executable": false,
+    "sha256": "2a8295a66094be2000610282a87edb8340915d7b1e5a1e2756d1be23ed0ceabd"
+  },
+  "citadel/Examples/CitadelCLI/CitadelCLI.xcodeproj/project.pbxproj": {
+    "executable": false,
+    "sha256": "1ec170b50a0266a1f2c1df452ef6494bef288752102beb5835149ff7acfa45a6"
+  },
+  "citadel/Examples/CitadelCLI/CitadelCLI.xcodeproj/project.xcworkspace/contents.xcworkspacedata": {
+    "executable": false,
+    "sha256": "7f3b00b5c3fdb45242d7b87e1e5c4e25d1fa8129a16c94295ecc4e8ea2235c5f"
+  },
+  "citadel/Examples/CitadelCLI/CitadelCLI.xcodeproj/xcshareddata/xcschemes/CitadelCLI.xcscheme": {
+    "executable": false,
+    "sha256": "bfec0728d9d7b8e69ac45888bb5d259c583390746814c8dddbce2bff766f8d67"
+  },
+  "citadel/Examples/CitadelCLI/CitadelCLI/Assets.xcassets/AccentColor.colorset/Contents.json": {
+    "executable": false,
+    "sha256": "9af65086fa30b49252fae1a1225731691de794f7775af74d71befeb507d12b7c"
+  },
+  "citadel/Examples/CitadelCLI/CitadelCLI/Assets.xcassets/AppIcon.appiconset/Contents.json": {
+    "executable": false,
+    "sha256": "a93d059297d6108109bbdf46e8424cb53bb45d141a98de62122c9ab8ec8709b7"
+  },
+  "citadel/Examples/CitadelCLI/CitadelCLI/Assets.xcassets/Contents.json": {
+    "executable": false,
+    "sha256": "0fd49ba3c3585c709678e0046a821c3c60685ec7063720d30d3a3448be3a208b"
+  },
+  "citadel/Examples/CitadelCLI/CitadelCLI/CitadelCLI.entitlements": {
+    "executable": false,
+    "sha256": "22f41fdaa0ef3d2e2adca03db60daedb8965afcfe2146a2054e18c899494f9db"
+  },
+  "citadel/Examples/CitadelCLI/CitadelCLI/CitadelCLIApp.swift": {
+    "executable": false,
+    "sha256": "d4ac993e3b5a8e61b81de434548d60fd74e5406b78b89c893e46f6d9b3252350"
+  },
+  "citadel/Examples/CitadelCLI/CitadelCLI/ContentView.swift": {
+    "executable": false,
+    "sha256": "b2d71b96435969ebf78c28427ebbfc2cbd3934cef3a8eb803c175ec276f991d1"
+  },
+  "citadel/Examples/CitadelCLI/CitadelCLI/Preview Content/Preview Assets.xcassets/Contents.json": {
+    "executable": false,
+    "sha256": "0fd49ba3c3585c709678e0046a821c3c60685ec7063720d30d3a3448be3a208b"
+  },
+  "citadel/Examples/CitadelCLI/CitadelCLITests/CitadelCLITests.swift": {
+    "executable": false,
+    "sha256": "e4629335dbf10321b19ce4d8b3509dd325e4724adf784c0c3a7a3d020377f4fc"
+  },
+  "citadel/Examples/CitadelCLI/CitadelCLIUITests/CitadelCLIUITests.swift": {
+    "executable": false,
+    "sha256": "dca6994f6bcc9ea9a78fee2f606763f120c44d38f3e618a0c6dd2a5ccadcd3ee"
+  },
+  "citadel/Examples/CitadelCLI/CitadelCLIUITests/CitadelCLIUITestsLaunchTests.swift": {
+    "executable": false,
+    "sha256": "d775f789af1c60b2c0d86f176c3d721c94a3329cf6c1cea2d7a00213c3d38b09"
+  },
+  "citadel/Examples/ExampleClient/.gitignore": {
+    "executable": false,
+    "sha256": "1defc6c4884c7d1abebc836f18c1c953dc5c24ed923cf34cfc426f84e910e326"
+  },
+  "citadel/Examples/ExampleClient/.vscode/launch.json": {
+    "executable": false,
+    "sha256": "7458400fc5d78c37c784446b47fcf31c3446aeb15938b3c7c85463c3f8752815"
+  },
+  "citadel/Examples/ExampleClient/ExampleServer.dockerfile": {
+    "executable": false,
+    "sha256": "54e9e49c2df075864b1c0b12f706645e1ee60a0d686b4fb33591e9cf64718712"
+  },
+  "citadel/Examples/ExampleClient/Package.swift": {
+    "executable": false,
+    "sha256": "12db8ef60af0bfc96b2b9fa82e4faa4fd1668a6583f7e0bddd5eec2d4d2824f3"
+  },
+  "citadel/Examples/ExampleClient/README.md": {
+    "executable": false,
+    "sha256": "4aeda572b3ed7a2b3b88b304945cabbef314e184c8134564112f66f8eff6022e"
+  },
+  "citadel/Examples/ExampleClient/Sources/main.swift": {
+    "executable": false,
+    "sha256": "7db1dbffaf0ab8b118f117c6fc37fa30824c9ad2dab9e841fa6b79180ac2e29f"
+  },
+  "citadel/Examples/OpenSSH/Dockerfile": {
+    "executable": false,
+    "sha256": "37f30deaf00531e857b87d566c16f271f6e42dffabb3e3ec66231d315d406b64"
+  },
+  "citadel/Examples/RemotePortForwardExample/Package.swift": {
+    "executable": false,
+    "sha256": "cd84fd9a678ef1258e5e79f8583f80f03414421a0e726ca4dd1d8a544e24c9d9"
+  },
+  "citadel/Examples/RemotePortForwardExample/README.md": {
+    "executable": false,
+    "sha256": "1d1cf13d23d8716c727b9ca22365370a645596057f1f36fdb04b58d373b854fa"
+  },
+  "citadel/Examples/RemotePortForwardExample/Sources/RemotePortForwardExample/App.swift": {
+    "executable": false,
+    "sha256": "46bc3cb67d118bdf08f338ecaece488a12091cad392ecd4492fe881ed431e5c2"
+  },
+  "citadel/Examples/TerminalAppServer/.gitignore": {
+    "executable": false,
+    "sha256": "1defc6c4884c7d1abebc836f18c1c953dc5c24ed923cf34cfc426f84e910e326"
+  },
+  "citadel/Examples/TerminalAppServer/Package.swift": {
+    "executable": false,
+    "sha256": "b70c3075d0f716c0a2319f0ac21edcb0d0a4dc65469e0b6f3e1a492452d26243"
+  },
+  "citadel/Examples/TerminalAppServer/Sources/main.swift": {
+    "executable": false,
+    "sha256": "c8741effb5dd75dfcde739e1695fb68d7471d4ec27e6c9dde0f27db173c9332b"
+  },
+  "citadel/LICENSE": {
+    "executable": false,
+    "sha256": "580a39b7c09cba3cd18a5b1e0d4376e9d1ac200d241bda87e95ed74917bc3b31"
+  },
+  "citadel/Package.resolved": {
+    "executable": false,
+    "sha256": "4ee725a2ee698805372cc382b3a8d8b9e5e63e7a50200da171147db63359ab29"
+  },
+  "citadel/Package.swift": {
+    "executable": false,
+    "sha256": "91078992f5b022596f883e3caafa7274ed9426a9c4a525f1c4dd66008f514d28"
+  },
+  "citadel/README.md": {
+    "executable": false,
+    "sha256": "47c8ec613c9cdab5406c0855baef20e4f5e98e3c8f18d3c87a818ec3aca61798"
+  },
+  "citadel/Sources/CCitadelBcrypt/bcrypt-kdf.c": {
+    "executable": false,
+    "sha256": "6f061b0e552c6e1a801baa8e8beb96b63350ea46744dc058e0051112f6d53daa"
+  },
+  "citadel/Sources/CCitadelBcrypt/bcrypt-kdf.h": {
+    "executable": false,
+    "sha256": "38812b1edb8ba8abda14a920bb327ea2607191ec66c0591f45f177cf0249a7b6"
+  },
+  "citadel/Sources/CCitadelBcrypt/bcrypt.c": {
+    "executable": false,
+    "sha256": "6ff669e3486d13e426d3e223b299d6506d8734fce790c93adce0d709f5e62dbb"
+  },
+  "citadel/Sources/CCitadelBcrypt/bcrypt.h": {
+    "executable": false,
+    "sha256": "a2293e2b7928fcff868ab41e6eb0a81a7c94026fb7c223c893efef1685a007e7"
+  },
+  "citadel/Sources/CCitadelBcrypt/blf.c": {
+    "executable": false,
+    "sha256": "9793f6e45a4eff070194ad3e1a20ed79b00fc5e9bd89bc30367837cc65d5a4dd"
+  },
+  "citadel/Sources/CCitadelBcrypt/blf.h": {
+    "executable": false,
+    "sha256": "e3b1bdf7276f3f14af41a00d86b9f8d7e6dab43f1a07a8d4dd7530149c77e38b"
+  },
+  "citadel/Sources/CCitadelBcrypt/include/module.modulemap": {
+    "executable": false,
+    "sha256": "131e821edb7ee0c112cb0b20b4c33dfe3cb16756de262b8f7a289a7604b0ffac"
+  },
+  "citadel/Sources/Citadel/Algorithms/AES.swift": {
+    "executable": false,
+    "sha256": "2975e92c2e185d872a29b7f1a9518209b0253d119ce3f13c57dfdc7c2da8e357"
+  },
+  "citadel/Sources/Citadel/Algorithms/DH-Helpers.swift": {
+    "executable": false,
+    "sha256": "dd43bffe0a0c29b02b2ccf3e4ccd5363a4484469d8c0f593ea48b736c7bc96ed"
+  },
+  "citadel/Sources/Citadel/Algorithms/DiffieHellmanGroup14Sha1.swift": {
+    "executable": false,
+    "sha256": "ae30c129191445997dd300bec27cfcfdc76317b324e953d6f12d69cfcb0a3820"
+  },
+  "citadel/Sources/Citadel/Algorithms/DiffieHellmanGroup14Sha256.swift": {
+    "executable": false,
+    "sha256": "387b81196d7229cbbd51e8f406537df9c4536759a4c8da1ce96f7a8757e56e54"
+  },
+  "citadel/Sources/Citadel/Algorithms/RSA.swift": {
+    "executable": false,
+    "sha256": "86761dbb89799195cc9ba0b237852be82718f04583d0692c3d5d315eb0676884"
+  },
+  "citadel/Sources/Citadel/BCrypt.swift": {
+    "executable": false,
+    "sha256": "d1829a3aa5be32364985f70d3c35249fab13285cd8953338270c63e441460095"
+  },
+  "citadel/Sources/Citadel/ByteBufferHelpers.swift": {
+    "executable": false,
+    "sha256": "ba3ebe856cb28eb9bbdaf03240c8b540ede42fe92f78d3b276232b52b4b4684b"
+  },
+  "citadel/Sources/Citadel/ChannelUnwrapper.swift": {
+    "executable": false,
+    "sha256": "43b484bd513376f6079e4f1d5494cf58513770d6ba99d47a4df9b1d90a09ba4f"
+  },
+  "citadel/Sources/Citadel/Client.swift": {
+    "executable": false,
+    "sha256": "770981ad4e56926923a5c5c17caa8351d2a475cac48099c965dda183d4831654"
+  },
+  "citadel/Sources/Citadel/ClientSession.swift": {
+    "executable": false,
+    "sha256": "a35bceee0fb2664f118f198de9a2f5c0f93be1e7696d4413a596972ddfd1d351"
+  },
+  "citadel/Sources/Citadel/DirectTCPIP/Client/DirectTCPIP+Client.swift": {
+    "executable": false,
+    "sha256": "2536cc8c9323af93fa7b0109d1dd6fce9a516b22656a14878b92c08d6fa268a3"
+  },
+  "citadel/Sources/Citadel/DirectTCPIP/Server/DirectTCPIP+Server.swift": {
+    "executable": false,
+    "sha256": "da5ed35ff5c5986e82fab4933802651df5e8a51192f6fb51a45b96c948cabb36"
+  },
+  "citadel/Sources/Citadel/Errors.swift": {
+    "executable": false,
+    "sha256": "37ad1751ab7311c8e141ed9f529811d3a237a52908111d4259c16c123c09e6c8"
+  },
+  "citadel/Sources/Citadel/Exec/Client/ExecClient.swift": {
+    "executable": false,
+    "sha256": "097d4e48f95d4f4970ff6abc1f251ddb95a0e2a968e7b97652ff87ac6e4aecbc"
+  },
+  "citadel/Sources/Citadel/Exec/Server/ExecDelegate.swift": {
+    "executable": false,
+    "sha256": "ed9aae830b83aeedee8db82b0a9b6bfc0f4f058ba30060134ea443a238b10f32"
+  },
+  "citadel/Sources/Citadel/Exec/Server/ExecHandler.swift": {
+    "executable": false,
+    "sha256": "7beae4ae903a9dc13caed0a58e86fa2b25b0984e6e824f7e7840f4aa312eb1d8"
+  },
+  "citadel/Sources/Citadel/MacSCPECDSAKeyReader.swift": {
+    "executable": false,
+    "sha256": "4193d502c4b6dd1b77175106525aae50e87e95060c0b10468c594c152e97f7d3"
+  },
+  "citadel/Sources/Citadel/MacSCPKeepAlive.swift": {
+    "executable": false,
+    "sha256": "69a8697271858917df1b40c33ce0677cf9b9b522175d6ae827a40b2735c64b6d"
+  },
+  "citadel/Sources/Citadel/MacSCPRSAAuthentication.swift": {
+    "executable": false,
+    "sha256": "8ff128e88833076674d6d58ce89abd79eb84fb69b926a1fc7ba5682840262e68"
+  },
+  "citadel/Sources/Citadel/NIOGlueHandler.swift": {
+    "executable": false,
+    "sha256": "714573c860b2866fe77aaee70d5c375adefe4408e71fc56c97bef8ad86a41f5a"
+  },
+  "citadel/Sources/Citadel/OpenSSHKey.swift": {
+    "executable": false,
+    "sha256": "0e88973e417ec15c059b4d0e3a781443e5db9337532a027a6b788173b3ea39ff"
+  },
+  "citadel/Sources/Citadel/RemotePortForward/Client/RemotePortForward+Client.swift": {
+    "executable": false,
+    "sha256": "1f3e6c2f06cc74a3c3ef8fa81aecb3cea4e266fe1e72a5824b8af0f67932cbfb"
+  },
+  "citadel/Sources/Citadel/RemotePortForward/Server/RemotePortForward+Server.swift": {
+    "executable": false,
+    "sha256": "aa88252bfb9f66759497cd62c33e67ea8f8099a163d17b9f9826a05ead260cc7"
+  },
+  "citadel/Sources/Citadel/SFTP/Client/SFTPClient.swift": {
+    "executable": false,
+    "sha256": "ba638a69dbce95259cb42037e577f445b353a5b33e29b0319fbacead390c6f13"
+  },
+  "citadel/Sources/Citadel/SFTP/Client/SFTPClientInboundHandler.swift": {
+    "executable": false,
+    "sha256": "8ea1f9585f564300f4fd25808b276ce7040a5396edf17ff4f5573a3014a95444"
+  },
+  "citadel/Sources/Citadel/SFTP/Client/SFTPFile.swift": {
+    "executable": false,
+    "sha256": "eec22a7fa8fa0023e5ae18b941b858b0d1c0279515fa0b933cd6e4e0dc2a446d"
+  },
+  "citadel/Sources/Citadel/SFTP/SFTPBasicEnums.swift": {
+    "executable": false,
+    "sha256": "60fa85de3148028b136c94665b747392255d7b0e7873a6b31ee3c249db5df6fc"
+  },
+  "citadel/Sources/Citadel/SFTP/SFTPFileFlags.swift": {
+    "executable": false,
+    "sha256": "e235c9b6af438c5f6f38b504fa62a213c30c84ba7d0c51b700042d42fe9e8f42"
+  },
+  "citadel/Sources/Citadel/SFTP/SFTPMessage.swift": {
+    "executable": false,
+    "sha256": "f218da50ad54fc55b235a58bbe31bcb104583c0a17c495798bdf9ff90c12d63e"
+  },
+  "citadel/Sources/Citadel/SFTP/SFTPMessageParser.swift": {
+    "executable": false,
+    "sha256": "5d87848412ec0d793b75b238728d038441b76b11032128e24235a70f9fecafdf"
+  },
+  "citadel/Sources/Citadel/SFTP/SFTPResourceLimits.swift": {
+    "executable": false,
+    "sha256": "4946ce359ebb2c17a4dd3a251093e696d3939facc768430f6371ed4246905296"
+  },
+  "citadel/Sources/Citadel/SFTP/SFTPSerializer.swift": {
+    "executable": false,
+    "sha256": "7322b30fadb8f14d9243d94987b2b4f8a7e4a6ed4127ad03a8cd1ab4674bb8ad"
+  },
+  "citadel/Sources/Citadel/SFTP/Server/SFTPServer.swift": {
+    "executable": false,
+    "sha256": "1d488126ad5536e7900defb484b48911de22122e680467b216b7665f526f1f7c"
+  },
+  "citadel/Sources/Citadel/SFTP/Server/SFTPServerInboundHandler.swift": {
+    "executable": false,
+    "sha256": "f60cbc5b9e97010f47d12788b9a9eb4565bc8ad4c282a32fe71cee5ac057f81b"
+  },
+  "citadel/Sources/Citadel/SSHAuthenticationMethod.swift": {
+    "executable": false,
+    "sha256": "348088665ec9e008d2e92f1bf84868dbb32e0bc3c56befd125528fe592dc684d"
+  },
+  "citadel/Sources/Citadel/SSHCert.swift": {
+    "executable": false,
+    "sha256": "dc867fbf844722933ec017aa958dc1bbff9731c1e82826a86a707cddd53bfadb"
+  },
+  "citadel/Sources/Citadel/SSHConnectionPoolSettings.swift": {
+    "executable": false,
+    "sha256": "d62953019369aa5dc5dfdd67f053a8b86e695be39033c455bd763a2d13f4f386"
+  },
+  "citadel/Sources/Citadel/SSHKeyTypeDetection.swift": {
+    "executable": false,
+    "sha256": "97d07b22b9fb4daa4a12e982ac7e33e64875f8b906f238230129e2e8aeecde07"
+  },
+  "citadel/Sources/Citadel/Server.swift": {
+    "executable": false,
+    "sha256": "fecc19939bdff40f6e2e090fbded7f61312f64238757d6b14a48e0d716fb953f"
+  },
+  "citadel/Sources/Citadel/Shell/Server/ShellDelegate.swift": {
+    "executable": false,
+    "sha256": "f2b4df23fa5f9198722ed4938058899bdeacb4c82c73adfca168b76a98541f95"
+  },
+  "citadel/Sources/Citadel/TTY/Client/TTY.swift": {
+    "executable": false,
+    "sha256": "61b358ba713286d3f69ba78714b17e0d0b00c2cc9a8398e4fb2a3d116dffacd0"
+  },
+  "citadel/Sources/CitadelServerExample/EchoShell/BasicCommands.swift": {
+    "executable": false,
+    "sha256": "5ad06013eafc2d2a372c0ade84702c78d8890306c21f699d898d641793f475a7"
+  },
+  "citadel/Sources/CitadelServerExample/EchoShell/EchoShell.swift": {
+    "executable": false,
+    "sha256": "c570877cc95a9a4066fb163e2fa8670ec67970086be4bdb2bbf3f5f413626e46"
+  },
+  "citadel/Sources/CitadelServerExample/EchoShell/Extensions.swift": {
+    "executable": false,
+    "sha256": "b094512b25542e33ee92abbedaeff518f7e09ae63b87cba524ee57bbbbf6f032"
+  },
+  "citadel/Sources/CitadelServerExample/EchoShell/Terminal.swift": {
+    "executable": false,
+    "sha256": "a2a7d1174054430ab4ebada49f2f1e0b61b3ca82809721f7820c665e54060cc9"
+  },
+  "citadel/Sources/CitadelServerExample/HostKeyFile.swift": {
+    "executable": false,
+    "sha256": "d7fcf39e8478d3b82c6ae9dda6cfcef7638dfdd10e3a45a3e6a80f8c4ebfd0c0"
+  },
+  "citadel/Sources/CitadelServerExample/Server.swift": {
+    "executable": false,
+    "sha256": "54a3954b435459a0258eac009ed11a88b7bc3bf9705086844836241c7b0470bb"
+  },
+  "citadel/Tests/CitadelTests/Citadel2Tests.swift": {
+    "executable": false,
+    "sha256": "897a867b94afcf689f412d7a3a9db227417cd4791f056bf930e7d62ae07a6b82"
+  },
+  "citadel/Tests/CitadelTests/EndToEndTests.swift": {
+    "executable": false,
+    "sha256": "7164fc4332ce38da2a6625dc13376055b5d0ee557a906e5dfd498a3a7be73b47"
+  },
+  "citadel/Tests/CitadelTests/KeyTests.swift": {
+    "executable": false,
+    "sha256": "cace719b6446bd0304324f852339caef90f01bf0fbee66097c524a01c338b44e"
+  },
+  "citadel/Tests/CitadelTests/RemotePortForwardTests.swift": {
+    "executable": false,
+    "sha256": "f4072418544f958bb9ef753d60e99fd77a85a69d3ee8549bc5abd250ca86961f"
+  },
+  "citadel/Tests/CitadelTests/WithExecTests.swift": {
+    "executable": false,
+    "sha256": "64eb25cc0f5fe74100c27dcf370e8f2a3ad2454eedf7df6c6d6af09c5ca14a8a"
+  },
+  "native-dependencies.json": {
+    "executable": false,
+    "sha256": "029ec49ff6b030fb7cde0326e28a66d427cabf8112706e65e862a68a1349b1f4"
+  },
+  "sparkle-argument-parser/.github/ISSUE_TEMPLATE/BUG_REPORT.md": {
+    "executable": true,
+    "sha256": "8d80293c6aa29e891629d40ce29193a809f77e9e7eb84d8d16c80e3364be27dc"
+  },
+  "sparkle-argument-parser/.github/ISSUE_TEMPLATE/FEATURE_REQUEST.md": {
+    "executable": true,
+    "sha256": "c79733787ac3eb8104d1931e353e61b819df497d95de1c94fa0efc451ac32879"
+  },
+  "sparkle-argument-parser/.github/ISSUE_TEMPLATE/config.yml": {
+    "executable": false,
+    "sha256": "7fb95e41ccc2098a9a09bb6e34c74aff26ed7a3e0e669a32ed7ea18691c8b984"
+  },
+  "sparkle-argument-parser/.github/PULL_REQUEST_TEMPLATE.md": {
+    "executable": false,
+    "sha256": "099af682236accbf5938a4881f33636409cbaff5deeed3cc7cd9e512037d8417"
+  },
+  "sparkle-argument-parser/.github/PULL_REQUEST_TEMPLATE/NEW.md": {
+    "executable": false,
+    "sha256": "5433d1319d3be55ab256d406d21e847d47350f85110ce85ef897ddd19d261f88"
+  },
+  "sparkle-argument-parser/.gitignore": {
+    "executable": false,
+    "sha256": "d7f898defcd52be558f969a5e2695e5c174bd0091e533bd1736567fe0c8c6475"
+  },
+  "sparkle-argument-parser/CHANGELOG.md": {
+    "executable": false,
+    "sha256": "507b648cb8f9719c195e439361c1c43e3b0f5da08bbdf78917c6c83dac42ef63"
+  },
+  "sparkle-argument-parser/CMakeLists.txt": {
+    "executable": false,
+    "sha256": "34989f6c4f8e087d096a21b24b80284a61b00ce2bfc1293b607ada19a3e28fb5"
+  },
+  "sparkle-argument-parser/CODE_OF_CONDUCT.md": {
+    "executable": false,
+    "sha256": "2d04ee0ce4960a79aa1d3b10fe43a94d63eb9739d13403b6e096daf47bd3bcb9"
+  },
+  "sparkle-argument-parser/CONTRIBUTING.md": {
+    "executable": false,
+    "sha256": "bf573ed19fb90d0cbfa73a2a455bfe639ca562ed623bb815685bfeb5acebb997"
+  },
+  "sparkle-argument-parser/Documentation/01 Getting Started.md": {
+    "executable": false,
+    "sha256": "fbbce71a76662e68195dad4b2aca3530171436f015312c19ba24df8f6046e852"
+  },
+  "sparkle-argument-parser/Documentation/02 Arguments, Options, and Flags.md": {
+    "executable": false,
+    "sha256": "f8b37e0f03ad4840351f43ca2756b9798d0235e42965e0454f6e03f4ab662608"
+  },
+  "sparkle-argument-parser/Documentation/03 Commands and Subcommands.md": {
+    "executable": false,
+    "sha256": "b3d5c3457ccb1d220946901188c8fe56586ee65a2e9bbf24a3fb575d0fc092aa"
+  },
+  "sparkle-argument-parser/Documentation/04 Customizing Help.md": {
+    "executable": false,
+    "sha256": "cb37fa2367d91eed84e1d582302abe973e547b1c2b34314601843fa335f5d92c"
+  },
+  "sparkle-argument-parser/Documentation/05 Validation and Errors.md": {
+    "executable": false,
+    "sha256": "cfe9a3507bf52e69607ffe584b240fc3e83c7319aac68f890eec558e146c7c26"
+  },
+  "sparkle-argument-parser/Documentation/06 Manual Parsing and Testing.md": {
+    "executable": false,
+    "sha256": "c95514047c1e64f84a4eb37fa36e0824be45069ed490399ab970fca2ba0cd60c"
+  },
+  "sparkle-argument-parser/Documentation/07 Completion Scripts.md": {
+    "executable": false,
+    "sha256": "dfd73908c217548cdf2acc63d27ab6cbc40a13ac9ebc1e01322bf041f708ee1b"
+  },
+  "sparkle-argument-parser/Examples/CMakeLists.txt": {
+    "executable": false,
+    "sha256": "690e61139036b25df556771bfd3ee052f43653f87ec7c53c5cb932206ac0d3ba"
+  },
+  "sparkle-argument-parser/Examples/math/main.swift": {
+    "executable": false,
+    "sha256": "b29241483ede3a8a2bfcf4e5b64c10f17c7bbe6bea4f570d3ae0587834c97e99"
+  },
+  "sparkle-argument-parser/Examples/repeat/main.swift": {
+    "executable": false,
+    "sha256": "11fe31b10ef592e7c6ec8a72ee5255b76a09d2105aeb96dd9aab49ce2be91f62"
+  },
+  "sparkle-argument-parser/Examples/roll/SplitMix64.swift": {
+    "executable": false,
+    "sha256": "3e90899ecb02868c36ce68edd5416e2bc917f6afdba3e2beaa589a9b74295ae6"
+  },
+  "sparkle-argument-parser/Examples/roll/main.swift": {
+    "executable": false,
+    "sha256": "9e7945cfa022ba3f5a59aa3564c602f81f36d2bfd32b0070aea04472be7292ba"
+  },
+  "sparkle-argument-parser/LICENSE.txt": {
+    "executable": false,
+    "sha256": "770af8291f708538d8ff885a0bbc4e045cd700531741c4f99528d435c14d7f55"
+  },
+  "sparkle-argument-parser/Package.swift": {
+    "executable": false,
+    "sha256": "70e0559d6152a2e1674a1a726fcfcbfac5c709a6c0b48130036e558b3de0aba4"
+  },
+  "sparkle-argument-parser/README.md": {
+    "executable": false,
+    "sha256": "160fe5f8923ea6fef39b1ed544060db2d2969481ac73be9139d236a96eb16e75"
+  },
+  "sparkle-argument-parser/Scripts/environment.sh": {
+    "executable": true,
+    "sha256": "ffe7e91a24fbfa826eb816f66cdb315097fe841a7b67a476865aec1ad7a4dda0"
+  },
+  "sparkle-argument-parser/Sources/ArgumentParser/CMakeLists.txt": {
+    "executable": false,
+    "sha256": "e6ab67f1e2a154130c86a9533cf05d9e665db341fd375928ee5f1bbc3c5f2ee7"
+  },
+  "sparkle-argument-parser/Sources/ArgumentParser/Completions/BashCompletionsGenerator.swift": {
+    "executable": false,
+    "sha256": "4f59bdbb7630b2f478544a7eb35812d447bd716a4f7f295bef00cea8776f9c1e"
+  },
+  "sparkle-argument-parser/Sources/ArgumentParser/Completions/CompletionsGenerator.swift": {
+    "executable": false,
+    "sha256": "f0e253ba0e6c4a892d2cdd32039fe3deb273c878a2234ee23cf352b06d4aa809"
+  },
+  "sparkle-argument-parser/Sources/ArgumentParser/Completions/FishCompletionsGenerator.swift": {
+    "executable": false,
+    "sha256": "846f56fa4b1b6fa4b8c1c522c4084b4e9e42b8f61e243d577d25d468c11423cb"
+  },
+  "sparkle-argument-parser/Sources/ArgumentParser/Completions/ZshCompletionsGenerator.swift": {
+    "executable": false,
+    "sha256": "9ba2f4b12541a3ae6c1ca04b9a53693932561175747e333edbaefe0b2c4c4321"
+  },
+  "sparkle-argument-parser/Sources/ArgumentParser/Parsable Properties/Argument.swift": {
+    "executable": false,
+    "sha256": "0b087c84ce1069c0affdcbd27e1dfc089015fb9acb1e74dd071264f95cddb2e7"
+  },
+  "sparkle-argument-parser/Sources/ArgumentParser/Parsable Properties/ArgumentHelp.swift": {
+    "executable": false,
+    "sha256": "6ab72d2a005ca168f49dbcee5712acfb3076e6615fe8ecbf188adcaea0e1b65d"
+  },
+  "sparkle-argument-parser/Sources/ArgumentParser/Parsable Properties/CompletionKind.swift": {
+    "executable": false,
+    "sha256": "c43b70395eb382a2e889fb572b288a0662190d7033cb42d0278e2b1b9004bebe"
+  },
+  "sparkle-argument-parser/Sources/ArgumentParser/Parsable Properties/Errors.swift": {
+    "executable": false,
+    "sha256": "b552e924da65210aa2e0142480f02415a7bf3f9f7e08c0281036665850d0eb07"
+  },
+  "sparkle-argument-parser/Sources/ArgumentParser/Parsable Properties/Flag.swift": {
+    "executable": false,
+    "sha256": "a46590fd8fe00fa04654d2ee6ffac01a8893c27ab1e6c43eacfe453cd3c72070"
+  },
+  "sparkle-argument-parser/Sources/ArgumentParser/Parsable Properties/NameSpecification.swift": {
+    "executable": false,
+    "sha256": "def01bcbce3870c785396658624157cb9b70076700e2caa28be18c5ce13c64c5"
+  },
+  "sparkle-argument-parser/Sources/ArgumentParser/Parsable Properties/Option.swift": {
+    "executable": false,
+    "sha256": "7ee74ffbbb1550f81032ef8a49b4c342d91363f7d9546c0b356f8dec10d77a6b"
+  },
+  "sparkle-argument-parser/Sources/ArgumentParser/Parsable Properties/OptionGroup.swift": {
+    "executable": false,
+    "sha256": "b4f713ea915a1a246837729416fa1b4ddef4c779c0d406fb2ee8c5b844c0197f"
+  },
+  "sparkle-argument-parser/Sources/ArgumentParser/Parsable Types/CommandConfiguration.swift": {
+    "executable": false,
+    "sha256": "3bcd2abee35ab36bc73b971a15c1db8575dffd9fafd2b77150f6b35882d71018"
+  },
+  "sparkle-argument-parser/Sources/ArgumentParser/Parsable Types/EnumerableFlag.swift": {
+    "executable": false,
+    "sha256": "d67bd9d6a7283a2b89953e1fb93c45d419d2099733c6ef35e552550e50044277"
+  },
+  "sparkle-argument-parser/Sources/ArgumentParser/Parsable Types/ExpressibleByArgument.swift": {
+    "executable": false,
+    "sha256": "44078ae3a3b982c261c56103e441c3699e90d934e618a3dce5b58c869b0e545f"
+  },
+  "sparkle-argument-parser/Sources/ArgumentParser/Parsable Types/ParsableArguments.swift": {
+    "executable": false,
+    "sha256": "571648d229d11a3c6511e8655537fae0a2571dd7dc0f41bd1dcf0ef83b7471cf"
+  },
+  "sparkle-argument-parser/Sources/ArgumentParser/Parsable Types/ParsableArgumentsValidation.swift": {
+    "executable": false,
+    "sha256": "849e162fc7e4cd4f7df4945e2e8974c6888e5a96c823dfde7e50c1407af69b62"
+  },
+  "sparkle-argument-parser/Sources/ArgumentParser/Parsable Types/ParsableCommand.swift": {
+    "executable": false,
+    "sha256": "56ae1fa062a92957b48ca8f32a613aa305186d584d251a32caddf05b0fca0249"
+  },
+  "sparkle-argument-parser/Sources/ArgumentParser/Parsing/ArgumentDecoder.swift": {
+    "executable": false,
+    "sha256": "2168cd7be1c353e00068a5566594a22a3425a83995fdab230424ddd3f4d52725"
+  },
+  "sparkle-argument-parser/Sources/ArgumentParser/Parsing/ArgumentDefinition.swift": {
+    "executable": false,
+    "sha256": "b0bd363ce1cf0ac995893b792cb7931a3db295510f3762053b72b73e5dbe80c9"
+  },
+  "sparkle-argument-parser/Sources/ArgumentParser/Parsing/ArgumentSet.swift": {
+    "executable": false,
+    "sha256": "bae490d35c53d43f6e8fd4b3af7361259be4324e69e4228035e5eb438968b7a0"
+  },
+  "sparkle-argument-parser/Sources/ArgumentParser/Parsing/CommandParser.swift": {
+    "executable": false,
+    "sha256": "da43327a84c32e6e556a229c3604cb634c8bfd66a8b5909a055fd1303ae7fbab"
+  },
+  "sparkle-argument-parser/Sources/ArgumentParser/Parsing/InputOrigin.swift": {
+    "executable": false,
+    "sha256": "ee9553e95c9b6bfa6393bba073f9a485404b2faaca1a5c6bf1fafe78d2849be8"
+  },
+  "sparkle-argument-parser/Sources/ArgumentParser/Parsing/Name.swift": {
+    "executable": false,
+    "sha256": "51fb5b21d4612b0834fc70f37c8ea44e804df9eb54ddf137dec8731d81221849"
+  },
+  "sparkle-argument-parser/Sources/ArgumentParser/Parsing/Parsed.swift": {
+    "executable": false,
+    "sha256": "29ca0d38bd94577713d58291e04c6b96b67c00346cd092c1536dbdcd73ed7ae0"
+  },
+  "sparkle-argument-parser/Sources/ArgumentParser/Parsing/ParsedValues.swift": {
+    "executable": false,
+    "sha256": "23e7939e80430cf617433b60fd87586521e8e481ad1267eded9f62daea4faf72"
+  },
+  "sparkle-argument-parser/Sources/ArgumentParser/Parsing/ParserError.swift": {
+    "executable": false,
+    "sha256": "433685b9b82d8bb45ef01ac44907999f86003b304e1f1a1ad178b2e046f57b5b"
+  },
+  "sparkle-argument-parser/Sources/ArgumentParser/Parsing/SplitArguments.swift": {
+    "executable": false,
+    "sha256": "2cafc21673fbacd5b84f426551a1aaa5b9d37ccd663e0762a68130740adc6467"
+  },
+  "sparkle-argument-parser/Sources/ArgumentParser/Usage/HelpCommand.swift": {
+    "executable": false,
+    "sha256": "11b3ced121d03f5b0cc414ce8f14ef76c3141ff20b70b9722565d057900fd4f7"
+  },
+  "sparkle-argument-parser/Sources/ArgumentParser/Usage/HelpGenerator.swift": {
+    "executable": false,
+    "sha256": "4c723d2c44ed81b3d88deefa64f4356546ecd91dd7c1c86caef328b624e67cfc"
+  },
+  "sparkle-argument-parser/Sources/ArgumentParser/Usage/MessageInfo.swift": {
+    "executable": false,
+    "sha256": "471a5a9b6fff0abf614b34b5c6d07824cb9c611e8bfdc01f01281c29ab3d1997"
+  },
+  "sparkle-argument-parser/Sources/ArgumentParser/Usage/UsageGenerator.swift": {
+    "executable": false,
+    "sha256": "ca9472dccea5d4c62cea3bb5a771bd909d67d1499a519a7430af38cf7e88d2c9"
+  },
+  "sparkle-argument-parser/Sources/ArgumentParser/Utilities/SequenceExtensions.swift": {
+    "executable": false,
+    "sha256": "069b5375e24946a600ce5cdd0ca131c132f2bd7e429ac6f0898792179cd9013b"
+  },
+  "sparkle-argument-parser/Sources/ArgumentParser/Utilities/StringExtensions.swift": {
+    "executable": false,
+    "sha256": "91e320b855a91f2c8c169bbba837fd4639be5986b32cab6fa77a37105b555084"
+  },
+  "sparkle-argument-parser/Sources/ArgumentParser/Utilities/Tree.swift": {
+    "executable": false,
+    "sha256": "1c11702021034bb07f7ee5b79a97bf54913985de0b70d65d6aef312f6694359e"
+  },
+  "sparkle-argument-parser/Sources/ArgumentParserTestHelpers/CMakeLists.txt": {
+    "executable": false,
+    "sha256": "2d0575ba6d58eed19bf5f0a321b3a40ea7da69d06db889a0a12f8c3638b27973"
+  },
+  "sparkle-argument-parser/Sources/ArgumentParserTestHelpers/StringHelpers.swift": {
+    "executable": false,
+    "sha256": "52121c33e88229ecd321d47127f26930ba5e637c34c99d30a146fdf07d246205"
+  },
+  "sparkle-argument-parser/Sources/ArgumentParserTestHelpers/TestHelpers.swift": {
+    "executable": false,
+    "sha256": "ae36dfb352d5108a6ee46fb9bafb2bfedfffd4a629517d98b186f221d7e84f45"
+  },
+  "sparkle-argument-parser/Sources/CMakeLists.txt": {
+    "executable": false,
+    "sha256": "ec980017427871a3649557de25c1d8bf120439895dcfba59f0992ebe5d824d31"
+  },
+  "sparkle-argument-parser/Tests/ArgumentParserEndToEndTests/CMakeLists.txt": {
+    "executable": false,
+    "sha256": "51a8a284bdf8fbc68ef9a444df46d9c15ae6b44cd7b38563440571017e558a7c"
+  },
+  "sparkle-argument-parser/Tests/ArgumentParserEndToEndTests/CustomParsingEndToEndTests.swift": {
+    "executable": false,
+    "sha256": "cf01d4aa899f1bc0c14ee707ad9a06b925ff7a731856e1be31137b0653c34fe1"
+  },
+  "sparkle-argument-parser/Tests/ArgumentParserEndToEndTests/DefaultSubcommandEndToEndTests.swift": {
+    "executable": false,
+    "sha256": "f0cb21e3a1c1c8cfae3e358bfdf905ebd45cf4efd81be5eac0b352f63e936d53"
+  },
+  "sparkle-argument-parser/Tests/ArgumentParserEndToEndTests/DefaultsEndToEndTests.swift": {
+    "executable": false,
+    "sha256": "7c4386c6f38bbf2b0604e29676ed535001724dd0e9041f1db4ffe16df82e36a6"
+  },
+  "sparkle-argument-parser/Tests/ArgumentParserEndToEndTests/EnumEndToEndTests.swift": {
+    "executable": false,
+    "sha256": "9afb86e515170b71d9369633e05b195a43eaa3a93a5d346a135bda95b56acb83"
+  },
+  "sparkle-argument-parser/Tests/ArgumentParserEndToEndTests/EqualsEndToEndTests.swift": {
+    "executable": false,
+    "sha256": "23f601dc0ac8cbf7fb0824cbd911044ca991abc55f1bb09b4f80532f558443f2"
+  },
+  "sparkle-argument-parser/Tests/ArgumentParserEndToEndTests/FlagsEndToEndTests.swift": {
+    "executable": false,
+    "sha256": "adb622797a6437f44cdc7f667814be77012af7b5305f4683bbc6be10b6ff8edd"
+  },
+  "sparkle-argument-parser/Tests/ArgumentParserEndToEndTests/JoinedEndToEndTests.swift": {
+    "executable": false,
+    "sha256": "edcd87e2c1d66c85a5365dff72e609f27a329e2b5db946d802c29f2bb8067c24"
+  },
+  "sparkle-argument-parser/Tests/ArgumentParserEndToEndTests/LongNameWithShortDashEndToEndTests.swift": {
+    "executable": false,
+    "sha256": "f5f7afaa006a41668e75b2eac206b91d48c3c9cd69a08319daa04d7f7d8221cf"
+  },
+  "sparkle-argument-parser/Tests/ArgumentParserEndToEndTests/NestedCommandEndToEndTests.swift": {
+    "executable": false,
+    "sha256": "07f6fdf945d391c965d05c0164ec89e69cfbd9f1ea8f6bdf33191e90bc2dac48"
+  },
+  "sparkle-argument-parser/Tests/ArgumentParserEndToEndTests/OptionGroupEndToEndTests.swift": {
+    "executable": false,
+    "sha256": "e8dc0c65d9d5bed58c56d52814627063410a1395042efca9eb6fb20a3cd12789"
+  },
+  "sparkle-argument-parser/Tests/ArgumentParserEndToEndTests/OptionalEndToEndTests.swift": {
+    "executable": false,
+    "sha256": "d69c2cd176fe7a8b269f84e7d8408c056bd92d6fa446c4a02b3d7f062655a4a6"
+  },
+  "sparkle-argument-parser/Tests/ArgumentParserEndToEndTests/PositionalEndToEndTests.swift": {
+    "executable": false,
+    "sha256": "7fa6eab603f64d452489b3c210646d8781a56e37cc151fbf4e810bb63dfe79e2"
+  },
+  "sparkle-argument-parser/Tests/ArgumentParserEndToEndTests/RawRepresentableEndToEndTests.swift": {
+    "executable": false,
+    "sha256": "01859553b72148581cc19288b7d21157ae871065eeaadc908f934d8dc1d3836a"
+  },
+  "sparkle-argument-parser/Tests/ArgumentParserEndToEndTests/RepeatingEndToEndTests.swift": {
+    "executable": false,
+    "sha256": "bc531ea4f7c50ac7e3dbc21dbd9d349a052159adb71d5037ae8e0650f4f00076"
+  },
+  "sparkle-argument-parser/Tests/ArgumentParserEndToEndTests/ShortNameEndToEndTests.swift": {
+    "executable": false,
+    "sha256": "047b80ca1a906dd99f185981fd99fbc34e77e7f1b4a23dd4f1d89868e468af01"
+  },
+  "sparkle-argument-parser/Tests/ArgumentParserEndToEndTests/SimpleEndToEndTests.swift": {
+    "executable": false,
+    "sha256": "3963ef9d067be2c09362289f03d5e3cf9daee2246e8fb1b6b9f335839c5354ff"
+  },
+  "sparkle-argument-parser/Tests/ArgumentParserEndToEndTests/SingleValueParsingStrategyTests.swift": {
+    "executable": false,
+    "sha256": "40f66a9f1deb182ad2209b20996a2545495dc71140d0736f5b0beba47adcbab3"
+  },
+  "sparkle-argument-parser/Tests/ArgumentParserEndToEndTests/SourceCompatEndToEndTests.swift": {
+    "executable": false,
+    "sha256": "f78dc922d3f007c0d8d01d9480f0e98c8c18d42e024404dc3395602ff7442eb8"
+  },
+  "sparkle-argument-parser/Tests/ArgumentParserEndToEndTests/SubcommandEndToEndTests.swift": {
+    "executable": false,
+    "sha256": "755d6c68867ecc9ba05e52d8e31b96cca9ff33985aa813450ceebdfc5dd2dc1e"
+  },
+  "sparkle-argument-parser/Tests/ArgumentParserEndToEndTests/TransformEndToEndTests.swift": {
+    "executable": false,
+    "sha256": "0f8a200c38930aeaa10f6543dc9e3c227bed4b0d1d0edf9af98311ea60fe9fb7"
+  },
+  "sparkle-argument-parser/Tests/ArgumentParserEndToEndTests/UnparsedValuesEndToEndTest.swift": {
+    "executable": false,
+    "sha256": "3673d4d5167cce841cd5124e669c7c52b58c08327f3b6be781b6955adaecc0ef"
+  },
+  "sparkle-argument-parser/Tests/ArgumentParserEndToEndTests/ValidationEndToEndTests.swift": {
+    "executable": false,
+    "sha256": "d1c9a8b5502e93e2d8cd8bb4c1cde474821df06ea9649234dbc7f92ca4c9df8b"
+  },
+  "sparkle-argument-parser/Tests/ArgumentParserExampleTests/MathExampleTests.swift": {
+    "executable": false,
+    "sha256": "bc55f3cf53dad3ba78cd78a1efcf05dc0a3011ad0e470ecbd1c20df4cd5a7d3b"
+  },
+  "sparkle-argument-parser/Tests/ArgumentParserExampleTests/RepeatExampleTests.swift": {
+    "executable": false,
+    "sha256": "cd15550e037a9210680cd3836adb255b91094f4eedb6b2ecfa19ab4710816768"
+  },
+  "sparkle-argument-parser/Tests/ArgumentParserExampleTests/RollDiceExampleTests.swift": {
+    "executable": false,
+    "sha256": "bcd12da0d540b026a8b0d518527bfb29594e42fd470fba9876843c8aa3d82a79"
+  },
+  "sparkle-argument-parser/Tests/ArgumentParserPackageManagerTests/CMakeLists.txt": {
+    "executable": false,
+    "sha256": "b89074b7ccd3e5eaca75186dfd365bdc308702d78b8081c088fd4ae1b9965b4c"
+  },
+  "sparkle-argument-parser/Tests/ArgumentParserPackageManagerTests/HelpTests.swift": {
+    "executable": false,
+    "sha256": "1624baa4186219a13a00fa685e7f5f4c45dea5f6935171cd31a42b88837edf88"
+  },
+  "sparkle-argument-parser/Tests/ArgumentParserPackageManagerTests/PackageManager/Clean.swift": {
+    "executable": false,
+    "sha256": "f5ac3727c35660698d1721fdb56faaa250108b01cace204acf75d08c2e3284f4"
+  },
+  "sparkle-argument-parser/Tests/ArgumentParserPackageManagerTests/PackageManager/Config.swift": {
+    "executable": false,
+    "sha256": "0835d3c0c7f3b37707837968e1ede7ceb9d438c60c4bea9ca2771cb642f3c547"
+  },
+  "sparkle-argument-parser/Tests/ArgumentParserPackageManagerTests/PackageManager/Describe.swift": {
+    "executable": false,
+    "sha256": "5314b25661cb38ac3dc0bc52b021eefed6657437cf2cd718c4343306817a0ba5"
+  },
+  "sparkle-argument-parser/Tests/ArgumentParserPackageManagerTests/PackageManager/GenerateXcodeProject.swift": {
+    "executable": false,
+    "sha256": "18541b2c11ec48cbeae9ec86dceba2423c0cfe521eb09e970df43f0e65f65e12"
+  },
+  "sparkle-argument-parser/Tests/ArgumentParserPackageManagerTests/PackageManager/Options.swift": {
+    "executable": false,
+    "sha256": "ce67b9fad2deba999c3c1d5806586f9311504e477a91c6ff74fc1ef0753cb230"
+  },
+  "sparkle-argument-parser/Tests/ArgumentParserPackageManagerTests/Tests.swift": {
+    "executable": false,
+    "sha256": "41a121eceed2dbfec930d15a1cdc822d13b23355e81fe2b8929439a1452528f1"
+  },
+  "sparkle-argument-parser/Tests/ArgumentParserUnitTests/CMakeLists.txt": {
+    "executable": false,
+    "sha256": "a9a1245179829980a668bcc19d673cee05a2f4975186b65cef249fe5179cbc23"
+  },
+  "sparkle-argument-parser/Tests/ArgumentParserUnitTests/CompletionScriptTests.swift": {
+    "executable": false,
+    "sha256": "bb3d2f230d625390a4e0f9027cbd4efb6de83b18310be6d893b55e0a288f466b"
+  },
+  "sparkle-argument-parser/Tests/ArgumentParserUnitTests/ErrorMessageTests.swift": {
+    "executable": false,
+    "sha256": "22e5e19aba6b7ac7dd9b86ff825c9819f5b85f5f26293f3cd78c336f9131e90c"
+  },
+  "sparkle-argument-parser/Tests/ArgumentParserUnitTests/ExitCodeTests.swift": {
+    "executable": false,
+    "sha256": "9b59d4a74b06a99e7beb087444977e50cf95678e63a4ab5c2602c304c02e9140"
+  },
+  "sparkle-argument-parser/Tests/ArgumentParserUnitTests/HelpGenerationTests.swift": {
+    "executable": false,
+    "sha256": "b68092eb40dd5d0c03d281005e6743057821d9d25b315993be47fbe26fc8c8fb"
+  },
+  "sparkle-argument-parser/Tests/ArgumentParserUnitTests/InputOriginTests.swift": {
+    "executable": false,
+    "sha256": "7bc520b4a3d86288ac9d612deaf60c16a448febec8b4e26b2382e9c5d684d5bd"
+  },
+  "sparkle-argument-parser/Tests/ArgumentParserUnitTests/MirrorTests.swift": {
+    "executable": false,
+    "sha256": "5cf8a2cdee2d1d5707a9f763f8d44559033c21df1f43e78f5a564edfcffcb588"
+  },
+  "sparkle-argument-parser/Tests/ArgumentParserUnitTests/NameSpecificationTests.swift": {
+    "executable": false,
+    "sha256": "444fe89ff967e34003cd8684f4bf678138b4fab08dff2ab4cc8a0125d7994db5"
+  },
+  "sparkle-argument-parser/Tests/ArgumentParserUnitTests/ParsableArgumentsValidationTests.swift": {
+    "executable": false,
+    "sha256": "ce5ebc539c8aa34dd24ded81c345f8f0cc203c689011dd9a4525151dc86903e5"
+  },
+  "sparkle-argument-parser/Tests/ArgumentParserUnitTests/SequenceExtensionTests.swift": {
+    "executable": false,
+    "sha256": "a51613751a8d785b3496187c39d876199a06030bb7cd6ea81bb44513eda33f1a"
+  },
+  "sparkle-argument-parser/Tests/ArgumentParserUnitTests/SplitArgumentTests.swift": {
+    "executable": false,
+    "sha256": "06fad0401cc492f8a23908403829f81cea4372491a73530f714cf613ed065544"
+  },
+  "sparkle-argument-parser/Tests/ArgumentParserUnitTests/StringEditDistanceTests.swift": {
+    "executable": false,
+    "sha256": "4bb2ca059e9cbbfc60cf42101f51fa91fd21d7c4ddc86f88d23b7a4edc9594a2"
+  },
+  "sparkle-argument-parser/Tests/ArgumentParserUnitTests/StringSnakeCaseTests.swift": {
+    "executable": false,
+    "sha256": "47b2d7726d5d296a459c73dc277dc52b8647c1b8923abe60f874345c61ced244"
+  },
+  "sparkle-argument-parser/Tests/ArgumentParserUnitTests/StringWrappingTests.swift": {
+    "executable": false,
+    "sha256": "84d0901afbf4747bb60163a483c10cb2a584887de6ab7f56b506ec9952c1838e"
+  },
+  "sparkle-argument-parser/Tests/ArgumentParserUnitTests/TreeTests.swift": {
+    "executable": false,
+    "sha256": "97054e90d7618e8b4eca363c6f1265ac176ce8290c40120ff32bd6e91f2834da"
+  },
+  "sparkle-argument-parser/Tests/ArgumentParserUnitTests/UsageGenerationTests.swift": {
+    "executable": false,
+    "sha256": "65a808d9978cb309c5ec78cfdaf2812da3239ea6b14c4fd647113071f663d0cb"
+  },
+  "sparkle-argument-parser/Tests/CMakeLists.txt": {
+    "executable": false,
+    "sha256": "f3f32115229c5bf57fb4e8f68ab2729950b68288459e6c67bc8fa854dd8371fa"
+  },
+  "sparkle-argument-parser/Tests/LinuxMain.swift": {
+    "executable": false,
+    "sha256": "360df4718ab800712f3e7d9a91d63fba8ce34b1582f55f6f0440e11625a556f6"
+  },
+  "sparkle-argument-parser/Tools/changelog-authors/main.swift": {
+    "executable": false,
+    "sha256": "8b8cc10bcd895ea85277988cb0d0f7bd070a78c9094fb85dc6b41fc7317a8117"
+  },
+  "sparkle-argument-parser/cmake/modules/ArgumentParserConfig.cmake.in": {
+    "executable": false,
+    "sha256": "049d3dda9b264c8ae28aae492b79c533520348c3914f829d4703ec1833ffda1a"
+  },
+  "sparkle-argument-parser/cmake/modules/CMakeLists.txt": {
+    "executable": false,
+    "sha256": "124c09115566c97728cfa6089eaf1628ca4cbf39e1be7f76f7d65cabd21b6cf5"
+  },
+  "sparkle-argument-parser/cmake/modules/SwiftSupport.cmake": {
+    "executable": false,
+    "sha256": "b428e02c65f5c38f19355b133164c17261f615f56342cc1f73b168bbcfde9861"
+  },
+  "sparkle/.clang-format": {
+    "executable": false,
+    "sha256": "945ca0f671d441e3ed08bb76072b5832b1055115c20801171acd18c5780df50e"
+  },
+  "sparkle/.github/ISSUE_TEMPLATE/fixes-and-enhancements.md": {
+    "executable": false,
+    "sha256": "0e97a889d8a0be50f8281f82c010ff3e4d841874f10ef23500ae1de23934b354"
+  },
+  "sparkle/.github/ISSUE_TEMPLATE/sparkle-doesn-t-work-in-my-app.md": {
+    "executable": false,
+    "sha256": "2cb9841bde682a6e23c43c8c651f81d5e80091e67243ec0457fc3ef677988d32"
+  },
+  "sparkle/.github/pull_request_template.md": {
+    "executable": false,
+    "sha256": "59807ba1565a8349c5ce30345ca8630bf4e00d2b360828da110774f765d8bd82"
+  },
+  "sparkle/.github/workflows/ci.yml": {
+    "executable": false,
+    "sha256": "29ce86fbcf2e94de97365fad210a84a1addc50e1a86fee3c23421feed0aa6c4c"
+  },
+  "sparkle/.github/workflows/create-draft-release.yml": {
+    "executable": false,
+    "sha256": "848c3da152cf09cf42ee95977174afdd03b4aeec7a0ffdeac376197337f6a584"
+  },
+  "sparkle/.gitignore": {
+    "executable": false,
+    "sha256": "5f3b36abdf83e9156d11106d31a6fffaf1bf4f9875f1815f67c4beb9ce19ed3d"
+  },
+  "sparkle/.gitmodules": {
+    "executable": false,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  "sparkle/.swiftlint.yml": {
+    "executable": false,
+    "sha256": "777723a31e837a2959fab2332ce910e814de2f63bd61d2f9d659234c7686c4c9"
+  },
+  "sparkle/Autoupdate/AgentConnection.h": {
+    "executable": false,
+    "sha256": "6fa1cfe4273b36479c542f00181bca479511100016d7c74a3f326c15441ff40b"
+  },
+  "sparkle/Autoupdate/AgentConnection.m": {
+    "executable": false,
+    "sha256": "7a6aec63772ed2d6d394369b7c518b28e204990ce6de20e019719b43d6c9fc19"
+  },
+  "sparkle/Autoupdate/AppInstaller.h": {
+    "executable": false,
+    "sha256": "c69abb13d6211037379bf7124622d03dba4b164c9762e87d8a355b5f1f67f772"
+  },
+  "sparkle/Autoupdate/AppInstaller.m": {
+    "executable": false,
+    "sha256": "935a33a54c4e55a37fccdb535f25957ddd38c80560344972506369bf7d3c861e"
+  },
+  "sparkle/Autoupdate/SPUDeltaArchive.h": {
+    "executable": false,
+    "sha256": "15e48ddaa9003933ca14f70dcfba86a5cd5a7eea8c7c3aadd10baf5648c9c8ac"
+  },
+  "sparkle/Autoupdate/SPUDeltaArchive.m": {
+    "executable": false,
+    "sha256": "e61982300e694287ddcbbc2dafcf740b0c83d84888e3ab6b7ebbd57ff953d2ac"
+  },
+  "sparkle/Autoupdate/SPUDeltaArchiveProtocol.h": {
+    "executable": false,
+    "sha256": "99cf74fc165b206ba9d1124f4f385bf6c74aeb47a84a5c0b07198a4133c0bd67"
+  },
+  "sparkle/Autoupdate/SPUDeltaCompressionMode.h": {
+    "executable": false,
+    "sha256": "89872438b2e708fc173111ca3f210b550fa9bf1899a4b1a102aa890f4a538639"
+  },
+  "sparkle/Autoupdate/SPUInstallationInfo.h": {
+    "executable": false,
+    "sha256": "44186a7b6613ab1f89ea8af24306b6c580be1de2b19f15fbdd31cad3aa692b51"
+  },
+  "sparkle/Autoupdate/SPUInstallationInfo.m": {
+    "executable": false,
+    "sha256": "8adb5a949dd560330f0b9b9003cd656b9b556b7545fe30ab65df81e7b108cc18"
+  },
+  "sparkle/Autoupdate/SPUInstallationInputData.h": {
+    "executable": false,
+    "sha256": "5ec4ff8b833f772e5ea459b5080fe65f35d42a83431d0be9605b3c44106c3b67"
+  },
+  "sparkle/Autoupdate/SPUInstallationInputData.m": {
+    "executable": false,
+    "sha256": "282f9135979701e5c9764cc9612f9729e483f7fbdf8e0945456b0eb3d1d5bd18"
+  },
+  "sparkle/Autoupdate/SPUMessageTypes.h": {
+    "executable": false,
+    "sha256": "0e98c3c5d9c99048c4760bd6c3e447e11c6eef6ceb744516f93abe2818929398"
+  },
+  "sparkle/Autoupdate/SPUMessageTypes.m": {
+    "executable": false,
+    "sha256": "cfdf113586d73271c956bd11f3978acad709b2a03874927b9fd1d4d1e0117f14"
+  },
+  "sparkle/Autoupdate/SPUSparkleDeltaArchive.h": {
+    "executable": false,
+    "sha256": "8c7ab047ac0d8c60d9e88632e17a5f3e36eb4b78baa791a6ce47b81f39112481"
+  },
+  "sparkle/Autoupdate/SPUSparkleDeltaArchive.m": {
+    "executable": false,
+    "sha256": "c872e675944e2460d68557a7ef1bf7ab2f818792f5e724c62d3424db83f64856"
+  },
+  "sparkle/Autoupdate/SPUXarDeltaArchive.h": {
+    "executable": false,
+    "sha256": "7a88771cb6d09dcb1accc3b8d96919aad45e2f535634312ffa67c1722ca90484"
+  },
+  "sparkle/Autoupdate/SPUXarDeltaArchive.m": {
+    "executable": false,
+    "sha256": "3e158af02c0b6db97f56d25f6ef896b88a3d0344128e732ee0e9ff714d90a482"
+  },
+  "sparkle/Autoupdate/SUBinaryDeltaApply.h": {
+    "executable": false,
+    "sha256": "8c68dc5ea5ef94761ebabd5af078cbce2b183cd9e178458823abef4175a04482"
+  },
+  "sparkle/Autoupdate/SUBinaryDeltaApply.m": {
+    "executable": false,
+    "sha256": "f4df1d320faa2a670c97b4f589241a59b6f3e3b67d99449cd20c4e7eb8d5079a"
+  },
+  "sparkle/Autoupdate/SUBinaryDeltaCommon.h": {
+    "executable": false,
+    "sha256": "c87cc3eed8e58594fbc85f2bc97c14a0cdbde73b5a8f912636176e2e8a70de12"
+  },
+  "sparkle/Autoupdate/SUBinaryDeltaCommon.m": {
+    "executable": false,
+    "sha256": "7c5064e65fa20413b6da94c4aa6da3ab458ba104eff7001fd080912c462010de"
+  },
+  "sparkle/Autoupdate/SUBinaryDeltaCreate.h": {
+    "executable": false,
+    "sha256": "1d45a99b756ee594f2e4115eb5af95837ca54e4ad05de8068cee79f36b28da8e"
+  },
+  "sparkle/Autoupdate/SUBinaryDeltaCreate.m": {
+    "executable": false,
+    "sha256": "368fda955b7893e217cea29bdb7e75222b02811d5783968259e8515ea9d02a8e"
+  },
+  "sparkle/Autoupdate/SUBinaryDeltaUnarchiver.h": {
+    "executable": false,
+    "sha256": "1b6fb4e4136259a8db9c56f661311ec888ba4c26bbc173a509ab8c7b4481da6c"
+  },
+  "sparkle/Autoupdate/SUBinaryDeltaUnarchiver.m": {
+    "executable": false,
+    "sha256": "59eaafe4be0bd3d7a5f3234bb85680c8c27817f44338d8928f188fd798317d4f"
+  },
+  "sparkle/Autoupdate/SUCodeSigningVerifier.h": {
+    "executable": false,
+    "sha256": "585c7cf189acc971bb77be76d2d1cb95441a4b4fb72579e555c1fa385f1ff61c"
+  },
+  "sparkle/Autoupdate/SUCodeSigningVerifier.m": {
+    "executable": false,
+    "sha256": "9ca1226912254de42cf0c36e2b266a6ebcd437bf164a9c48d3594aa677fd7b9f"
+  },
+  "sparkle/Autoupdate/SUDiskImageUnarchiver.h": {
+    "executable": false,
+    "sha256": "42e08c49236270ed8ea912f17ddfd6074317b1c2db2cdfb0790094e2f65790da"
+  },
+  "sparkle/Autoupdate/SUDiskImageUnarchiver.m": {
+    "executable": false,
+    "sha256": "8dd71cca89586f540f737c9b0a3af39363b3068c376dc4232cb56b59b84b7980"
+  },
+  "sparkle/Autoupdate/SUFlatPackageUnarchiver.h": {
+    "executable": false,
+    "sha256": "b0b6bd89e70f0b4c1378ca5efa1fd62bef1711ba3b627d23a8d92cfd7bcd8f49"
+  },
+  "sparkle/Autoupdate/SUFlatPackageUnarchiver.m": {
+    "executable": false,
+    "sha256": "bfc22eb2f30855f5fec32555362c9b28a903a085fe80ad601ba5f639186afac9"
+  },
+  "sparkle/Autoupdate/SUGuidedPackageInstaller.h": {
+    "executable": false,
+    "sha256": "4814fadb4a49091d3f8afe7bc91a40ad457840a74c7b07e7893e99e67931f1f2"
+  },
+  "sparkle/Autoupdate/SUGuidedPackageInstaller.m": {
+    "executable": false,
+    "sha256": "2e57bb1fd6cf21eb440a9aa696680408975d6e3cb80a31073f272196ffba55de"
+  },
+  "sparkle/Autoupdate/SUInstaller.h": {
+    "executable": false,
+    "sha256": "05f989b215e7922dd30ec4d1d429db0c13a0283fc2c76f66170b6548bb7b4915"
+  },
+  "sparkle/Autoupdate/SUInstaller.m": {
+    "executable": false,
+    "sha256": "30d38f074235b0bbfc21326c5f5b8710444e2e03f740411426eee29fbf6c3532"
+  },
+  "sparkle/Autoupdate/SUInstallerProtocol.h": {
+    "executable": false,
+    "sha256": "de74c5c4e71e5ee530d4ca9fcf0ae47ec1ea748bd76b13e8a3456f71387b9c00"
+  },
+  "sparkle/Autoupdate/SUPipedUnarchiver.h": {
+    "executable": false,
+    "sha256": "0e352466ac17a12c7c028c08da7294971c210e7064c9efc39e964b207942bd53"
+  },
+  "sparkle/Autoupdate/SUPipedUnarchiver.m": {
+    "executable": false,
+    "sha256": "81a45b5c7fee4bbfaefbec6575d77f40b036a8be30cad0fcd2d896de46140eb6"
+  },
+  "sparkle/Autoupdate/SUPlainInstaller.h": {
+    "executable": false,
+    "sha256": "baf0a0c0d2ec0c26465fddb77bf750c7d97c4e53d3bb90f2d2da4c37201bfc1d"
+  },
+  "sparkle/Autoupdate/SUPlainInstaller.m": {
+    "executable": false,
+    "sha256": "d5191e8b7684df756383c2122dcfcaaa011d5bae237b2ddbf9fa05986c8f5b55"
+  },
+  "sparkle/Autoupdate/SUSignatureVerifier.h": {
+    "executable": false,
+    "sha256": "456cefefa02bd61168bd7243381c36d4d9c982f8a16063bc919446da1461acba"
+  },
+  "sparkle/Autoupdate/SUSignatureVerifier.m": {
+    "executable": false,
+    "sha256": "66666de6a077e17f854675a030cd2f7b5876a8b4589f45861e2c70018532e854"
+  },
+  "sparkle/Autoupdate/SUStatusInfoProtocol.h": {
+    "executable": false,
+    "sha256": "8fd364741d7c8c74bab97c9029ad08541dbe120a7fcc5fd489cabe7b61cd005b"
+  },
+  "sparkle/Autoupdate/SUUnarchiver.h": {
+    "executable": false,
+    "sha256": "32b5935dde30c6f972e43998a587223d207284531464cc857cab306e567e8e1f"
+  },
+  "sparkle/Autoupdate/SUUnarchiver.m": {
+    "executable": false,
+    "sha256": "3b95de30ad79660765dd67641b1ced4469080f72a367e6d748b812b6160c11e8"
+  },
+  "sparkle/Autoupdate/SUUnarchiverNotifier.h": {
+    "executable": false,
+    "sha256": "eb1b4fa893680f9aed8bc1b7fb2f7c1d92776937176db06005c24a4da616a163"
+  },
+  "sparkle/Autoupdate/SUUnarchiverNotifier.m": {
+    "executable": false,
+    "sha256": "d25c49724e266cac1d517c5a3f06bc61d2f0c21553e8b4cb630dff98ee34c1ff"
+  },
+  "sparkle/Autoupdate/SUUnarchiverProtocol.h": {
+    "executable": false,
+    "sha256": "494e4240e8accde8878a48f7aad53646fb483f4f825196a455bf6956d795349d"
+  },
+  "sparkle/Autoupdate/StatusInfo.h": {
+    "executable": false,
+    "sha256": "56cd9668cc4dbc7611a18d28b24eaf8610488191feeaeefd4950aa366da62923"
+  },
+  "sparkle/Autoupdate/StatusInfo.m": {
+    "executable": false,
+    "sha256": "864bba546f8e4f1a30d8352df5b54d787561c0b28b564154d404a02fabbff4b8"
+  },
+  "sparkle/Autoupdate/main.m": {
+    "executable": false,
+    "sha256": "007aa472843626e034ea9fbbee82f50b856e443c1cb279301908481f09af971e"
+  },
+  "sparkle/BinaryDelta/Bridging-Header.h": {
+    "executable": false,
+    "sha256": "42420d012b2d2bc28625745623387dc05468eaa5f5f030f71b57bfd9f3131e93"
+  },
+  "sparkle/BinaryDelta/main.swift": {
+    "executable": false,
+    "sha256": "83fe61dc9387acf8ec03744c19dfd54e58309ef9c3a2491ca55ec2ffe2e8a588"
+  },
+  "sparkle/CHANGELOG": {
+    "executable": false,
+    "sha256": "d5d646f966fd035096b7dfc8eba568bf499da879a7d527dccf4618c7abe15690"
+  },
+  "sparkle/CODE_OF_CONDUCT.md": {
+    "executable": false,
+    "sha256": "c5ce0c0b932543e5d0378f08c2bb2c2e9617e2c22b02e49656f870326210f71a"
+  },
+  "sparkle/Carthage-dev.json": {
+    "executable": false,
+    "sha256": "30a8fae133add355d57e09ecab1fd772193e3cabef725cdedc5d35840c9c36a4"
+  },
+  "sparkle/Configurations/CommandLineTool-Debug.xcconfig": {
+    "executable": false,
+    "sha256": "32e1a0a21dec0889c06ee79189bdeb132bf210143118928e623a65ce875a966c"
+  },
+  "sparkle/Configurations/CommandLineTool-Release.xcconfig": {
+    "executable": false,
+    "sha256": "656c0706ca4810a33463b302e07cb9c2edce339d5f2db3bccaed94b22ca322aa"
+  },
+  "sparkle/Configurations/CommandLineTool-Shared.xcconfig": {
+    "executable": false,
+    "sha256": "8e2711505487c02866e6400b0dfc8302d1b6ccffae64a744dd81a65f8ddbf958"
+  },
+  "sparkle/Configurations/ConfigCommon.xcconfig": {
+    "executable": false,
+    "sha256": "1b23e7c4e759348f736a9e7628d44d9cfb3724649b40ca8fa6e2e1302e73b0a4"
+  },
+  "sparkle/Configurations/ConfigCommonCoverage.xcconfig": {
+    "executable": false,
+    "sha256": "aa3cdeeabe88bf8dbaed19279bd2f91fafc04fee70bc0eb102e477a52a351033"
+  },
+  "sparkle/Configurations/ConfigCommonDebug.xcconfig": {
+    "executable": false,
+    "sha256": "d972430bc451a0900dc8c95c6a2627405d92a3ff3481d2fbdd725942d181e883"
+  },
+  "sparkle/Configurations/ConfigCommonRelease.xcconfig": {
+    "executable": false,
+    "sha256": "e3793f6d1a5d6f8de94a3780e85c38bc20e60374158fc562c2ec84a3548eaec4"
+  },
+  "sparkle/Configurations/ConfigDownloader.xcconfig": {
+    "executable": false,
+    "sha256": "3b722beebfe9a377f15b8a967abe14a806f91e002bab7b7658f2d0440f67f974"
+  },
+  "sparkle/Configurations/ConfigDownloaderDebug.xcconfig": {
+    "executable": false,
+    "sha256": "dc6d734cf1e30e4931dfa12148ace80208aca113c425a6913dd87737576fea12"
+  },
+  "sparkle/Configurations/ConfigFramework.xcconfig": {
+    "executable": false,
+    "sha256": "267819ba1df34992d93eeb93871453caaacacc8eb251f1ade60a0cfd31149338"
+  },
+  "sparkle/Configurations/ConfigFrameworkDebug.xcconfig": {
+    "executable": false,
+    "sha256": "26746ae8ca780bd0640728e2a0ba4292494605448cb8668a4751e0e05d3e8781"
+  },
+  "sparkle/Configurations/ConfigFrameworkRelease.xcconfig": {
+    "executable": false,
+    "sha256": "26383da5fe989aa2e45e2e9ce78256e10869b47b913c3106845e26bf17dc01e9"
+  },
+  "sparkle/Configurations/ConfigInstallerConnection.xcconfig": {
+    "executable": false,
+    "sha256": "34bbb96b923a1c111e408a15d1d1d98dd269f31ad8bbebc92ec4339859b01623"
+  },
+  "sparkle/Configurations/ConfigInstallerConnectionDebug.xcconfig": {
+    "executable": false,
+    "sha256": "0701698c7799cb037a676efe924465ad08bc144a563dd043576b1f5351d3369f"
+  },
+  "sparkle/Configurations/ConfigInstallerLauncher.xcconfig": {
+    "executable": false,
+    "sha256": "fb8446c6d2a7f1efe19c56c4523da3dfa1214a3a9489245a089164ce6585078a"
+  },
+  "sparkle/Configurations/ConfigInstallerLauncherDebug.xcconfig": {
+    "executable": false,
+    "sha256": "2e940b4a3349cd3a4680a8c75607f264d886f802188ea9b28465717303f68f2a"
+  },
+  "sparkle/Configurations/ConfigInstallerProgress.xcconfig": {
+    "executable": false,
+    "sha256": "e13bb9dc5dd3f0606d4f397449f0bf68d14d39b3d66f5dd16dc1c14f37d106d2"
+  },
+  "sparkle/Configurations/ConfigInstallerStatus.xcconfig": {
+    "executable": false,
+    "sha256": "12850fd2ea71507709babaa835b807a3bb46b13b5fe5048fbfc0b9e4b7880eba"
+  },
+  "sparkle/Configurations/ConfigInstallerStatusDebug.xcconfig": {
+    "executable": false,
+    "sha256": "a6264b08cbe2b256e9f634ada4dde23f108b3510d57b3da47fe8c2db1e85c943"
+  },
+  "sparkle/Configurations/ConfigRelaunch.xcconfig": {
+    "executable": false,
+    "sha256": "46b752d3aa19f0f2de0eba6898ef415e5be8faeab00aaa9aab9cc0b94e09a3f7"
+  },
+  "sparkle/Configurations/ConfigSparkleTool.xcconfig": {
+    "executable": false,
+    "sha256": "17af9842cb0adaac625132f6b0d7738452a7fd52d00bb5b1c41b2a01174e2f27"
+  },
+  "sparkle/Configurations/ConfigSwift.xcconfig": {
+    "executable": false,
+    "sha256": "8b2742208764e719ab1865037c022e5ab6529314745a848f9375a93a050f58fa"
+  },
+  "sparkle/Configurations/ConfigSwiftDebug.xcconfig": {
+    "executable": false,
+    "sha256": "28c4afab198a0d46c14b1be013b000da081e563635c71af217fd5d7175d020d2"
+  },
+  "sparkle/Configurations/ConfigSwiftRelease.xcconfig": {
+    "executable": false,
+    "sha256": "6c001db9653bcf9aeda9f76fe598bda068eacf7704c5ac8c0d0d0ebad9d0b89e"
+  },
+  "sparkle/Configurations/ConfigTestApp.xcconfig": {
+    "executable": false,
+    "sha256": "c049497469838e964d034e22b0d730edbdbf40b1507bc9470a88c17266fef987"
+  },
+  "sparkle/Configurations/ConfigTestAppDebug.xcconfig": {
+    "executable": false,
+    "sha256": "e12335579b2b5753301bdb14e5885be9852e6c9d520796e375dce91367060feb"
+  },
+  "sparkle/Configurations/ConfigTestAppHelper.xcconfig": {
+    "executable": false,
+    "sha256": "be37e71495be39b75ca4b749b4bff8492667c125f2b229a55ac1a80c2079cc23"
+  },
+  "sparkle/Configurations/ConfigTestAppHelperDebug.xcconfig": {
+    "executable": false,
+    "sha256": "2d055153880e3dc6f6b1ef640f560975d1c92afbff9b72b8c2babedffd21a0b0"
+  },
+  "sparkle/Configurations/ConfigUITest.xcconfig": {
+    "executable": false,
+    "sha256": "25a742a09d325061a8e744e4894fe281834ff70410123880add1b6ee34cef2e4"
+  },
+  "sparkle/Configurations/ConfigUITestCoverage.xcconfig": {
+    "executable": false,
+    "sha256": "d2e1d02e6fcb9be0911e979a374d15e64eaf4a80bef31df99e4c2d55687e128f"
+  },
+  "sparkle/Configurations/ConfigUITestDebug.xcconfig": {
+    "executable": false,
+    "sha256": "c86d53827b5bca4617e663390a3a0f9aac78ed291238bb3d47e6899fca6c49f3"
+  },
+  "sparkle/Configurations/ConfigUITestRelease.xcconfig": {
+    "executable": false,
+    "sha256": "065ae59acd99f16869e1cbc5040d4bfd368ed01b609757a5431ec472f8310952"
+  },
+  "sparkle/Configurations/ConfigUnitTest.xcconfig": {
+    "executable": false,
+    "sha256": "9dbf2799333f361353553d795e76847b7e634ff820e96e043948dd1b0626dceb"
+  },
+  "sparkle/Configurations/ConfigUnitTestCoverage.xcconfig": {
+    "executable": false,
+    "sha256": "3bdbf619a6550685f446aaa5ed8966203abc802b4fedc9e9a7b07979c87adc62"
+  },
+  "sparkle/Configurations/ConfigUnitTestDebug.xcconfig": {
+    "executable": false,
+    "sha256": "c8bb4bbdca4b59067976fa23d538469d7f2922a4fb5cf2a70a3aab57dc416e9a"
+  },
+  "sparkle/Configurations/ConfigUnitTestRelease.xcconfig": {
+    "executable": false,
+    "sha256": "a6906192c0ece4a879388b9821a5f2bbf3cdd50910747b95cc8eec8b68461bfc"
+  },
+  "sparkle/Configurations/bsdiff-Debug.xcconfig": {
+    "executable": false,
+    "sha256": "ec1ed9a77eed5f97b8f1596593057abd839fd5cfb7782ce32c53d9021beb5143"
+  },
+  "sparkle/Configurations/bsdiff-Release.xcconfig": {
+    "executable": false,
+    "sha256": "0b2377f53b4a9f9b58b6881f1fea0d0dba286b710f4739e6608c68b0904d56d8"
+  },
+  "sparkle/Configurations/bsdiff-Shared.xcconfig": {
+    "executable": false,
+    "sha256": "1f47e591101e4042db816433711d06696b6ad019be482bfd671740c37e7e0afe"
+  },
+  "sparkle/Configurations/ed25519-Debug.xcconfig": {
+    "executable": false,
+    "sha256": "39241a5469c7e7d5392bb3e70a6f352a81908ae381ba20aeea8c60960f46e7d4"
+  },
+  "sparkle/Configurations/ed25519-Release.xcconfig": {
+    "executable": false,
+    "sha256": "39241a5469c7e7d5392bb3e70a6f352a81908ae381ba20aeea8c60960f46e7d4"
+  },
+  "sparkle/Configurations/ed25519-Shared.xcconfig": {
+    "executable": false,
+    "sha256": "84f2e3935fc45b9cff3ee93ec721cb94532d50b75532778806261ffa057ec21e"
+  },
+  "sparkle/Configurations/generate_latest_changes.py": {
+    "executable": true,
+    "sha256": "b731122d76f2db35236e473c0ef820ed2def10a07105be0f273cd21c012ad950"
+  },
+  "sparkle/Configurations/link-tools.sh": {
+    "executable": true,
+    "sha256": "4f61f1508524b2b53f150dfbfc798b54ceaa85d618af70318a31bead2e9ac049"
+  },
+  "sparkle/Configurations/make-release-package.sh": {
+    "executable": true,
+    "sha256": "3a694c1832e95a9766ff716527c2cc904d827667fba9dc876e3f2b9cb01bfd78"
+  },
+  "sparkle/Configurations/make-xcframework.sh": {
+    "executable": true,
+    "sha256": "f3c376e422a9d0991b19a4ea36500c4ec210725c3ce969d0405422878ad22901"
+  },
+  "sparkle/Configurations/release-move-tag.sh": {
+    "executable": true,
+    "sha256": "2d27f96d22321cfc2d13b1894b7ff046971d955d0efbb7381c0078ffb1c4f26d"
+  },
+  "sparkle/Configurations/set-git-version-info.sh": {
+    "executable": true,
+    "sha256": "9f39bb2f4d68a73bb8e59f209323e545acbe184bcbf56f50928b08b8a83cc70c"
+  },
+  "sparkle/Configurations/strip-framework.sh": {
+    "executable": true,
+    "sha256": "97ac2121fff6270e2870b2de225b246ed58492bce07cc411b51542016955b673"
+  },
+  "sparkle/Configurations/update-carthage.py": {
+    "executable": true,
+    "sha256": "f2a4e725dbd91798649e94a593a3229fe9efbc5b80fc98ecab55335b83d0baa1"
+  },
+  "sparkle/Documentation/.gitignore": {
+    "executable": false,
+    "sha256": "95d53ad4efbcc898697e40693e04357cb6b8e54198270fc9d2b1b51227d23b7b"
+  },
+  "sparkle/Documentation/API_README.markdown": {
+    "executable": false,
+    "sha256": "c0242055d6467ec5d53bf4a99a51c9ebb704c60f620f106df99300ab4af4cae0"
+  },
+  "sparkle/Documentation/Design Practices.md": {
+    "executable": false,
+    "sha256": "22ec4add82de80daebb443cabefabaf58909ae1ed1087f2c4f2edc0ab407853f"
+  },
+  "sparkle/Documentation/Installation.md": {
+    "executable": false,
+    "sha256": "710abdef1c59a9614a749125e9cc9d5cdad630f9f5bcefbe6a17c3adcc2a9998"
+  },
+  "sparkle/Documentation/Security.md": {
+    "executable": false,
+    "sha256": "0160a2240bbfbd9f5773eb51e179d4171416a3fe0f2f09518a93b08647b980b1"
+  },
+  "sparkle/Downloader/Downloader.entitlements": {
+    "executable": false,
+    "sha256": "b043dea477bbd5da1552ef2f436a0cb644b884bb2568a9f831bd4ee362f9e99b"
+  },
+  "sparkle/Downloader/Info.plist": {
+    "executable": false,
+    "sha256": "e1643ea943b133b84291fa17a5b9e0699a71642cdc97c4b120a671d397621505"
+  },
+  "sparkle/Downloader/SPUDownloader.h": {
+    "executable": false,
+    "sha256": "db8d3cf04000856613f868b066dac766bd68652d798eb10810ed761b4ff6d04f"
+  },
+  "sparkle/Downloader/SPUDownloader.m": {
+    "executable": false,
+    "sha256": "7cda9fcc6ced02faf0dd9a9ad2806225d921a80fbca5b59ede3706026bbfbe8f"
+  },
+  "sparkle/Downloader/SPUDownloaderDelegate.h": {
+    "executable": false,
+    "sha256": "eb81d81bd1343d851bf8b81355c20c302d81b6a09e0de84a078111b18e23d04c"
+  },
+  "sparkle/Downloader/SPUDownloaderProtocol.h": {
+    "executable": false,
+    "sha256": "c61bc23189646aa553e0726d6b44c12449ec845bd86fc50d82c21efa0202b673"
+  },
+  "sparkle/Downloader/main.m": {
+    "executable": false,
+    "sha256": "e23d620003b5644987ed5e9c3e7d34694ba9a20a853ef5d1c98d988350acef08"
+  },
+  "sparkle/INSTALL": {
+    "executable": false,
+    "sha256": "f627ddf9a7761bf91f5a1558986166b82c5c84fece245f8e5cf5fb395800c830"
+  },
+  "sparkle/InstallerConnection/Info.plist": {
+    "executable": false,
+    "sha256": "d8a3b98dac5d18ca364c5133f34fe7f2d8ab4e56484405f839420dedb76f9960"
+  },
+  "sparkle/InstallerConnection/SUInstallerCommunicationProtocol.h": {
+    "executable": false,
+    "sha256": "205303a85277c2c08f1a777c583696ce9aeeb119b8d54575b11e12e83da52f04"
+  },
+  "sparkle/InstallerConnection/SUInstallerConnection.h": {
+    "executable": false,
+    "sha256": "38f54a3a50e942a94002696aea4aa1fb4e4070496698a920c598d7aba3955410"
+  },
+  "sparkle/InstallerConnection/SUInstallerConnection.m": {
+    "executable": false,
+    "sha256": "ea34c9286ed6df08b5a313d5780b44317023a87a009092c1d732cec5fd71d4e6"
+  },
+  "sparkle/InstallerConnection/SUInstallerConnectionProtocol.h": {
+    "executable": false,
+    "sha256": "9d447a722f6fd1393ed61d3f16b46519e9df92409a27b1f7b01613d52b908345"
+  },
+  "sparkle/InstallerConnection/SUXPCInstallerConnection.h": {
+    "executable": false,
+    "sha256": "e173ed8c148ede88d672174f6dceb1f1a5fb7932f0407fb59758d65e8c9c6b84"
+  },
+  "sparkle/InstallerConnection/SUXPCInstallerConnection.m": {
+    "executable": false,
+    "sha256": "4b3ed82406d40cc9bf7549540b94ea3517f989751c91c0d173b978f0cb414aab"
+  },
+  "sparkle/InstallerConnection/main.m": {
+    "executable": false,
+    "sha256": "2bd9fea47f8fc79c8906e6667d82f94fe28a8fddc6095025059cac6e74662589"
+  },
+  "sparkle/InstallerLauncher/Info.plist": {
+    "executable": false,
+    "sha256": "415fa99aa54d4d0e43e2dbf62ad26c61f8123076f35e0741e4f11a978ebc44ea"
+  },
+  "sparkle/InstallerLauncher/SUInstallerLauncher+Private.h": {
+    "executable": false,
+    "sha256": "cb2e9c465f08ab0309c2bf3a4d2f7c35d9c76ff5a4480694700a22298520dd94"
+  },
+  "sparkle/InstallerLauncher/SUInstallerLauncher.h": {
+    "executable": false,
+    "sha256": "6e31930fd1bcecaa0ecae6d40a8984c6f1d6d5cb250578183dc5e7453810d1a1"
+  },
+  "sparkle/InstallerLauncher/SUInstallerLauncher.m": {
+    "executable": false,
+    "sha256": "04f6c2e44ddcf6bb5b1cb0530be2f970b2652a02cd81b6e1d7bd874bd92f915a"
+  },
+  "sparkle/InstallerLauncher/SUInstallerLauncherProtocol.h": {
+    "executable": false,
+    "sha256": "a6425ef508e1880bb84236dd2bff89c0b71dc97648e340c7eaed1688d4d368f2"
+  },
+  "sparkle/InstallerLauncher/SUInstallerLauncherStatus.h": {
+    "executable": false,
+    "sha256": "eb1f08aa42311efb1a7ab5223e330eca230b40885831ec253c23d18be7902c0c"
+  },
+  "sparkle/InstallerLauncher/main.m": {
+    "executable": false,
+    "sha256": "6fcb42a068d86612bd63096631f34706cea93eaedf581a6132aa9bccead9259a"
+  },
+  "sparkle/InstallerStatus/Info.plist": {
+    "executable": false,
+    "sha256": "d8a3b98dac5d18ca364c5133f34fe7f2d8ab4e56484405f839420dedb76f9960"
+  },
+  "sparkle/InstallerStatus/SUInstallerStatus.h": {
+    "executable": false,
+    "sha256": "f551762d34dc2d7f4d4849dbe16b1593eddfc9af7424d934af3abafefae59666"
+  },
+  "sparkle/InstallerStatus/SUInstallerStatus.m": {
+    "executable": false,
+    "sha256": "c77e4978676c97f91d27fe260335a6a122d3a528467e84a856e9c1f2e118a4b9"
+  },
+  "sparkle/InstallerStatus/SUInstallerStatusProtocol.h": {
+    "executable": false,
+    "sha256": "c00ebfb5598d3158899fdeae9dba541cad5ec710f244885e9acf65b381e6dac8"
+  },
+  "sparkle/InstallerStatus/SUXPCInstallerStatus.h": {
+    "executable": false,
+    "sha256": "dbad0d024a5c2d25f0051051c3faad53d6a1525c1493eecd527f3871955d22a3"
+  },
+  "sparkle/InstallerStatus/SUXPCInstallerStatus.m": {
+    "executable": false,
+    "sha256": "df8abe572586f8a5638023c2b2e04cc6804c2ec53e2d084c7cc8ee1f3e65e18e"
+  },
+  "sparkle/InstallerStatus/main.m": {
+    "executable": false,
+    "sha256": "05b73710bc2b1e8a1bddaeb46287e2e7f31f5b5aa8fcacb5eaec3d979f59ba07"
+  },
+  "sparkle/LICENSE": {
+    "executable": false,
+    "sha256": "389a4e4e9a32f059775b13a06e25a591445ba229d2838d26dd3e7c0c45127cfe"
+  },
+  "sparkle/Makefile": {
+    "executable": false,
+    "sha256": "7c86fb0657e58f2786cabbd08cddf223038bc0ef3582ca21d36c96a8b71c7ad2"
+  },
+  "sparkle/README.markdown": {
+    "executable": false,
+    "sha256": "026d91de7c1690828738536abe7c841cbf564718062f2910a571a7eeb7c5ed99"
+  },
+  "sparkle/Resources/AppIcon.icon/Assets/circular_arrow.png": {
+    "executable": false,
+    "sha256": "5e5696a04d39401b81fa506a25c60f4087e96e2ed8aa93921d32ab4721ce1435"
+  },
+  "sparkle/Resources/AppIcon.icon/Assets/sparkles.png": {
+    "executable": false,
+    "sha256": "f36a6916b148176eb47bf6df912c7346c2853fdb539b0fb5baddad6ad8db08c3"
+  },
+  "sparkle/Resources/AppIcon.icon/icon.json": {
+    "executable": false,
+    "sha256": "35cd33d6ab578631ad5e82924597325542aebf1597a72cf7af4e03e8bca52cc2"
+  },
+  "sparkle/Resources/Images.xcassets/AppIcon.appiconset/Contents.json": {
+    "executable": false,
+    "sha256": "2d55c952e54746b6c80ed184411413e261e576411552d5700deb28625b16a9ab"
+  },
+  "sparkle/Resources/Images.xcassets/AppIcon.appiconset/icon_128x128.png": {
+    "executable": false,
+    "sha256": "b2b9a4c08b5e0f4d77e54c85192dcabf219fcb863286eac9cb21f7a990f22ae0"
+  },
+  "sparkle/Resources/Images.xcassets/AppIcon.appiconset/icon_128x128@2x.png": {
+    "executable": false,
+    "sha256": "686093fd384360e72458df8d6fce0f19ab90e2cf212909a359f9a00556dcddbd"
+  },
+  "sparkle/Resources/Images.xcassets/AppIcon.appiconset/icon_16x16.png": {
+    "executable": false,
+    "sha256": "e09c8f2d02d1ddea08f11ec4231f2311272efb3b54ce3413b1971768e0fa9df7"
+  },
+  "sparkle/Resources/Images.xcassets/AppIcon.appiconset/icon_16x16@2x.png": {
+    "executable": false,
+    "sha256": "5a1b6c0e2c7dd98882c51c045cb7cf3e342a4b2d80402e5b1c979665b775dafb"
+  },
+  "sparkle/Resources/Images.xcassets/AppIcon.appiconset/icon_256x256.png": {
+    "executable": false,
+    "sha256": "686093fd384360e72458df8d6fce0f19ab90e2cf212909a359f9a00556dcddbd"
+  },
+  "sparkle/Resources/Images.xcassets/AppIcon.appiconset/icon_256x256@2x.png": {
+    "executable": false,
+    "sha256": "47f4c97a990150d61c09391ab4c359abcf7026dcbc47a583e8d73f86e214b57c"
+  },
+  "sparkle/Resources/Images.xcassets/AppIcon.appiconset/icon_32x32.png": {
+    "executable": false,
+    "sha256": "5a1b6c0e2c7dd98882c51c045cb7cf3e342a4b2d80402e5b1c979665b775dafb"
+  },
+  "sparkle/Resources/Images.xcassets/AppIcon.appiconset/icon_32x32@2x.png": {
+    "executable": false,
+    "sha256": "204d2bd5bcec8b5b62be9b9f99b8c94dafdba84604f813cb4d8b2edcea2f1eae"
+  },
+  "sparkle/Resources/Images.xcassets/AppIcon.appiconset/icon_512x512.png": {
+    "executable": false,
+    "sha256": "47f4c97a990150d61c09391ab4c359abcf7026dcbc47a583e8d73f86e214b57c"
+  },
+  "sparkle/Resources/Images.xcassets/AppIcon.appiconset/icon_512x512@2x.png": {
+    "executable": false,
+    "sha256": "5a12c14a7057e809f96d4395bd8809d9dcc22e6ad8951a4b6c3d51deca2fcd00"
+  },
+  "sparkle/Resources/ReleaseNotesColorStyle.css": {
+    "executable": false,
+    "sha256": "76bd6999758fd8e51d17e6b482db434f9b4768c02b037af6bd2e3a000ce8cbc1"
+  },
+  "sparkle/Resources/SampleAppcast.xml": {
+    "executable": true,
+    "sha256": "0aefc5c16ada8b2874783ee7b7e6c83092944d1c99480a120d2b08665b8af2ba"
+  },
+  "sparkle/Resources/Screenshot2.png": {
+    "executable": false,
+    "sha256": "56b09caac4cec28f208380f188f0778664d71878e8b136b919b2605a0dce7f76"
+  },
+  "sparkle/Resources/Sparkle-Icon-2016.sketch": {
+    "executable": false,
+    "sha256": "594c31507244dcf36ca8e9785f67199f352c0decab502449d8003b9f61545f25"
+  },
+  "sparkle/Sparkle.podspec": {
+    "executable": false,
+    "sha256": "ca15d539699ddcd258a6f0041b3e6d95c4a52e48ff73875a7d319f2204f724d4"
+  },
+  "sparkle/Sparkle.xcodeproj/project.pbxproj": {
+    "executable": false,
+    "sha256": "dc692ffb1004eaaba829590e94b63b3a1073f2704e6236e91f350f5d5f9e4c30"
+  },
+  "sparkle/Sparkle.xcodeproj/project.xcworkspace/contents.xcworkspacedata": {
+    "executable": false,
+    "sha256": "7f3b00b5c3fdb45242d7b87e1e5c4e25d1fa8129a16c94295ecc4e8ea2235c5f"
+  },
+  "sparkle/Sparkle.xcodeproj/project.xcworkspace/xcshareddata/IDEWorkspaceChecks.plist": {
+    "executable": false,
+    "sha256": "dfa0f9bb85b95ccba9c6811adadf8cb407fb5d52088e89db83ebc308ec448542"
+  },
+  "sparkle/Sparkle.xcodeproj/xcshareddata/xcschemes/BinaryDelta.xcscheme": {
+    "executable": false,
+    "sha256": "c32361ebb6b3bac78925faec665127eb3715eab7e50617cfb54e113af940ce9c"
+  },
+  "sparkle/Sparkle.xcodeproj/xcshareddata/xcschemes/Distribution.xcscheme": {
+    "executable": false,
+    "sha256": "72f262dcc13794f41ea46ecd8de68c39bad8d2b4f88fc6090cb091fe07afcbf0"
+  },
+  "sparkle/Sparkle.xcodeproj/xcshareddata/xcschemes/Sparkle Test App.xcscheme": {
+    "executable": false,
+    "sha256": "36ee3857b5e31c9bbefcfb070055bfaac2b0722752f54d5ff97a4888f1babfef"
+  },
+  "sparkle/Sparkle.xcodeproj/xcshareddata/xcschemes/Sparkle.xcscheme": {
+    "executable": false,
+    "sha256": "9ebbf0b05b40f8c4846d7ecd4ec607ca016c6e02d711e6b8696498f925dc2a87"
+  },
+  "sparkle/Sparkle.xcodeproj/xcshareddata/xcschemes/UITests.xcscheme": {
+    "executable": false,
+    "sha256": "662f69c03fba3e71e890a74b15261dc3c393ef40c5cf2a14d0d63eb1aab42d4b"
+  },
+  "sparkle/Sparkle.xcodeproj/xcshareddata/xcschemes/generate_appcast.xcscheme": {
+    "executable": false,
+    "sha256": "9e997f95cab19f908fc0784a7a54569c19be0f1fca97fe5d07df70d580cd849f"
+  },
+  "sparkle/Sparkle.xcodeproj/xcshareddata/xcschemes/generate_keys.xcscheme": {
+    "executable": false,
+    "sha256": "e0efee6b7f5b4e702bfef5d9ab27209a7c3e626a8db483080427dfc2ccb29d18"
+  },
+  "sparkle/Sparkle.xcodeproj/xcshareddata/xcschemes/sign_update.xcscheme": {
+    "executable": false,
+    "sha256": "42adb94bce0278b75a0e5ed4e0b889082f513a4491813cef9284a74dea5a0d79"
+  },
+  "sparkle/Sparkle.xcodeproj/xcshareddata/xcschemes/sparkle-cli.xcscheme": {
+    "executable": false,
+    "sha256": "0fd611d2ea4408a46603673f22f57c029158aed5c96eeb3ee29f068bc76a7730"
+  },
+  "sparkle/Sparkle/AppKitPrevention.h": {
+    "executable": false,
+    "sha256": "ea0cbd2614bb4878fb45711fb22de3669e03c66dee8e4f0fc68103a36ef9ffdd"
+  },
+  "sparkle/Sparkle/Autoupdate/TerminationListener.h": {
+    "executable": false,
+    "sha256": "56213cc2f6138893d39ed14508e2ba5c13a3a0cd7c5d43d0a27fc893457be6e4"
+  },
+  "sparkle/Sparkle/Autoupdate/TerminationListener.m": {
+    "executable": false,
+    "sha256": "b4aeec764d12461da5428cca008c6039c6152e564ab828db519db07bc6654272"
+  },
+  "sparkle/Sparkle/Base.lproj/Sparkle.strings": {
+    "executable": false,
+    "sha256": "f77582fb64b29dd39b5eeda4fe0bb3638b38257acc49985b23a39d5501a280f9"
+  },
+  "sparkle/Sparkle/CheckLocalizations.swift": {
+    "executable": true,
+    "sha256": "bce9ca1e3a08654ded3dfca1d430728703d1fba4b694648f9632e9798118b8f2"
+  },
+  "sparkle/Sparkle/InstallerProgress/InstallerProgress-Info.plist": {
+    "executable": false,
+    "sha256": "d77166a4d612b5f444b9b9f9f0cebc04e617db74579d46f171dea99a2de21843"
+  },
+  "sparkle/Sparkle/InstallerProgress/InstallerProgressAppController.h": {
+    "executable": false,
+    "sha256": "20d9b11c3f3bf1ac551fb3c8371c932c83ab109354d4552cad521fd65f756e3b"
+  },
+  "sparkle/Sparkle/InstallerProgress/InstallerProgressAppController.m": {
+    "executable": false,
+    "sha256": "1757a04f721a0e1eca7ddab00706ff0e8a4161e67960def3f7bfb1d38f49787f"
+  },
+  "sparkle/Sparkle/InstallerProgress/InstallerProgressDelegate.h": {
+    "executable": false,
+    "sha256": "9f04fa31847b0b68315012db8ebde7c7bfcc12743d45c568211e79cf695fabc8"
+  },
+  "sparkle/Sparkle/InstallerProgress/SPUInstallerAgentProtocol.h": {
+    "executable": false,
+    "sha256": "7227abdc445f936da49cb0c6c40b03e06919cc999908c3d9689c33ac793e210c"
+  },
+  "sparkle/Sparkle/InstallerProgress/SUInstallerAgentInitiationProtocol.h": {
+    "executable": false,
+    "sha256": "751c5b815c84b86875dabd0b97a24d6011134718458fec6ceb3b339a9703418b"
+  },
+  "sparkle/Sparkle/InstallerProgress/ShowInstallerProgress.h": {
+    "executable": false,
+    "sha256": "83092cf23c469b8b4449f03dc67a4c6b9e9ae048c4925b34f9b2641d8d3d5374"
+  },
+  "sparkle/Sparkle/InstallerProgress/ShowInstallerProgress.m": {
+    "executable": false,
+    "sha256": "915067ce0a11fb583038231c2c25c0bd053a7874f342970897b76c3ff1f85adb"
+  },
+  "sparkle/Sparkle/InstallerProgress/main.m": {
+    "executable": false,
+    "sha256": "bb09bd4e88d4485c58577accffc44682131766cfc2a42420689c67966a4474d8"
+  },
+  "sparkle/Sparkle/SPUAppcastItemState.h": {
+    "executable": false,
+    "sha256": "a9ce03566681ed41cb3f938b221089d7f81d7cea6ac63ecb5fb47476a2494226"
+  },
+  "sparkle/Sparkle/SPUAppcastItemState.m": {
+    "executable": false,
+    "sha256": "712b5a5dcf414d56647c16ddee5d9c6e19c6620962d1c3e335075f120ca639fb"
+  },
+  "sparkle/Sparkle/SPUAppcastItemStateResolver+Private.h": {
+    "executable": false,
+    "sha256": "5e00af7421bc44344a8c138ab8b4815aa73c3cd02a89e0bfc46209d78f82dca7"
+  },
+  "sparkle/Sparkle/SPUAppcastItemStateResolver.h": {
+    "executable": false,
+    "sha256": "1c3be298008c19757ae3b27083622a005bce809a01f06d2c74f6dea16f3214ee"
+  },
+  "sparkle/Sparkle/SPUAppcastItemStateResolver.m": {
+    "executable": false,
+    "sha256": "1c0b066bd1036a0e002dd6dbfdef389ffa7c0bb59ac87195598bdeaab379e6f3"
+  },
+  "sparkle/Sparkle/SPUAppcastSigningValidationStatus.h": {
+    "executable": false,
+    "sha256": "513d4607ac9ba03c2203b03df307f404216c3ce7f3436784fbbef1842c742749"
+  },
+  "sparkle/Sparkle/SPUAutomaticUpdateDriver.h": {
+    "executable": false,
+    "sha256": "692c1f36e208199568b5f1196ef7a872b1456232133d93627c2481c24990d95a"
+  },
+  "sparkle/Sparkle/SPUAutomaticUpdateDriver.m": {
+    "executable": false,
+    "sha256": "838d0257b1442436b8d8d4715e1e39b2abfbc18d3f5ede04747a9d8c5826e781"
+  },
+  "sparkle/Sparkle/SPUBasicUpdateDriver.h": {
+    "executable": false,
+    "sha256": "27c8b269cbb44c9261c3db63a8b7d771bffa99c3a3accdc43db91f72aa3d6cc5"
+  },
+  "sparkle/Sparkle/SPUBasicUpdateDriver.m": {
+    "executable": false,
+    "sha256": "565a57b38efe443f48a0859022b695c7d34c6a44c74586ea099ff705b95897a5"
+  },
+  "sparkle/Sparkle/SPUCoreBasedUpdateDriver.h": {
+    "executable": false,
+    "sha256": "d1a5c74cf8701ad734ae02274342c0a099d8aa0fedc955bdd0e455db9ce87999"
+  },
+  "sparkle/Sparkle/SPUCoreBasedUpdateDriver.m": {
+    "executable": false,
+    "sha256": "a0c2d0993514feaa438ff397bacbd7c29a74c0a050d3c43f604e38e66e21aa08"
+  },
+  "sparkle/Sparkle/SPUDownloadData.h": {
+    "executable": false,
+    "sha256": "58184c2c068a8d43b1ee85651f9edd30a6a9e5899ac936baf4a5f15a6081d7b7"
+  },
+  "sparkle/Sparkle/SPUDownloadData.m": {
+    "executable": false,
+    "sha256": "f5aafe30f836979d532186049e29ac247a85e54533e896f4186b2771f6d413b5"
+  },
+  "sparkle/Sparkle/SPUDownloadDataPrivate.h": {
+    "executable": false,
+    "sha256": "e93efeb383150efcb78a1767373e7cbfaedbcc4cf8f4efa1f2a01abc0a500306"
+  },
+  "sparkle/Sparkle/SPUDownloadDriver.h": {
+    "executable": false,
+    "sha256": "90ae74123863948d982124fe3f0fd1197064b0f819af863df985f1b3eca2c138"
+  },
+  "sparkle/Sparkle/SPUDownloadDriver.m": {
+    "executable": false,
+    "sha256": "d2d5e7d352ad76980b7db85b89f715f63e7742f62cb33423722dbfe07b3edf87"
+  },
+  "sparkle/Sparkle/SPUDownloadedUpdate.h": {
+    "executable": false,
+    "sha256": "a27d6e0c47a8cbcd1609542dafde213a7c999300eec9a20bfa0b17ee1cddc46b"
+  },
+  "sparkle/Sparkle/SPUDownloadedUpdate.m": {
+    "executable": false,
+    "sha256": "d5a331d432df6907fed653ebf44aa60457efd80e5597812362f5dc49327cf32c"
+  },
+  "sparkle/Sparkle/SPUExtractSignedFeed.h": {
+    "executable": false,
+    "sha256": "6045b2d8ff2dacaed5db18e9bb8fe5b7b2831c18e91c9b32009bce582e091563"
+  },
+  "sparkle/Sparkle/SPUExtractSignedFeed.m": {
+    "executable": false,
+    "sha256": "a3661045ee078167381b3418fda1cb1258a1cf875be93889758bf309d81ed10b"
+  },
+  "sparkle/Sparkle/SPUGentleUserDriverReminders.h": {
+    "executable": false,
+    "sha256": "f56d9d277f16417d79d66a484b4afcfc47c2a9957a8c487adb5c709dad895402"
+  },
+  "sparkle/Sparkle/SPUInformationalUpdate.h": {
+    "executable": false,
+    "sha256": "381bee2cfbcdb445ff922ddcc0318dd15ac65bca93cd0709b39179946967c8c6"
+  },
+  "sparkle/Sparkle/SPUInformationalUpdate.m": {
+    "executable": false,
+    "sha256": "c76f151950edffc233ba5a3b3c5a4ace7668fcff3bd6b93524f0a712d043c686"
+  },
+  "sparkle/Sparkle/SPUInstallationType.h": {
+    "executable": false,
+    "sha256": "52a1a445f58e7c6de94ac558c23913f8081647a499262affe9ac38ff790971d4"
+  },
+  "sparkle/Sparkle/SPUInstallerDriver.h": {
+    "executable": false,
+    "sha256": "5fd51f58f2e2344cc9df679eb4e34685adef3e463a0ab2c07b66775102c0eabc"
+  },
+  "sparkle/Sparkle/SPUInstallerDriver.m": {
+    "executable": false,
+    "sha256": "ed73cfd69edbaa1a75e8cae345fe9f3767c3c94b452d0d0d57cada4f692bdba1"
+  },
+  "sparkle/Sparkle/SPULocalCacheDirectory.h": {
+    "executable": false,
+    "sha256": "a20fe485ea47c8007024aa7060de972739b29ad9f6656d44b5c5975646d35fe7"
+  },
+  "sparkle/Sparkle/SPULocalCacheDirectory.m": {
+    "executable": false,
+    "sha256": "35b631ed1927e922fb9bb187e2dd925e309746b22ae70fed6815bbbf62470b77"
+  },
+  "sparkle/Sparkle/SPUNoUpdateFoundInfo.h": {
+    "executable": false,
+    "sha256": "027fd5a0f29b6e21771364c48cb77d6efc1d836587bc606de7391766efd36325"
+  },
+  "sparkle/Sparkle/SPUNoUpdateFoundInfo.m": {
+    "executable": false,
+    "sha256": "f36250ccdb12ae0075d09fa953834989f2bc2a24dc2271d2636251b4126b1dd3"
+  },
+  "sparkle/Sparkle/SPUProbeInstallStatus.h": {
+    "executable": false,
+    "sha256": "17a2ea63c3f02c8ac1441a7277f18d1f2a432f69d96f781b7dfd0c5bd80af613"
+  },
+  "sparkle/Sparkle/SPUProbeInstallStatus.m": {
+    "executable": false,
+    "sha256": "bc0b1490c58af5c106f206a1f158a3d335cf3188a8ba5193ee29a3388d5fd09a"
+  },
+  "sparkle/Sparkle/SPUProbingUpdateDriver.h": {
+    "executable": false,
+    "sha256": "ac00f414920a95694a754b0fa4038bc5bd826382cc3ec7fe3040e8e9f8162474"
+  },
+  "sparkle/Sparkle/SPUProbingUpdateDriver.m": {
+    "executable": false,
+    "sha256": "685a8f3524ff467a1cf0adc4ec9f1d8cf1338f0b36a0b425840d18f8188cad49"
+  },
+  "sparkle/Sparkle/SPUResumableUpdate.h": {
+    "executable": false,
+    "sha256": "5938419ff1f51302784f7bb76fda7f3f5ad279bcfa8d0aeab0a9d2281890f8ec"
+  },
+  "sparkle/Sparkle/SPUScheduledUpdateDriver.h": {
+    "executable": false,
+    "sha256": "bd25468e17c362c81bfd0f892c82ff2d9462d192336fc28f7928f20c5afecd13"
+  },
+  "sparkle/Sparkle/SPUScheduledUpdateDriver.m": {
+    "executable": false,
+    "sha256": "5a6052f828ed1d212c39cb346120e457ba57ce5c8549a0495b12704059e4b5a1"
+  },
+  "sparkle/Sparkle/SPUSecureCoding.h": {
+    "executable": false,
+    "sha256": "b81b0e9c2f04e85dc03501a9cc10e853ef7d33d9f0ebfb778c6afc1aafa7e235"
+  },
+  "sparkle/Sparkle/SPUSecureCoding.m": {
+    "executable": false,
+    "sha256": "e6e30060f0eec85551d2561735d62c30ed7d8e04d7a15cc837f7b3785ed7cf18"
+  },
+  "sparkle/Sparkle/SPUSkippedUpdate.h": {
+    "executable": false,
+    "sha256": "a9459dacf75731dbce7e4e731a91e11d82db77060bae7e03985f93c5e49fea7f"
+  },
+  "sparkle/Sparkle/SPUSkippedUpdate.m": {
+    "executable": false,
+    "sha256": "eacbebdb9031ffcceee36ec926fe98bdadb479ddd005bf28ed33585c476556e6"
+  },
+  "sparkle/Sparkle/SPUStandardUpdaterController.h": {
+    "executable": false,
+    "sha256": "f45dfdf2315664c5891b97ad0d7ffce9ab09d067effbd2921b10b58b4831ef0f"
+  },
+  "sparkle/Sparkle/SPUStandardUpdaterController.m": {
+    "executable": false,
+    "sha256": "2282d543add79ee35c86073904757d33eb897008fbb7ddc008518087281a192c"
+  },
+  "sparkle/Sparkle/SPUStandardUserDriver+Private.h": {
+    "executable": false,
+    "sha256": "acc764e731fe9e6d307fe32dea4d06b451964225c2b2a9745a23f035a9cdeaad"
+  },
+  "sparkle/Sparkle/SPUStandardUserDriver.h": {
+    "executable": false,
+    "sha256": "0a0e476b61932196027dd7b94e78d187f810f80c7900168eb4a5956b63d54a77"
+  },
+  "sparkle/Sparkle/SPUStandardUserDriver.m": {
+    "executable": false,
+    "sha256": "037d66085e156118fdcc363fd9e13a5f72730f713e7a7b592ede48538660f155"
+  },
+  "sparkle/Sparkle/SPUStandardUserDriverDelegate.h": {
+    "executable": false,
+    "sha256": "d906e549f7b108979727fa56f13c029906fe48c5602538513a4b480bb45a8c2d"
+  },
+  "sparkle/Sparkle/SPUStandardVersionDisplay.h": {
+    "executable": false,
+    "sha256": "3616b0a44414828e236c89e4dcc294aa99d0ba03518e0c053ec1ad84996fc1a1"
+  },
+  "sparkle/Sparkle/SPUStandardVersionDisplay.m": {
+    "executable": false,
+    "sha256": "3d083df30cce9e1793fa8f6a405bba7163f216165c173c6b7bbf09ede4443168"
+  },
+  "sparkle/Sparkle/SPUUIBasedUpdateDriver.h": {
+    "executable": false,
+    "sha256": "ce6d28baacb0d18b6fc6592776d0053e4dc343f40dcd5270ec0dd5ba29942be9"
+  },
+  "sparkle/Sparkle/SPUUIBasedUpdateDriver.m": {
+    "executable": false,
+    "sha256": "6f41af937b1b39fba4b413796542f5de28a221d9c91fd31f000df92d5a9e9a9f"
+  },
+  "sparkle/Sparkle/SPUUpdateCheck.h": {
+    "executable": false,
+    "sha256": "1f7d05da2e466263aefe3e09130e56b2e65b8862579e07b9829c9bf5ed921c03"
+  },
+  "sparkle/Sparkle/SPUUpdateDriver.h": {
+    "executable": false,
+    "sha256": "89d3a64d04d49e1f9b74adbb950a171973fbef9a2c82b3813a1d9e1cf505a3b6"
+  },
+  "sparkle/Sparkle/SPUUpdatePermissionRequest.h": {
+    "executable": false,
+    "sha256": "8c227246c2ea7461741db8bd7274936c3cbcbc7375fe814654d479b2650cd6bd"
+  },
+  "sparkle/Sparkle/SPUUpdatePermissionRequest.m": {
+    "executable": false,
+    "sha256": "887b10f8dce955c1b2e8c4b909fa4e60b116ea13f62b311610659c9ceb9a18a9"
+  },
+  "sparkle/Sparkle/SPUUpdater.h": {
+    "executable": false,
+    "sha256": "a30b876dc722a2861fb8f271a0bf0c95bd664db4cf2af57d216d190f2e010ee7"
+  },
+  "sparkle/Sparkle/SPUUpdater.m": {
+    "executable": false,
+    "sha256": "c86e3e59a201a9339bbd5a391f12e62d9c31aca125ef6d665a16088a1c144c78"
+  },
+  "sparkle/Sparkle/SPUUpdaterCycle.h": {
+    "executable": false,
+    "sha256": "5f579c8d5cbd87f4978fe1cc7653415df77db741233eade2ebeb5bce2c8f9429"
+  },
+  "sparkle/Sparkle/SPUUpdaterCycle.m": {
+    "executable": false,
+    "sha256": "64b9095df368a082b8cd60cc5f5f847cdf0e90cbf948226e6d8fcbae5663124b"
+  },
+  "sparkle/Sparkle/SPUUpdaterDelegate.h": {
+    "executable": false,
+    "sha256": "20ea4bf5273eaa6560160941d680acec6565965162737f50ea4240845a7dde24"
+  },
+  "sparkle/Sparkle/SPUUpdaterSettings+Debug.h": {
+    "executable": false,
+    "sha256": "c2d5bbbb2586a147a61f9c30804fc6c40b20858bd2a01507f52fdf659482ae8b"
+  },
+  "sparkle/Sparkle/SPUUpdaterSettings.h": {
+    "executable": false,
+    "sha256": "ad7bdfc719775fe4cdf1490f45ef902ded4dcb3756402e64884397bee425edff"
+  },
+  "sparkle/Sparkle/SPUUpdaterSettings.m": {
+    "executable": false,
+    "sha256": "2122557fe4bfc6f3444dedd9129a1751d161edc9716bc41eb6eabf20a1f4ee41"
+  },
+  "sparkle/Sparkle/SPUUpdaterTimer.h": {
+    "executable": false,
+    "sha256": "2884e8a6443f1a5ee0b8331a981b40f83841d9c90cc0b22c84bf4978b8a15c11"
+  },
+  "sparkle/Sparkle/SPUUpdaterTimer.m": {
+    "executable": false,
+    "sha256": "226e8f973a9531d2e4b8c4d87d3675589b2050de934a31576199f33a25320486"
+  },
+  "sparkle/Sparkle/SPUUserAgent+Private.h": {
+    "executable": false,
+    "sha256": "0c3ea7c6aabab32840e41c56bb22cfab4dee4dde3302603b6f4aba9ac1b5850c"
+  },
+  "sparkle/Sparkle/SPUUserAgent+Private.m": {
+    "executable": false,
+    "sha256": "754a0e1b11d3c142c622fa9507ad88faf1357119fd73142cff0d4790863cbda0"
+  },
+  "sparkle/Sparkle/SPUUserDriver.h": {
+    "executable": false,
+    "sha256": "db9fe6cf78aca0f2f79a99898d38daff566f96c823de2bb2b985511ad77017dc"
+  },
+  "sparkle/Sparkle/SPUUserInitiatedUpdateDriver.h": {
+    "executable": false,
+    "sha256": "0e357b1052beef88b1043873dffe58d37efb335c1b2133dca087e89334bd6ea6"
+  },
+  "sparkle/Sparkle/SPUUserInitiatedUpdateDriver.m": {
+    "executable": false,
+    "sha256": "464a5c2b648043b3f547e2ff463c930bdbba79962def9ac4080190263b403bfe"
+  },
+  "sparkle/Sparkle/SPUUserUpdateState+Private.h": {
+    "executable": false,
+    "sha256": "f2f0e98333c729e589532b5cce3d5a6e11b6954c03abc77cbdee63389ce8e188"
+  },
+  "sparkle/Sparkle/SPUUserUpdateState.h": {
+    "executable": false,
+    "sha256": "59f95e933f8b5b2b39c1e7c465aa39af021a2c88820b4b09dbcfc55b1dd19c30"
+  },
+  "sparkle/Sparkle/SPUUserUpdateState.m": {
+    "executable": false,
+    "sha256": "b9a72eb084ebe9685ee1a7b87b830389d7ed0b0b78cdcf6e442b9ec1e08dcbf0"
+  },
+  "sparkle/Sparkle/SPUVerifierInformation.h": {
+    "executable": false,
+    "sha256": "59faac46296a6001c78fa3f1641b27d0d0b1d067e387727a050146fe437913d3"
+  },
+  "sparkle/Sparkle/SPUVerifierInformation.m": {
+    "executable": false,
+    "sha256": "7830ae3cfe32bebcf6a291323a6d9c406793b9131008ef7f703ddef2f470eaa7"
+  },
+  "sparkle/Sparkle/SPUXPCServiceInfo.h": {
+    "executable": false,
+    "sha256": "0f67937936a1608c7bed884efab167a506091afd77ca7da5f765788dd29d4f3a"
+  },
+  "sparkle/Sparkle/SPUXPCServiceInfo.m": {
+    "executable": false,
+    "sha256": "ab4c11ef5d19062344bcf552eeeaaa13fb935efd34575f046b20b16d3bb04125"
+  },
+  "sparkle/Sparkle/SUAppcast+Private.h": {
+    "executable": false,
+    "sha256": "064f28b250333b95b7adfa033614aa354b640f6c687a1a3d559ffd178522330a"
+  },
+  "sparkle/Sparkle/SUAppcast.h": {
+    "executable": false,
+    "sha256": "251d6ffa7cbc890999ddda3406834f45396cf887a71e5be9ff581883559df0a0"
+  },
+  "sparkle/Sparkle/SUAppcast.m": {
+    "executable": false,
+    "sha256": "0175c8a46be0f8a81d68ccf7f4fd5387a56cc3a794e7f06fd550b7296a35f9b4"
+  },
+  "sparkle/Sparkle/SUAppcastDriver.h": {
+    "executable": false,
+    "sha256": "7ffcee1521ed545ce3bbaa2a6c24e2a13b282093cc33c12af8c3a1aa4dbe3912"
+  },
+  "sparkle/Sparkle/SUAppcastDriver.m": {
+    "executable": false,
+    "sha256": "af743b4e963d9370650561e58d07aa57083d8d13f47f0ad212e2cd3a5319b3a4"
+  },
+  "sparkle/Sparkle/SUAppcastItem+Private.h": {
+    "executable": false,
+    "sha256": "642ecbeecb323f7201a732b5953d60fefefa13cf894af28936dd0d7d001a101a"
+  },
+  "sparkle/Sparkle/SUAppcastItem.h": {
+    "executable": false,
+    "sha256": "95e15231e3965d480f8b14f5c911e392b72849549f314750c851128bf66ac314"
+  },
+  "sparkle/Sparkle/SUAppcastItem.m": {
+    "executable": false,
+    "sha256": "d9ba807c6aa04d9664022ee932d33d884676a9f832c9bc1b7d3b29c742ee1dbf"
+  },
+  "sparkle/Sparkle/SUApplicationInfo.h": {
+    "executable": false,
+    "sha256": "dc1a80b79533d88a77a1cb5573a6dc019dc50075c316361251b6bef2173b7237"
+  },
+  "sparkle/Sparkle/SUApplicationInfo.m": {
+    "executable": false,
+    "sha256": "6deb5399f56e613747263605778feec6abf71e33a297f632baab2907e1735962"
+  },
+  "sparkle/Sparkle/SUConstants.h": {
+    "executable": false,
+    "sha256": "eb12c789092575cdcdbb0a36333f81d40ec2448ddb819a19f88602befd85fdfe"
+  },
+  "sparkle/Sparkle/SUConstants.m": {
+    "executable": false,
+    "sha256": "0d25e81bf61bc2c843b32cef06ba60483130b2b718c83c76aa9b71d3c4b36965"
+  },
+  "sparkle/Sparkle/SUErrors.h": {
+    "executable": false,
+    "sha256": "e7e84fa6ef85b549810682ec883593f560d79b776ebec5fb11d9558a6f1f78e5"
+  },
+  "sparkle/Sparkle/SUExport.h": {
+    "executable": false,
+    "sha256": "5cef024266c54e12db620f78f4d106860de0fa2a2e230dffdfe04208bb447451"
+  },
+  "sparkle/Sparkle/SUFileManager.h": {
+    "executable": false,
+    "sha256": "e07bd075ebe14baea8ca09ee36aa34baa7a5813e894481979ae9d29cdf63f9ed"
+  },
+  "sparkle/Sparkle/SUFileManager.m": {
+    "executable": false,
+    "sha256": "278b8a11abd196b4c3a6b277e1f14ba8f682a21c0c8bb610d7c9267f29bd9864"
+  },
+  "sparkle/Sparkle/SUHost.h": {
+    "executable": false,
+    "sha256": "8e95e19e7f4266e8459589d6d4dc93eb3a1183e2b6f5ddb0f63bb9fe1412793c"
+  },
+  "sparkle/Sparkle/SUHost.m": {
+    "executable": false,
+    "sha256": "93f2ac76c9324f42d5d4587997e9fb8f3cc5640d9eba13ac6b3e40850b2699b4"
+  },
+  "sparkle/Sparkle/SUInstallerProtocol.h": {
+    "executable": false,
+    "sha256": "52c6d4314d7329927b85be6d8b3abba0d2c77b0e025a4a2919dfac5a02f9ba3c"
+  },
+  "sparkle/Sparkle/SULegacyWebView.h": {
+    "executable": false,
+    "sha256": "fcc77327b07beab408422400171ff0490c660222808345be1e5c973927f4c842"
+  },
+  "sparkle/Sparkle/SULegacyWebView.m": {
+    "executable": false,
+    "sha256": "8c86ee44faf8c2f31af4d626476d5013ba1ffdc499da0dcb6a1446a285ac4eb4"
+  },
+  "sparkle/Sparkle/SULocalizations.h": {
+    "executable": false,
+    "sha256": "7fe490df1c0dcce6fab05a0801970ad6fbfab9c8fa49bb709322cf152ffc89bd"
+  },
+  "sparkle/Sparkle/SULog+NSError.h": {
+    "executable": false,
+    "sha256": "c77e106430df0c893f7cbc8ed876e9b0e87b0ddc60b05e9502008f055cc22de5"
+  },
+  "sparkle/Sparkle/SULog+NSError.m": {
+    "executable": false,
+    "sha256": "647d0b3ba7b73728fdcd776845d585a896f052d8ac32f22b2ac098d240be0ad4"
+  },
+  "sparkle/Sparkle/SULog.h": {
+    "executable": false,
+    "sha256": "bdcdc3bec1f8651dcc4235fc1ce5011169a9adf635e0544b4f3966689ed693bb"
+  },
+  "sparkle/Sparkle/SULog.m": {
+    "executable": false,
+    "sha256": "479b6bec3133c58d8b6da57fbe049c80493a6992bed90545a150e77f436185b6"
+  },
+  "sparkle/Sparkle/SUNormalization.h": {
+    "executable": false,
+    "sha256": "f7cbc9239303686bc0faed48c52227cf0744942d523b8610a7da26bfa408daa0"
+  },
+  "sparkle/Sparkle/SUNormalization.m": {
+    "executable": false,
+    "sha256": "a94c91d94abe679d1ba6fbff635d7e4a560ed6d1ccce929bbdef676c7abf5df4"
+  },
+  "sparkle/Sparkle/SUOperatingSystem.h": {
+    "executable": false,
+    "sha256": "f502c758361a44c2c82eabb3a35911ef660af11e6c04480e4468f1e71db7e60f"
+  },
+  "sparkle/Sparkle/SUOperatingSystem.m": {
+    "executable": false,
+    "sha256": "25cf8f8966bd8864f3b578593dc40bd4ea92f67fdc6064bd0a72ca1a9ce1ee25"
+  },
+  "sparkle/Sparkle/SUPhasedUpdateGroupInfo.h": {
+    "executable": false,
+    "sha256": "f05efeb52b08f8e1221e6c72b694e1fa51b4a1f1887b2d0fa9b8827a0b0a359d"
+  },
+  "sparkle/Sparkle/SUPhasedUpdateGroupInfo.m": {
+    "executable": false,
+    "sha256": "cf5c386e70614e0dbf178591dcaf62905291b85e9c2346b727dd16050fe0c1be"
+  },
+  "sparkle/Sparkle/SUReleaseNotesCommon.h": {
+    "executable": false,
+    "sha256": "a3801348c647ff33c0884bb6324522083b7c92489bab708b6a22f70b16951e9a"
+  },
+  "sparkle/Sparkle/SUReleaseNotesCommon.m": {
+    "executable": false,
+    "sha256": "cebf5164ebe241dd46d8f5b508bf6b5a4d3a3ab60a32eed5b81dd65c389066dc"
+  },
+  "sparkle/Sparkle/SUReleaseNotesView.h": {
+    "executable": false,
+    "sha256": "ccafbc29d5b75b7621d390dc349c94ddaeedc089d5b411b26ccd865674cf27fc"
+  },
+  "sparkle/Sparkle/SUSignatures.h": {
+    "executable": false,
+    "sha256": "1106536dca0bd5dcc179a851b79f1e7d4a60d9cce3cc46da69100bf51052b0b6"
+  },
+  "sparkle/Sparkle/SUSignatures.m": {
+    "executable": false,
+    "sha256": "e859e366d47062b155caaa6dedeb221823c19be51badde7b2d2dae9770b68d7f"
+  },
+  "sparkle/Sparkle/SUStandardVersionComparator.h": {
+    "executable": false,
+    "sha256": "7d407b9ce721d5c650e741ecb692e77f12ef3b5e18ea8136f72448e8d7208c6c"
+  },
+  "sparkle/Sparkle/SUStandardVersionComparator.m": {
+    "executable": false,
+    "sha256": "65cbe5526f1f40f9465bc5ea102536238c4270b10653d073cc361e748660d012"
+  },
+  "sparkle/Sparkle/SUStatus.xib": {
+    "executable": false,
+    "sha256": "f1d92463a8b2fb5e9c5eeb0c51141a7e339398e4a6eb20a0fd27828c35657788"
+  },
+  "sparkle/Sparkle/SUStatusController.h": {
+    "executable": false,
+    "sha256": "41242b578935003af0a56c4847c62cf9f1ee2793a252b04e846ab2c4a30c5e8f"
+  },
+  "sparkle/Sparkle/SUStatusController.m": {
+    "executable": false,
+    "sha256": "8531bcc03e22a018220ebbc74b197a7f4711145094c1a26248bde44c15442883"
+  },
+  "sparkle/Sparkle/SUSystemProfiler.h": {
+    "executable": false,
+    "sha256": "1b6662374a4d8c640e3137b25a52066bf49c55ffb70abf6952e34cdf33649044"
+  },
+  "sparkle/Sparkle/SUSystemProfiler.m": {
+    "executable": false,
+    "sha256": "a6a6914e57e86475e438b74b8cb8bf9196507f660cfe88bf5ee0e96e6fa633af"
+  },
+  "sparkle/Sparkle/SUTextViewReleaseNotesView.h": {
+    "executable": false,
+    "sha256": "75c0b0b8dd246132ab537886cdde5bb0c3710233134e3c47fd6b13a57da7699b"
+  },
+  "sparkle/Sparkle/SUTextViewReleaseNotesView.m": {
+    "executable": false,
+    "sha256": "a970822932913678eac85969891f180fcad834a5765b7f9cb60fdd0238d7ff17"
+  },
+  "sparkle/Sparkle/SUTouchBarButtonGroup.h": {
+    "executable": false,
+    "sha256": "6799a5609b73afe8f0ab0bc7a4a9a61c970e6f61005596d412ec9b6af049daca"
+  },
+  "sparkle/Sparkle/SUTouchBarButtonGroup.m": {
+    "executable": false,
+    "sha256": "a6e6c838fdfd3640b5ddd2bf860fa0251c51b57ffecd5ee4a6b512e7fc7af33a"
+  },
+  "sparkle/Sparkle/SUUpdateAlert.h": {
+    "executable": false,
+    "sha256": "12909aa34581198f06e7bf2ca9c5e04b1e8491c44619daf18ff00497f61914d1"
+  },
+  "sparkle/Sparkle/SUUpdateAlert.m": {
+    "executable": false,
+    "sha256": "e14bf8dc1da109ef1df543dd46461f2e5e198952514291d762aba7b251c1a9c1"
+  },
+  "sparkle/Sparkle/SUUpdateAlert.xib": {
+    "executable": false,
+    "sha256": "c834b301336327604144c8cb251645e0f58aeb75399226a399d42adfe86df60c"
+  },
+  "sparkle/Sparkle/SUUpdatePermissionPrompt.h": {
+    "executable": false,
+    "sha256": "d905e8004c3112f017e24bdcd71506e50a0ece98ae108988ec9552e9c1016144"
+  },
+  "sparkle/Sparkle/SUUpdatePermissionPrompt.m": {
+    "executable": false,
+    "sha256": "c54dd736ec8b7a53b30c39a382579a968ddffe8cd9a1ac78cf6a373c314b408d"
+  },
+  "sparkle/Sparkle/SUUpdatePermissionPrompt.xib": {
+    "executable": false,
+    "sha256": "7ae1740a7d0127f790c736edf9835797a2ba064013a83bb537ecb2ce88b4c5e5"
+  },
+  "sparkle/Sparkle/SUUpdatePermissionResponse.h": {
+    "executable": false,
+    "sha256": "f9355c8044c7dc168bdaefa37ac2e986002ec328895f17119293e084dad96f21"
+  },
+  "sparkle/Sparkle/SUUpdatePermissionResponse.m": {
+    "executable": false,
+    "sha256": "af3c10bbcd5b06229d29850ee642949a146ace0662b7f6d8473d69036e24a11a"
+  },
+  "sparkle/Sparkle/SUUpdateValidator.h": {
+    "executable": false,
+    "sha256": "13a620bee9b58a7c5204c59f99152836a7878340a9530cdb11c91a4893457449"
+  },
+  "sparkle/Sparkle/SUUpdateValidator.m": {
+    "executable": false,
+    "sha256": "944a7ba53e49ebb0f7cf38e2228d38def9b70738cf2f4b7c5dd63a8d826ce465"
+  },
+  "sparkle/Sparkle/SUUpdater.h": {
+    "executable": false,
+    "sha256": "96f6f598d582ca87c9d17f3ccd7bccb0ae4f057ac6e8fafb854ad8d04de336f6"
+  },
+  "sparkle/Sparkle/SUUpdater.m": {
+    "executable": false,
+    "sha256": "01b8542445521e8bb2a141dd60b070462cb3271a2b06838e39bebe885ca3c0ac"
+  },
+  "sparkle/Sparkle/SUUpdaterDelegate.h": {
+    "executable": false,
+    "sha256": "a1a08c33fd41ebdd105916d8181d222417f9feda01cdc42afa6a3151106cde36"
+  },
+  "sparkle/Sparkle/SUVersionComparisonProtocol.h": {
+    "executable": false,
+    "sha256": "28bbb424ac7ab81e2b93f61e359fefa3ed09d6a38d0b265004d2103c0f46bdb4"
+  },
+  "sparkle/Sparkle/SUVersionDisplayProtocol.h": {
+    "executable": false,
+    "sha256": "3f23c4fb9bbdbc19714580ee4dd7f73ffc31436ea733c9bb308c3f74e7ab512c"
+  },
+  "sparkle/Sparkle/SUWKWebView.h": {
+    "executable": false,
+    "sha256": "1e30180a35e35943ea5f44b43e4c13c790eeac91dbda0c032ce71ffacb4acf5a"
+  },
+  "sparkle/Sparkle/SUWKWebView.m": {
+    "executable": false,
+    "sha256": "a2527efd9f6309e37a74c64347cd9ea0640f88b2cc45a2f403a208773fe59c93"
+  },
+  "sparkle/Sparkle/Sparkle-Info.plist": {
+    "executable": false,
+    "sha256": "5c8610a0bf328c6318321f0d15a874de10717d2e343eea4acab4aafda2ff1f40"
+  },
+  "sparkle/Sparkle/Sparkle.h": {
+    "executable": false,
+    "sha256": "3a442a32eb22a77bb5a08e61ac678daffdf6c697d33020b82a683baf40228e0c"
+  },
+  "sparkle/Sparkle/Sparkle.private.modulemap": {
+    "executable": false,
+    "sha256": "db1d60f57b43a9eb17f3550f5720ac53466d4385368670fb5148da5b71f43f3a"
+  },
+  "sparkle/Sparkle/ar.lproj/Sparkle.strings": {
+    "executable": false,
+    "sha256": "ca0c76b91e213daab02ca3374b94f588a5523ea012d3a5c75b31e4561285601e"
+  },
+  "sparkle/Sparkle/ca.lproj/Sparkle.strings": {
+    "executable": false,
+    "sha256": "a91dc7feb35750c58e2b919e900d13368d7f9e709126036bc1dc426b8a474388"
+  },
+  "sparkle/Sparkle/cs.lproj/Sparkle.strings": {
+    "executable": false,
+    "sha256": "2cd70c15a97b595c3c50e0597c63a78480f0fa6b29bcc048c6ce0bcdf423ca2d"
+  },
+  "sparkle/Sparkle/da.lproj/Sparkle.strings": {
+    "executable": false,
+    "sha256": "6f3200f48bed159d74da83ac91050477f9d37f9ec2c09c43b0bd1b59d67d24c4"
+  },
+  "sparkle/Sparkle/de.lproj/Sparkle.strings": {
+    "executable": false,
+    "sha256": "bc725ecc89163341b034364cfd7facb1500599a44d119ab6497bfc7de9af0abc"
+  },
+  "sparkle/Sparkle/el.lproj/Sparkle.strings": {
+    "executable": false,
+    "sha256": "dd4c2ac8f2f6db380fdccffba5f623a21450ed067cc1acf84941aa9b3e958f61"
+  },
+  "sparkle/Sparkle/es.lproj/Sparkle.strings": {
+    "executable": false,
+    "sha256": "19c65328fa5e99bc98a1700e3a462f35575cb47d1d3d90cec148534a45b5cc35"
+  },
+  "sparkle/Sparkle/fa.lproj/Sparkle.strings": {
+    "executable": false,
+    "sha256": "77e49bec7b271d08d264479737bca633e79e7fce933524b7ecbc59d5072cb7b7"
+  },
+  "sparkle/Sparkle/fi.lproj/Sparkle.strings": {
+    "executable": false,
+    "sha256": "8e7876f35bd3341786447bb066ee26d079b1d6a3b6c592ee1d0a527a94db3410"
+  },
+  "sparkle/Sparkle/fr.lproj/Sparkle.strings": {
+    "executable": false,
+    "sha256": "8a27a9e7b49d9227d798a3eee5e2fe0e1b016cb7a4e2f365555f5b7e36f5f472"
+  },
+  "sparkle/Sparkle/he.lproj/Sparkle.strings": {
+    "executable": false,
+    "sha256": "4b6f1ca333ce969badbc8559d517403b1ad42e932444e5a8adf24a01f9729ad7"
+  },
+  "sparkle/Sparkle/hr.lproj/Sparkle.strings": {
+    "executable": false,
+    "sha256": "07f30a75ecdb829b20dbe9896e63bd573dbb83c0c2aa1b7996fa5e00ba2fcda0"
+  },
+  "sparkle/Sparkle/hu.lproj/Sparkle.strings": {
+    "executable": false,
+    "sha256": "1a88dc33532a8b855f7bf823428d825e824ce6697f3f09c7f2b6b97369e9a719"
+  },
+  "sparkle/Sparkle/is.lproj/Sparkle.strings": {
+    "executable": false,
+    "sha256": "9cab27a24146e55ef790d5de2b0144c8dde9d8793db0592524462f1a4097b454"
+  },
+  "sparkle/Sparkle/it.lproj/Sparkle.strings": {
+    "executable": false,
+    "sha256": "cb530454aec3f1cefd0ad002ba375c92132208ee6928717d3816614dff7553eb"
+  },
+  "sparkle/Sparkle/ja.lproj/Sparkle.strings": {
+    "executable": false,
+    "sha256": "f8277f7e0dcf0fb181d2da5c5a1b9c06b8519b502315a2e2190a849dae1cbb36"
+  },
+  "sparkle/Sparkle/ko.lproj/Sparkle.strings": {
+    "executable": false,
+    "sha256": "b58acbe4eb8414e288beac66b9d39de6090458f86f7592d3946e94cebab0fe36"
+  },
+  "sparkle/Sparkle/nb.lproj/Sparkle.strings": {
+    "executable": false,
+    "sha256": "2762507550df84e56fe2215a393cf9623c0084cc89307cf48bd54914926b23ef"
+  },
+  "sparkle/Sparkle/nl.lproj/Sparkle.strings": {
+    "executable": false,
+    "sha256": "1d5209cc080750a443c5826b513c80e6c234e5b4d4bc78a88ed01ed21751cc26"
+  },
+  "sparkle/Sparkle/nn.lproj/Sparkle.strings": {
+    "executable": false,
+    "sha256": "f260edad70147cd7c6024ac24c67eee89fc6f5be4315a22a480ed9ee4bbbdce2"
+  },
+  "sparkle/Sparkle/pl.lproj/Sparkle.strings": {
+    "executable": false,
+    "sha256": "670d402921d9bf6f5d80b0ac67f4e77c40fc93fe8cec80e9f9e844574110890f"
+  },
+  "sparkle/Sparkle/pt-BR.lproj/Sparkle.strings": {
+    "executable": false,
+    "sha256": "69cb993102e4f31d5f2060eb992a6b131ff979307301f5abb5e169df98cf182a"
+  },
+  "sparkle/Sparkle/pt-PT.lproj/Sparkle.strings": {
+    "executable": false,
+    "sha256": "0c40b0395b2439d464f5d1fa778f82ee594c776357d67e46b3d5ff2ff10f4b31"
+  },
+  "sparkle/Sparkle/ro.lproj/Sparkle.strings": {
+    "executable": false,
+    "sha256": "619713d19a64478b5c54f03c698e2c96898c8c81115749696611d744d16ff6e9"
+  },
+  "sparkle/Sparkle/ru.lproj/Sparkle.strings": {
+    "executable": false,
+    "sha256": "c650e032334fcee8bdbd261242ad489653d6d92ec36b6c0851bf883b3477d72b"
+  },
+  "sparkle/Sparkle/sk.lproj/Sparkle.strings": {
+    "executable": false,
+    "sha256": "186a98826a6f7730af911cbfe8f47ed2ba272cc022573f647ba6c3f893ca1703"
+  },
+  "sparkle/Sparkle/sl.lproj/Sparkle.strings": {
+    "executable": false,
+    "sha256": "19efe58f8ef6bc21ce94939af65c8ae64ae3d29c3ce1c4d03ad7abef5c725789"
+  },
+  "sparkle/Sparkle/sv.lproj/Sparkle.strings": {
+    "executable": false,
+    "sha256": "79bd76029e41aa8a1cc9964aa965f10f18012b78ac30641407f0c048c8d37b2f"
+  },
+  "sparkle/Sparkle/th.lproj/Sparkle.strings": {
+    "executable": false,
+    "sha256": "01467c6fb233a152388e6e602a0148b9fbc3cafa46daa4fd15cd2df3702f93b4"
+  },
+  "sparkle/Sparkle/tr.lproj/Sparkle.strings": {
+    "executable": false,
+    "sha256": "30674d0a2c274b1f49c72bb019bfadc663903c1b6d0d8726d708eaf3cc282f95"
+  },
+  "sparkle/Sparkle/uk.lproj/Sparkle.strings": {
+    "executable": false,
+    "sha256": "a37d022a0072613b03b110b843f1e5a403e7ff6cfb18a6ce1f46390e823e114f"
+  },
+  "sparkle/Sparkle/vi.lproj/Sparkle.strings": {
+    "executable": false,
+    "sha256": "7f8ed9e11b20d17e958aa6e5160d4e8a021cbdfd45a9bb33e5c2048defc58ca5"
+  },
+  "sparkle/Sparkle/zh_CN.lproj/Sparkle.strings": {
+    "executable": false,
+    "sha256": "87c2a80abf0a8223d38394c8423dddb937c59a1ed58165133ccdf59d54ff02bd"
+  },
+  "sparkle/Sparkle/zh_HK.lproj/Sparkle.strings": {
+    "executable": false,
+    "sha256": "8f1f4157225ae576021c113a62bee01ea5d80e0b8cdf7d94e152c6203ec12731"
+  },
+  "sparkle/Sparkle/zh_TW.lproj/Sparkle.strings": {
+    "executable": false,
+    "sha256": "a5a31dd57b7a110d3ebeee12e768c0a9db2583977894ed65c7aa054b431368b3"
+  },
+  "sparkle/TestAppHelper/Info.plist": {
+    "executable": false,
+    "sha256": "c2bfa01594940599e05398357317c655b35b189ac63357cee1f710c6f0251ea8"
+  },
+  "sparkle/TestAppHelper/TestAppHelper.h": {
+    "executable": false,
+    "sha256": "b378e3dcdee62d7f94b3d620ea02957704fa9e3a49679ab9598f0d11e5b7a0c0"
+  },
+  "sparkle/TestAppHelper/TestAppHelper.m": {
+    "executable": false,
+    "sha256": "4cc07130353e383f8c6e411e5530b7972a726615aec6f20b49de2ffce63e1dfa"
+  },
+  "sparkle/TestAppHelper/TestAppHelperProtocol.h": {
+    "executable": false,
+    "sha256": "1fc2efec2a7db590b66ccdabaf9ae57e0c4bd861ecfd66993b9fcf43da4a2062"
+  },
+  "sparkle/TestAppHelper/main.m": {
+    "executable": false,
+    "sha256": "20d9d83c10f697ba0bfb591156e824d6041c16ddc78f6214468cb523f2fb1d0e"
+  },
+  "sparkle/TestApplication/AppIcon.icon/Assets/circular_arrow.png": {
+    "executable": false,
+    "sha256": "5e5696a04d39401b81fa506a25c60f4087e96e2ed8aa93921d32ab4721ce1435"
+  },
+  "sparkle/TestApplication/AppIcon.icon/Assets/sparkles.png": {
+    "executable": false,
+    "sha256": "f36a6916b148176eb47bf6df912c7346c2853fdb539b0fb5baddad6ad8db08c3"
+  },
+  "sparkle/TestApplication/AppIcon.icon/icon.json": {
+    "executable": false,
+    "sha256": "35cd33d6ab578631ad5e82924597325542aebf1597a72cf7af4e03e8bca52cc2"
+  },
+  "sparkle/TestApplication/Base.lproj/InfoPlist.strings": {
+    "executable": false,
+    "sha256": "2762cf46805f5287f809dec9d6155c59ad3c50aa26b128e2def258acc3f823bc"
+  },
+  "sparkle/TestApplication/Base.lproj/MainMenu.xib": {
+    "executable": false,
+    "sha256": "d56d17da7b53151bab27ad9049585113e7533cc55fa682313f86ef8eb1c05893"
+  },
+  "sparkle/TestApplication/SUAdHocCodeSigning.h": {
+    "executable": false,
+    "sha256": "46471b1cd52c37cd1fd2e6927cbfc5fd2a29e96e7c72ab68a655b4c2224f733d"
+  },
+  "sparkle/TestApplication/SUAdHocCodeSigning.m": {
+    "executable": false,
+    "sha256": "95ba89247d75490ac3c717041a4bea5370c6ba61d27701eb04e002a663be14e7"
+  },
+  "sparkle/TestApplication/SUInstallUpdateViewController.h": {
+    "executable": false,
+    "sha256": "e0b08c94ea9aa61baf9131c5e23cafdba958c58f155297e9fd2c0a8b0d5b4d2c"
+  },
+  "sparkle/TestApplication/SUInstallUpdateViewController.m": {
+    "executable": false,
+    "sha256": "be73861778c7f21680a19fd07f7f1ec46d15d12e5adb2cbff062258ed06d78c0"
+  },
+  "sparkle/TestApplication/SUInstallUpdateViewController.xib": {
+    "executable": false,
+    "sha256": "7ee66ccee3120bd403e677cad0ed3522bcabeebe39695b18b672ec8cd1a7d0a5"
+  },
+  "sparkle/TestApplication/SUPopUpTitlebarUserDriver.h": {
+    "executable": false,
+    "sha256": "cf7407059ccbcf8a5c6752737b4192968a25f7bc94c131f8b3de06bdcfe78cca"
+  },
+  "sparkle/TestApplication/SUPopUpTitlebarUserDriver.m": {
+    "executable": false,
+    "sha256": "355f45926f95446cc70f013af5b76c64b1317f7d4a8528ebbd3b3cd874f00648"
+  },
+  "sparkle/TestApplication/SUTestApplicationDelegate.h": {
+    "executable": false,
+    "sha256": "ff0135d2a119ab684456e3a108c742eae14354ad0abce4a77282765e77c7ed65"
+  },
+  "sparkle/TestApplication/SUTestApplicationDelegate.m": {
+    "executable": false,
+    "sha256": "edf2aa94c14ebb79b950de501c0e35dd9e29afb6a320d5397bf056f0c66f9bfb"
+  },
+  "sparkle/TestApplication/SUTestWebServer.h": {
+    "executable": false,
+    "sha256": "532d0761c5bbb69d2c6de2a7b49c652a255f507bdbe8887a1276df542944799b"
+  },
+  "sparkle/TestApplication/SUTestWebServer.m": {
+    "executable": false,
+    "sha256": "490658f3270d5cf4eb34fc2ffdc6578cc59c377ed2c532be81dc0a68707315af"
+  },
+  "sparkle/TestApplication/SUUpdateSettingsWindowController.h": {
+    "executable": false,
+    "sha256": "89bc8a82b8feee8e4f6b26b17c40dc4c53dd5794c2939bc487e686f46d66d664"
+  },
+  "sparkle/TestApplication/SUUpdateSettingsWindowController.m": {
+    "executable": false,
+    "sha256": "cc083d194ce1c3eba5a172943f7bf25a99b412f4b8e82ba2f8b0e8b01224b464"
+  },
+  "sparkle/TestApplication/SUUpdateSettingsWindowController.xib": {
+    "executable": false,
+    "sha256": "f219c9b6577cb7c3808c0a270abcfd6c05f126c2519455d734889213ce4f4b5a"
+  },
+  "sparkle/TestApplication/Sparkle-Test-App.entitlements": {
+    "executable": false,
+    "sha256": "4088653839827d0bca2b6bc0d21cdeb748b436b32c23fef2609114e861149261"
+  },
+  "sparkle/TestApplication/TestApplication-Info.plist": {
+    "executable": false,
+    "sha256": "c6b736339ec2ea81370455469865f19a267419de74d9b3bc5dc80879d389cf57"
+  },
+  "sparkle/TestApplication/ar.lproj/MainMenu.strings": {
+    "executable": false,
+    "sha256": "70951546cc04beb087472e887a815355b6c702db8898ccd111cbbb41fc825e8f"
+  },
+  "sparkle/TestApplication/ca.lproj/MainMenu.strings": {
+    "executable": false,
+    "sha256": "70951546cc04beb087472e887a815355b6c702db8898ccd111cbbb41fc825e8f"
+  },
+  "sparkle/TestApplication/cs.lproj/MainMenu.strings": {
+    "executable": false,
+    "sha256": "70951546cc04beb087472e887a815355b6c702db8898ccd111cbbb41fc825e8f"
+  },
+  "sparkle/TestApplication/da.lproj/MainMenu.strings": {
+    "executable": false,
+    "sha256": "70951546cc04beb087472e887a815355b6c702db8898ccd111cbbb41fc825e8f"
+  },
+  "sparkle/TestApplication/de.lproj/MainMenu.strings": {
+    "executable": false,
+    "sha256": "70951546cc04beb087472e887a815355b6c702db8898ccd111cbbb41fc825e8f"
+  },
+  "sparkle/TestApplication/el.lproj/MainMenu.strings": {
+    "executable": false,
+    "sha256": "70951546cc04beb087472e887a815355b6c702db8898ccd111cbbb41fc825e8f"
+  },
+  "sparkle/TestApplication/en.lproj/MainMenu.strings": {
+    "executable": false,
+    "sha256": "70951546cc04beb087472e887a815355b6c702db8898ccd111cbbb41fc825e8f"
+  },
+  "sparkle/TestApplication/es.lproj/MainMenu.strings": {
+    "executable": false,
+    "sha256": "70951546cc04beb087472e887a815355b6c702db8898ccd111cbbb41fc825e8f"
+  },
+  "sparkle/TestApplication/fa.lproj/MainMenu.strings": {
+    "executable": false,
+    "sha256": "70951546cc04beb087472e887a815355b6c702db8898ccd111cbbb41fc825e8f"
+  },
+  "sparkle/TestApplication/fi.lproj/MainMenu.strings": {
+    "executable": false,
+    "sha256": "70951546cc04beb087472e887a815355b6c702db8898ccd111cbbb41fc825e8f"
+  },
+  "sparkle/TestApplication/fr.lproj/MainMenu.strings": {
+    "executable": false,
+    "sha256": "70951546cc04beb087472e887a815355b6c702db8898ccd111cbbb41fc825e8f"
+  },
+  "sparkle/TestApplication/he.lproj/MainMenu.strings": {
+    "executable": false,
+    "sha256": "70951546cc04beb087472e887a815355b6c702db8898ccd111cbbb41fc825e8f"
+  },
+  "sparkle/TestApplication/hr.lproj/MainMenu.strings": {
+    "executable": false,
+    "sha256": "70951546cc04beb087472e887a815355b6c702db8898ccd111cbbb41fc825e8f"
+  },
+  "sparkle/TestApplication/hu.lproj/MainMenu.strings": {
+    "executable": false,
+    "sha256": "70951546cc04beb087472e887a815355b6c702db8898ccd111cbbb41fc825e8f"
+  },
+  "sparkle/TestApplication/is.lproj/MainMenu.strings": {
+    "executable": false,
+    "sha256": "70951546cc04beb087472e887a815355b6c702db8898ccd111cbbb41fc825e8f"
+  },
+  "sparkle/TestApplication/it.lproj/MainMenu.strings": {
+    "executable": false,
+    "sha256": "70951546cc04beb087472e887a815355b6c702db8898ccd111cbbb41fc825e8f"
+  },
+  "sparkle/TestApplication/ja.lproj/MainMenu.strings": {
+    "executable": false,
+    "sha256": "70951546cc04beb087472e887a815355b6c702db8898ccd111cbbb41fc825e8f"
+  },
+  "sparkle/TestApplication/ko.lproj/MainMenu.strings": {
+    "executable": false,
+    "sha256": "70951546cc04beb087472e887a815355b6c702db8898ccd111cbbb41fc825e8f"
+  },
+  "sparkle/TestApplication/main.m": {
+    "executable": false,
+    "sha256": "5284ab0a0490ea687b5374f94fc2a7d2e31e6762b827b4a1678415ee8ef49120"
+  },
+  "sparkle/TestApplication/nb.lproj/MainMenu.strings": {
+    "executable": false,
+    "sha256": "70951546cc04beb087472e887a815355b6c702db8898ccd111cbbb41fc825e8f"
+  },
+  "sparkle/TestApplication/nl.lproj/MainMenu.strings": {
+    "executable": false,
+    "sha256": "70951546cc04beb087472e887a815355b6c702db8898ccd111cbbb41fc825e8f"
+  },
+  "sparkle/TestApplication/nn.lproj/MainMenu.strings": {
+    "executable": false,
+    "sha256": "70951546cc04beb087472e887a815355b6c702db8898ccd111cbbb41fc825e8f"
+  },
+  "sparkle/TestApplication/pl.lproj/MainMenu.strings": {
+    "executable": false,
+    "sha256": "70951546cc04beb087472e887a815355b6c702db8898ccd111cbbb41fc825e8f"
+  },
+  "sparkle/TestApplication/pt-BR.lproj/MainMenu.strings": {
+    "executable": false,
+    "sha256": "70951546cc04beb087472e887a815355b6c702db8898ccd111cbbb41fc825e8f"
+  },
+  "sparkle/TestApplication/pt-PT.lproj/MainMenu.strings": {
+    "executable": false,
+    "sha256": "70951546cc04beb087472e887a815355b6c702db8898ccd111cbbb41fc825e8f"
+  },
+  "sparkle/TestApplication/ro.lproj/MainMenu.strings": {
+    "executable": false,
+    "sha256": "70951546cc04beb087472e887a815355b6c702db8898ccd111cbbb41fc825e8f"
+  },
+  "sparkle/TestApplication/ru.lproj/MainMenu.strings": {
+    "executable": false,
+    "sha256": "70951546cc04beb087472e887a815355b6c702db8898ccd111cbbb41fc825e8f"
+  },
+  "sparkle/TestApplication/screenshot.png": {
+    "executable": false,
+    "sha256": "843a5b95a59b02e88900ea14f9d920880c2aa5ec72c35443b8ef096305cc6dde"
+  },
+  "sparkle/TestApplication/sk.lproj/MainMenu.strings": {
+    "executable": false,
+    "sha256": "70951546cc04beb087472e887a815355b6c702db8898ccd111cbbb41fc825e8f"
+  },
+  "sparkle/TestApplication/sl.lproj/MainMenu.strings": {
+    "executable": false,
+    "sha256": "70951546cc04beb087472e887a815355b6c702db8898ccd111cbbb41fc825e8f"
+  },
+  "sparkle/TestApplication/sparkletestcast.xml": {
+    "executable": false,
+    "sha256": "f06069b98dafe9dd1736d1fc671586000ab61d524ba430d00101972db35434c8"
+  },
+  "sparkle/TestApplication/sv.lproj/MainMenu.strings": {
+    "executable": false,
+    "sha256": "70951546cc04beb087472e887a815355b6c702db8898ccd111cbbb41fc825e8f"
+  },
+  "sparkle/TestApplication/th.lproj/MainMenu.strings": {
+    "executable": false,
+    "sha256": "70951546cc04beb087472e887a815355b6c702db8898ccd111cbbb41fc825e8f"
+  },
+  "sparkle/TestApplication/tr.lproj/MainMenu.strings": {
+    "executable": false,
+    "sha256": "70951546cc04beb087472e887a815355b6c702db8898ccd111cbbb41fc825e8f"
+  },
+  "sparkle/TestApplication/uk.lproj/MainMenu.strings": {
+    "executable": false,
+    "sha256": "70951546cc04beb087472e887a815355b6c702db8898ccd111cbbb41fc825e8f"
+  },
+  "sparkle/TestApplication/vi.lproj/MainMenu.strings": {
+    "executable": false,
+    "sha256": "e85ef5e72062c79e67d16837a725dad11956916189737f5611a824af46e8ff36"
+  },
+  "sparkle/TestApplication/zh_CN.lproj/MainMenu.strings": {
+    "executable": false,
+    "sha256": "70951546cc04beb087472e887a815355b6c702db8898ccd111cbbb41fc825e8f"
+  },
+  "sparkle/TestApplication/zh_HK.lproj/MainMenu.strings": {
+    "executable": false,
+    "sha256": "70951546cc04beb087472e887a815355b6c702db8898ccd111cbbb41fc825e8f"
+  },
+  "sparkle/TestApplication/zh_TW.lproj/MainMenu.strings": {
+    "executable": false,
+    "sha256": "70951546cc04beb087472e887a815355b6c702db8898ccd111cbbb41fc825e8f"
+  },
+  "sparkle/Tests/.swiftlint.yml": {
+    "executable": false,
+    "sha256": "e46586b935070356b4e27c6d2d9bc3c50a3572b339df2342d96bff8a46bd850d"
+  },
+  "sparkle/Tests/Resources/DevSignedApp.zip": {
+    "executable": false,
+    "sha256": "3738208d075f1cc064268b810824205f1c8f571352285368ca2749df4169a502"
+  },
+  "sparkle/Tests/Resources/DevSignedAppVersion2.dmg": {
+    "executable": false,
+    "sha256": "345fce4f3e386db816602f38e621fd869998d74d24b069b1f39493e22ec90deb"
+  },
+  "sparkle/Tests/Resources/DevSignedAppVersion2.zip": {
+    "executable": false,
+    "sha256": "e6f452a97318fe4cd4700aaeaa645131fa9bea267ccf896129026c5d0954de51"
+  },
+  "sparkle/Tests/Resources/SUUpdateValidatorTest/Both.bundle/Contents/Info.plist": {
+    "executable": false,
+    "sha256": "b9bccaf56fa5b54407d9a63ce0e31700e34a8043a8134fcef51f7e02889429dc"
+  },
+  "sparkle/Tests/Resources/SUUpdateValidatorTest/Both.bundle/Contents/Resources/test-pubkey.pem": {
+    "executable": false,
+    "sha256": "cc3fd7409bb81253d613ab1faadce8476bc48dd7e08bdf23fe1891a1866abfdc"
+  },
+  "sparkle/Tests/Resources/SUUpdateValidatorTest/CodeSignedBoth.bundle/Contents/Info.plist": {
+    "executable": false,
+    "sha256": "d3b014ca1b9fe90f3301e2b20053e99757d1a669fe7121ba25e1e11a8394c871"
+  },
+  "sparkle/Tests/Resources/SUUpdateValidatorTest/CodeSignedBoth.bundle/Contents/Resources/test-pubkey.pem": {
+    "executable": false,
+    "sha256": "cc3fd7409bb81253d613ab1faadce8476bc48dd7e08bdf23fe1891a1866abfdc"
+  },
+  "sparkle/Tests/Resources/SUUpdateValidatorTest/CodeSignedBoth.bundle/Contents/_CodeSignature/CodeDirectory": {
+    "executable": false,
+    "sha256": "6dafe30674f62d869a7125325cc3df296a1203e72004d133d6bf6ccc935c49ef"
+  },
+  "sparkle/Tests/Resources/SUUpdateValidatorTest/CodeSignedBoth.bundle/Contents/_CodeSignature/CodeRequirements": {
+    "executable": false,
+    "sha256": "5207aa60ec6f8753b4ef27bff59f7b13fdf0460587cc381a7ee78bab094b835f"
+  },
+  "sparkle/Tests/Resources/SUUpdateValidatorTest/CodeSignedBoth.bundle/Contents/_CodeSignature/CodeRequirements-1": {
+    "executable": false,
+    "sha256": "6bf8d18c90c9d536a3c0605cf650b54dedc1f7bff7b257eaf4193d854ef570fd"
+  },
+  "sparkle/Tests/Resources/SUUpdateValidatorTest/CodeSignedBoth.bundle/Contents/_CodeSignature/CodeResources": {
+    "executable": false,
+    "sha256": "b81abcc93cd53364f0db80d57b5ff4eb6bb369f247ed1d9759049ff27e63f43f"
+  },
+  "sparkle/Tests/Resources/SUUpdateValidatorTest/CodeSignedBoth.bundle/Contents/_CodeSignature/CodeSignature": {
+    "executable": false,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  "sparkle/Tests/Resources/SUUpdateValidatorTest/CodeSignedBothNew.bundle/Contents/Info.plist": {
+    "executable": false,
+    "sha256": "506984c581a05410631f120b9ec10156170242c70d23d172cf34a558d53b62b6"
+  },
+  "sparkle/Tests/Resources/SUUpdateValidatorTest/CodeSignedBothNew.bundle/Contents/Resources/test-pubkey.pem": {
+    "executable": false,
+    "sha256": "cc3fd7409bb81253d613ab1faadce8476bc48dd7e08bdf23fe1891a1866abfdc"
+  },
+  "sparkle/Tests/Resources/SUUpdateValidatorTest/CodeSignedBothNew.bundle/Contents/_CodeSignature/CodeDirectory": {
+    "executable": false,
+    "sha256": "b2436fb00393926873c5be249a27a4778bf8a47055614642c4065be0b01068c3"
+  },
+  "sparkle/Tests/Resources/SUUpdateValidatorTest/CodeSignedBothNew.bundle/Contents/_CodeSignature/CodeRequirements": {
+    "executable": false,
+    "sha256": "f50801bdefb5922ed67b1c0c29cbd4a22dc0cbf07aec57937397e824d7cb5c23"
+  },
+  "sparkle/Tests/Resources/SUUpdateValidatorTest/CodeSignedBothNew.bundle/Contents/_CodeSignature/CodeRequirements-1": {
+    "executable": false,
+    "sha256": "ff202470a6430bc0b25d1926ab4f595cd4f112470301607472fb31887ff1e23c"
+  },
+  "sparkle/Tests/Resources/SUUpdateValidatorTest/CodeSignedBothNew.bundle/Contents/_CodeSignature/CodeResources": {
+    "executable": false,
+    "sha256": "b81abcc93cd53364f0db80d57b5ff4eb6bb369f247ed1d9759049ff27e63f43f"
+  },
+  "sparkle/Tests/Resources/SUUpdateValidatorTest/CodeSignedBothNew.bundle/Contents/_CodeSignature/CodeSignature": {
+    "executable": false,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  "sparkle/Tests/Resources/SUUpdateValidatorTest/CodeSignedInvalid.bundle/Contents/Info.plist": {
+    "executable": false,
+    "sha256": "c351a3a6c300dfa449a2aceffaabda5d5eb1f3aeb0d89a2f66c706b46a041fbe"
+  },
+  "sparkle/Tests/Resources/SUUpdateValidatorTest/CodeSignedInvalid.bundle/Contents/Resources/test-pubkey.pem": {
+    "executable": false,
+    "sha256": "cc3fd7409bb81253d613ab1faadce8476bc48dd7e08bdf23fe1891a1866abfdc"
+  },
+  "sparkle/Tests/Resources/SUUpdateValidatorTest/CodeSignedInvalid.bundle/Contents/_CodeSignature/CodeDirectory": {
+    "executable": false,
+    "sha256": "9b95d027e59cc40c65b58c236f77c20e25286c9e3624041e685af95779351844"
+  },
+  "sparkle/Tests/Resources/SUUpdateValidatorTest/CodeSignedInvalid.bundle/Contents/_CodeSignature/CodeRequirements": {
+    "executable": false,
+    "sha256": "5207aa60ec6f8753b4ef27bff59f7b13fdf0460587cc381a7ee78bab094b835f"
+  },
+  "sparkle/Tests/Resources/SUUpdateValidatorTest/CodeSignedInvalid.bundle/Contents/_CodeSignature/CodeRequirements-1": {
+    "executable": false,
+    "sha256": "14ab68600b86205d22ce6472f0c983d7c7c1d1cfe741e6a349aae6f11e3c10b3"
+  },
+  "sparkle/Tests/Resources/SUUpdateValidatorTest/CodeSignedInvalid.bundle/Contents/_CodeSignature/CodeResources": {
+    "executable": false,
+    "sha256": "6686de10a28a2fe11b36cbb86dcbacc827cfc4ea116b4dabf1845e5aee629e9b"
+  },
+  "sparkle/Tests/Resources/SUUpdateValidatorTest/CodeSignedInvalid.bundle/Contents/_CodeSignature/CodeSignature": {
+    "executable": false,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  "sparkle/Tests/Resources/SUUpdateValidatorTest/CodeSignedInvalidOnly.bundle/Contents/Info.plist": {
+    "executable": false,
+    "sha256": "e53c8e961b7bf6cbe9f081cf04c011ab21c1d9e59bcdc064eac651d7b3aec6d2"
+  },
+  "sparkle/Tests/Resources/SUUpdateValidatorTest/CodeSignedInvalidOnly.bundle/Contents/_CodeSignature/CodeDirectory": {
+    "executable": false,
+    "sha256": "9b95d027e59cc40c65b58c236f77c20e25286c9e3624041e685af95779351844"
+  },
+  "sparkle/Tests/Resources/SUUpdateValidatorTest/CodeSignedInvalidOnly.bundle/Contents/_CodeSignature/CodeRequirements": {
+    "executable": false,
+    "sha256": "5207aa60ec6f8753b4ef27bff59f7b13fdf0460587cc381a7ee78bab094b835f"
+  },
+  "sparkle/Tests/Resources/SUUpdateValidatorTest/CodeSignedInvalidOnly.bundle/Contents/_CodeSignature/CodeRequirements-1": {
+    "executable": false,
+    "sha256": "14ab68600b86205d22ce6472f0c983d7c7c1d1cfe741e6a349aae6f11e3c10b3"
+  },
+  "sparkle/Tests/Resources/SUUpdateValidatorTest/CodeSignedInvalidOnly.bundle/Contents/_CodeSignature/CodeResources": {
+    "executable": false,
+    "sha256": "6686de10a28a2fe11b36cbb86dcbacc827cfc4ea116b4dabf1845e5aee629e9b"
+  },
+  "sparkle/Tests/Resources/SUUpdateValidatorTest/CodeSignedInvalidOnly.bundle/Contents/_CodeSignature/CodeSignature": {
+    "executable": false,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  "sparkle/Tests/Resources/SUUpdateValidatorTest/CodeSignedOldED.bundle/Contents/Info.plist": {
+    "executable": false,
+    "sha256": "4767630b72cdc5222324fe532d4899bf418c8be4af4a8d8e48c3193726d2e913"
+  },
+  "sparkle/Tests/Resources/SUUpdateValidatorTest/CodeSignedOldED.bundle/Contents/_CodeSignature/CodeDirectory": {
+    "executable": false,
+    "sha256": "c9fe5fc5aa544c730362787d3faf2fa4a824647104289d0f4d6518cbbbbad8f6"
+  },
+  "sparkle/Tests/Resources/SUUpdateValidatorTest/CodeSignedOldED.bundle/Contents/_CodeSignature/CodeRequirements": {
+    "executable": false,
+    "sha256": "5207aa60ec6f8753b4ef27bff59f7b13fdf0460587cc381a7ee78bab094b835f"
+  },
+  "sparkle/Tests/Resources/SUUpdateValidatorTest/CodeSignedOldED.bundle/Contents/_CodeSignature/CodeRequirements-1": {
+    "executable": false,
+    "sha256": "bbef4823ec331a932945303a1415f8f08de48ef6506f3f56d97f9c583f73654a"
+  },
+  "sparkle/Tests/Resources/SUUpdateValidatorTest/CodeSignedOldED.bundle/Contents/_CodeSignature/CodeResources": {
+    "executable": false,
+    "sha256": "6686de10a28a2fe11b36cbb86dcbacc827cfc4ea116b4dabf1845e5aee629e9b"
+  },
+  "sparkle/Tests/Resources/SUUpdateValidatorTest/CodeSignedOldED.bundle/Contents/_CodeSignature/CodeSignature": {
+    "executable": false,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  "sparkle/Tests/Resources/SUUpdateValidatorTest/CodeSignedOnly.bundle/Contents/Info.plist": {
+    "executable": false,
+    "sha256": "4f8db57ee97f10adc9b745ee43982b41a67790da802403a76e000d336ecc7699"
+  },
+  "sparkle/Tests/Resources/SUUpdateValidatorTest/CodeSignedOnly.bundle/Contents/_CodeSignature/CodeDirectory": {
+    "executable": false,
+    "sha256": "9b95d027e59cc40c65b58c236f77c20e25286c9e3624041e685af95779351844"
+  },
+  "sparkle/Tests/Resources/SUUpdateValidatorTest/CodeSignedOnly.bundle/Contents/_CodeSignature/CodeRequirements": {
+    "executable": false,
+    "sha256": "5207aa60ec6f8753b4ef27bff59f7b13fdf0460587cc381a7ee78bab094b835f"
+  },
+  "sparkle/Tests/Resources/SUUpdateValidatorTest/CodeSignedOnly.bundle/Contents/_CodeSignature/CodeRequirements-1": {
+    "executable": false,
+    "sha256": "14ab68600b86205d22ce6472f0c983d7c7c1d1cfe741e6a349aae6f11e3c10b3"
+  },
+  "sparkle/Tests/Resources/SUUpdateValidatorTest/CodeSignedOnly.bundle/Contents/_CodeSignature/CodeResources": {
+    "executable": false,
+    "sha256": "6686de10a28a2fe11b36cbb86dcbacc827cfc4ea116b4dabf1845e5aee629e9b"
+  },
+  "sparkle/Tests/Resources/SUUpdateValidatorTest/CodeSignedOnly.bundle/Contents/_CodeSignature/CodeSignature": {
+    "executable": false,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  "sparkle/Tests/Resources/SUUpdateValidatorTest/CodeSignedOnlyNew.bundle/Contents/Info.plist": {
+    "executable": false,
+    "sha256": "8176b3fb1dcd0992efdf84f233c16cac9aedcc3bf0ae07d54753384c99fd97aa"
+  },
+  "sparkle/Tests/Resources/SUUpdateValidatorTest/CodeSignedOnlyNew.bundle/Contents/_CodeSignature/CodeDirectory": {
+    "executable": false,
+    "sha256": "e3f1aba42b8f4d127393406ff038c6611d7317e0a61984cde7bbaede1b311394"
+  },
+  "sparkle/Tests/Resources/SUUpdateValidatorTest/CodeSignedOnlyNew.bundle/Contents/_CodeSignature/CodeRequirements": {
+    "executable": false,
+    "sha256": "f50801bdefb5922ed67b1c0c29cbd4a22dc0cbf07aec57937397e824d7cb5c23"
+  },
+  "sparkle/Tests/Resources/SUUpdateValidatorTest/CodeSignedOnlyNew.bundle/Contents/_CodeSignature/CodeRequirements-1": {
+    "executable": false,
+    "sha256": "4d6ff1aad215a04b1f57b5346f6d33fb56367be600402a02b2fd59f73dfdac4f"
+  },
+  "sparkle/Tests/Resources/SUUpdateValidatorTest/CodeSignedOnlyNew.bundle/Contents/_CodeSignature/CodeResources": {
+    "executable": false,
+    "sha256": "6686de10a28a2fe11b36cbb86dcbacc827cfc4ea116b4dabf1845e5aee629e9b"
+  },
+  "sparkle/Tests/Resources/SUUpdateValidatorTest/CodeSignedOnlyNew.bundle/Contents/_CodeSignature/CodeSignature": {
+    "executable": false,
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  "sparkle/Tests/Resources/SUUpdateValidatorTest/DSAOnly.bundle/Contents/Info.plist": {
+    "executable": false,
+    "sha256": "23dd0163f8e04898526ce08d9102fa63b04fb8b3fec30035c2f694c7120602e2"
+  },
+  "sparkle/Tests/Resources/SUUpdateValidatorTest/DSAOnly.bundle/Contents/Resources/test-pubkey.pem": {
+    "executable": false,
+    "sha256": "cc3fd7409bb81253d613ab1faadce8476bc48dd7e08bdf23fe1891a1866abfdc"
+  },
+  "sparkle/Tests/Resources/SUUpdateValidatorTest/EDOnly.bundle/Contents/Info.plist": {
+    "executable": false,
+    "sha256": "88c293bca34686ed9c5749846895c346c47d07ea5b7f70fb01b2d107a174aaaa"
+  },
+  "sparkle/Tests/Resources/SUUpdateValidatorTest/None.bundle/Contents/Info.plist": {
+    "executable": false,
+    "sha256": "e87523d5d48c9a3177403f16fc838b366873606305f9021fc2675f94bdb1e737"
+  },
+  "sparkle/Tests/Resources/SUUpdateValidatorTest/resign-all.sh": {
+    "executable": true,
+    "sha256": "40e3a5673bf83d202342f1dccf979064abc1ae6903cd7df5007753cb5e2028dc"
+  },
+  "sparkle/Tests/Resources/SparkleTestCodeSignApp.aar": {
+    "executable": false,
+    "sha256": "862aa289448c601440d13a6c67974e6a269ec079a894a92aafeb6fd535364fb6"
+  },
+  "sparkle/Tests/Resources/SparkleTestCodeSignApp.dmg": {
+    "executable": false,
+    "sha256": "a85b327bc0817397483759fdf7de8522fa239318075fd60be6007c4dc872c58a"
+  },
+  "sparkle/Tests/Resources/SparkleTestCodeSignApp.enc.aar": {
+    "executable": false,
+    "sha256": "b76e2cae8000797773304c1dcb049e154997fa438beccc1605b0141631a5d748"
+  },
+  "sparkle/Tests/Resources/SparkleTestCodeSignApp.enc.dmg": {
+    "executable": false,
+    "sha256": "5872666952cafa5c6c0ae9edf19d0d3a4de5326d25162f8118d717c303a093d7"
+  },
+  "sparkle/Tests/Resources/SparkleTestCodeSignApp.enc.nolicense.dmg": {
+    "executable": false,
+    "sha256": "711fb28dad948d1141438aca642c65efb809322d1911ae28bf51d5382d396c1b"
+  },
+  "sparkle/Tests/Resources/SparkleTestCodeSignApp.tar": {
+    "executable": false,
+    "sha256": "0fb68b47292eb3a52bf8c0578d1ffe89bd1d5f92e14305b67a25142b14bdc2c6"
+  },
+  "sparkle/Tests/Resources/SparkleTestCodeSignApp.tar.bz2": {
+    "executable": false,
+    "sha256": "e569039186cdef3f421c3e1bff18e2fa25858d9819675e8bafd545452d1b09d8"
+  },
+  "sparkle/Tests/Resources/SparkleTestCodeSignApp.tar.gz": {
+    "executable": false,
+    "sha256": "733eb102122f0a6caec67323a35c0bf34bb5c089ea28443addd41256b830fcf2"
+  },
+  "sparkle/Tests/Resources/SparkleTestCodeSignApp.tar.xz": {
+    "executable": false,
+    "sha256": "c34f35e0d2733439eddceb70ab36a4c587cefa4c2a7c1c4a76fd671ea770ea18"
+  },
+  "sparkle/Tests/Resources/SparkleTestCodeSignApp.zip": {
+    "executable": false,
+    "sha256": "ccbf10c5817c59c49063c7505038bb3ef969ddda9c43659486fc1d9978c5aaba"
+  },
+  "sparkle/Tests/Resources/SparkleTestCodeSignApp_bad_extraneous.zip": {
+    "executable": false,
+    "sha256": "eefc091b6935f6152d71edb7276a9f660398aeb0a63bcdbb2f3bbea1d6f5754b"
+  },
+  "sparkle/Tests/Resources/SparkleTestCodeSignApp_bad_header.zip": {
+    "executable": false,
+    "sha256": "bf998bff817e78030a6b6271ca340c595bc3b9801c45d049770dfbaa5febfc42"
+  },
+  "sparkle/Tests/Resources/SparkleTestCodeSign_apfs.dmg": {
+    "executable": false,
+    "sha256": "668f0f24922b9812e5bf2c1c99f1725b327160978dbe305dc641f908987d17ae"
+  },
+  "sparkle/Tests/Resources/SparkleTestCodeSign_apfs_lzma_aux_files_adhoc.dmg": {
+    "executable": false,
+    "sha256": "b22c4db20b107661775a5c9aec030eae2fd279ef113b48248a84f12e9a10172d"
+  },
+  "sparkle/Tests/Resources/SparkleTestCodeSign_pkg.dmg": {
+    "executable": false,
+    "sha256": "a981bce6c1d731110bcf6893d97de3a48038cb7d85b51eb4a621419f92b856b3"
+  },
+  "sparkle/Tests/Resources/signed-test-file.txt": {
+    "executable": false,
+    "sha256": "03ba204e50d126e4674c005e04d82e84c21366780af1f43bd54a37816b6ab340"
+  },
+  "sparkle/Tests/Resources/test-dangerous-link.xml": {
+    "executable": false,
+    "sha256": "8edbcf1ab2fb25aa81bab52e3ab7129f973e381b057719f9e4422451dc507556"
+  },
+  "sparkle/Tests/Resources/test-links.xml": {
+    "executable": false,
+    "sha256": "12ec5e65623dfa2b5df6a229c4266ec9a988f3a1ecc134dc157e016689fc637c"
+  },
+  "sparkle/Tests/Resources/test-package-update.xml": {
+    "executable": false,
+    "sha256": "4ef5da3325727090c39d420c1608b3e931c5ab300087cc905fed18875760c562"
+  },
+  "sparkle/Tests/Resources/test-pubkey.pem": {
+    "executable": false,
+    "sha256": "cc3fd7409bb81253d613ab1faadce8476bc48dd7e08bdf23fe1891a1866abfdc"
+  },
+  "sparkle/Tests/Resources/test-relative-urls.xml": {
+    "executable": false,
+    "sha256": "244466cb2e161bf0074169eb160ce5f6742d643d9fa3613ce524d1228731f245"
+  },
+  "sparkle/Tests/Resources/test.pkg": {
+    "executable": false,
+    "sha256": "9319af3fafb29f16da4c35e614c51586434c0903632ffedacfb2faf209cf4886"
+  },
+  "sparkle/Tests/Resources/testappcast.xml": {
+    "executable": false,
+    "sha256": "328bbbfff617c0e9b92c7337f43a77d810e8fb211f178a10b9d15c6d770f42ef"
+  },
+  "sparkle/Tests/Resources/testappcast_arm64HardwareRequirement.xml": {
+    "executable": false,
+    "sha256": "a74958eabeddbad6118baf0a84a4b61bf86fda3c45b19f02c368ef409a425475"
+  },
+  "sparkle/Tests/Resources/testappcast_channels.xml": {
+    "executable": false,
+    "sha256": "f0bebc6602af1a4eb386940e70a22ffd538de1ce05b860078a32d82ea4df502d"
+  },
+  "sparkle/Tests/Resources/testappcast_info_updates.xml": {
+    "executable": false,
+    "sha256": "9989a59fc085e9c84d0e64b097e345ee636ce13e012f68736013f3d7512c5878"
+  },
+  "sparkle/Tests/Resources/testappcast_minimumAutoupdateVersion.xml": {
+    "executable": false,
+    "sha256": "731d87248d3e2d136a8c74e18014ba7e4cdf86abf3935cf7ac2c229c0083d052"
+  },
+  "sparkle/Tests/Resources/testappcast_minimumAutoupdateVersionSkipping.xml": {
+    "executable": false,
+    "sha256": "462034f525f86e731324c8351c22b52313081bd9da751bc86d40cbd35ffd5c41"
+  },
+  "sparkle/Tests/Resources/testappcast_minimumAutoupdateVersionSkipping2.xml": {
+    "executable": false,
+    "sha256": "481c5f7a0f92ceda1f4c9a5f38658eb7cd96265b8918cc9e9f49fb6d40202352"
+  },
+  "sparkle/Tests/Resources/testappcast_minimumUpdateVersion.xml": {
+    "executable": false,
+    "sha256": "0b10b26ffa6b46cc1bd8337a69de980b614bff29f8271983f2be19370d68bef3"
+  },
+  "sparkle/Tests/Resources/testappcast_phasedRollout.xml": {
+    "executable": false,
+    "sha256": "8576f67e1296c35f924e0b8478aae58ccdb16f8acd64fa3e594f233eaf33a94c"
+  },
+  "sparkle/Tests/Resources/testlocalizedreleasenotesappcast.xml": {
+    "executable": false,
+    "sha256": "51872267426a7a072656dfce5fbff2fda523eb951944e30bc5327c1d85fb8864"
+  },
+  "sparkle/Tests/Resources/testnamespaces.xml": {
+    "executable": false,
+    "sha256": "e13870db40438230380534863355d9a79e2e2fcb46c6f2ea7a9ea09fd6c4a867"
+  },
+  "sparkle/Tests/Resources/testreleasenotes.html": {
+    "executable": false,
+    "sha256": "fa233628133cc1867249f49e430b39ce1dfdc39ebfebb88565d72e7f00fecc0a"
+  },
+  "sparkle/Tests/SUAppcastTest.swift": {
+    "executable": false,
+    "sha256": "5db79002b3ba7949c019b87dc64aabaa2dad9006b8b8ef36f47e27836158a372"
+  },
+  "sparkle/Tests/SUBinaryDeltaTest.m": {
+    "executable": false,
+    "sha256": "acb0fd0b866d339795896f27de46958b9d51230609a7623b545ff7f61d6b30a3"
+  },
+  "sparkle/Tests/SUCodeSigningVerifierTest.m": {
+    "executable": false,
+    "sha256": "e0aa1998fb2eac0fde5db0649eab87e9bd5b55322889165844e254c1feca0b08"
+  },
+  "sparkle/Tests/SUFeedSignatureVerifierTest.swift": {
+    "executable": false,
+    "sha256": "35f06eb47a2c8769e77db1a6160a3a09284c8210173e5aee1695b4f3caf8ace5"
+  },
+  "sparkle/Tests/SUFileManagerTest.swift": {
+    "executable": false,
+    "sha256": "c8bd6c0ff74ac30f95fba5929856ba68f96a3807c8168946ace4e8d9eca82c4f"
+  },
+  "sparkle/Tests/SUInstallerTest.m": {
+    "executable": false,
+    "sha256": "bf348bca2d4514fb68ab7adffaca84e018890bd3139f44f9a915c7dfde7e730a"
+  },
+  "sparkle/Tests/SUSignatureVerifierTest.m": {
+    "executable": false,
+    "sha256": "1c96502daa1360cf38e6f8a01258258d9246aeaacd3c9f8f33f31ca8711f1d65"
+  },
+  "sparkle/Tests/SUSpotlightImporterTest.swift": {
+    "executable": false,
+    "sha256": "4fafa33def723028defd0da40f65d80eaef9a1e848751de01b72a280ca7a52fb"
+  },
+  "sparkle/Tests/SUUnarchiverTest.swift": {
+    "executable": false,
+    "sha256": "0dc524ce74255e8448bf4f3f3f9ba2c2b77e43f50767192c3a8545604503788a"
+  },
+  "sparkle/Tests/SUUpdateValidatorTest.swift": {
+    "executable": false,
+    "sha256": "733479c5a513fa84058be3bedd9c6e082a68984f66c5cea9e343c9b253277cb2"
+  },
+  "sparkle/Tests/SUUpdaterTest.m": {
+    "executable": false,
+    "sha256": "e5117f6a1656239b5c553a25e72f72accbedd44d3b385ad4bc68e573db897c68"
+  },
+  "sparkle/Tests/SUVersionComparisonTest.m": {
+    "executable": false,
+    "sha256": "563fe8719325f79b55ed8ff52169e049989ce2a2523dee263b226a59b5501b8c"
+  },
+  "sparkle/Tests/Sparkle Unit Tests-Bridging-Header.h": {
+    "executable": false,
+    "sha256": "0f4acf70309b3bf913988a0ab7b8ad5b395e5a4169563458587047a78edffcda"
+  },
+  "sparkle/Tests/SparkleTests-Info.plist": {
+    "executable": false,
+    "sha256": "e87dd6a52858e58a76d0acceb8dba792fb180e2259167d755a15accc5d400595"
+  },
+  "sparkle/UITests/.swiftlint.yml": {
+    "executable": false,
+    "sha256": "e46586b935070356b4e27c6d2d9bc3c50a3572b339df2342d96bff8a46bd850d"
+  },
+  "sparkle/UITests/SUTestApplicationTest.swift": {
+    "executable": false,
+    "sha256": "67aed56721ba2c62ae6ab101f33ed996973feca8892c038e4fb0c61342a5c755"
+  },
+  "sparkle/UITests/UITests-Info.plist": {
+    "executable": false,
+    "sha256": "1dcb5aa88dabb5f19b671f7066204bd58220ded8654dc91f5f79e09690d81365"
+  },
+  "sparkle/Vendor/bsdiff/bscommon.c": {
+    "executable": false,
+    "sha256": "2dd9f0c72320ff1defbc1fbd60e3e590d3cab18aefa9ef5cba352025c3f4938e"
+  },
+  "sparkle/Vendor/bsdiff/bscommon.h": {
+    "executable": false,
+    "sha256": "306a20de57bc91b6cb973827f583dfdb2a00cd5b33d6dfdd36075fd4d8ea1d57"
+  },
+  "sparkle/Vendor/bsdiff/bsdiff.c": {
+    "executable": false,
+    "sha256": "f7fdd5ea87241eeb591624613f0f0e7cc97dd269b88224e37826d5c029ba7230"
+  },
+  "sparkle/Vendor/bsdiff/bspatch.c": {
+    "executable": false,
+    "sha256": "902dec19309278bcee1d4ed2e97ed621aef253a0e1882b6266e7152360184940"
+  },
+  "sparkle/Vendor/bsdiff/bspatch.h": {
+    "executable": false,
+    "sha256": "b68c211664d3f4be5e65290e95b89d5ec2f16a5d718efa19c6bfde99a8e2a0e6"
+  },
+  "sparkle/Vendor/bsdiff/sais.c": {
+    "executable": false,
+    "sha256": "0cde1fa0eb1ee5441dfe86cbefa1b702653f1dffdf23d1d5b9c73309e4a1a73d"
+  },
+  "sparkle/Vendor/bsdiff/sais.h": {
+    "executable": false,
+    "sha256": "4bb3827eff62ee0368d3e369c68ed25320ddec155221bcbe4a5e2c005bb8dd4e"
+  },
+  "sparkle/Vendor/ed25519-sparkle/alterations.txt": {
+    "executable": false,
+    "sha256": "ae2da6addece20761062fff5e38d85c1c3a7ac46f7d48a59f324cdf7761af0e2"
+  },
+  "sparkle/Vendor/ed25519-sparkle/license.txt": {
+    "executable": false,
+    "sha256": "f68d76b9c1c2271422e55134ea94cf71f2ac3fc3ed6a7ec6b83a1a0538753214"
+  },
+  "sparkle/Vendor/ed25519-sparkle/readme.md": {
+    "executable": false,
+    "sha256": "f92987113c76d1cc53998d2665d7970c6983b2aecc8413dc54eaf57923b3bbe0"
+  },
+  "sparkle/Vendor/ed25519-sparkle/src/add_scalar.c": {
+    "executable": false,
+    "sha256": "73aec76dd3842276a62b104e6bedf1ec4b4da2470baf32ecd921afa953f02979"
+  },
+  "sparkle/Vendor/ed25519-sparkle/src/ed25519.h": {
+    "executable": false,
+    "sha256": "8b09800605ac592c1f7d6e701f3526f84156db15bbd68904d39ad398e7d7c8ce"
+  },
+  "sparkle/Vendor/ed25519-sparkle/src/fe.c": {
+    "executable": false,
+    "sha256": "71082937da43def6ecaf7811c23410bd8ea763969dfec67383f8129b12b1926d"
+  },
+  "sparkle/Vendor/ed25519-sparkle/src/fe.h": {
+    "executable": false,
+    "sha256": "0476ae2ebb86978d1e0b9fbeb63dcddd7566d6b74806db47dda7688df74aaafb"
+  },
+  "sparkle/Vendor/ed25519-sparkle/src/fixedint.h": {
+    "executable": false,
+    "sha256": "451fd529865e7fc69156f4cbe7c548857704ae4913768ad9ed7103656efdfc17"
+  },
+  "sparkle/Vendor/ed25519-sparkle/src/ge.c": {
+    "executable": false,
+    "sha256": "c3bb834817edea83d843828a75af19867b93144d15140eadfd9784d40cf11409"
+  },
+  "sparkle/Vendor/ed25519-sparkle/src/ge.h": {
+    "executable": false,
+    "sha256": "b16be2ea1731d9212933e7beeaef6882145fdcdaebdff9996efb5cf97faa2651"
+  },
+  "sparkle/Vendor/ed25519-sparkle/src/key_exchange.c": {
+    "executable": false,
+    "sha256": "5b248ae57bdbd673a1a968ccf95bdb0cd1288f4511af7dad15a9e7c07f277db8"
+  },
+  "sparkle/Vendor/ed25519-sparkle/src/keypair.c": {
+    "executable": false,
+    "sha256": "a9fd88cc4558f52d5fabf03b1b54c1c38a105a03753dd7ca4e0249687be0ebcc"
+  },
+  "sparkle/Vendor/ed25519-sparkle/src/precomp_data.h": {
+    "executable": false,
+    "sha256": "c7d63a8b7ecd7bc6a3ac2b826a540a69dee0fc7e8bf3b00ef5dd98ce00a7c224"
+  },
+  "sparkle/Vendor/ed25519-sparkle/src/sc.c": {
+    "executable": false,
+    "sha256": "c1bdb840416b34e79ceb7472d1a4ac4b1407c47b4c982cad981c72142ef42407"
+  },
+  "sparkle/Vendor/ed25519-sparkle/src/sc.h": {
+    "executable": false,
+    "sha256": "b0ef537b4d4dad7bd2910e2a663a02a7ac25b473511a929c3c609d82f9bdf87d"
+  },
+  "sparkle/Vendor/ed25519-sparkle/src/seed.c": {
+    "executable": false,
+    "sha256": "6a1191d9f680f548fdc9fa858f5069132931532b711f2be5d47c9c1471f22198"
+  },
+  "sparkle/Vendor/ed25519-sparkle/src/sha512.c": {
+    "executable": false,
+    "sha256": "965f0afc2b6b51a96acff81952c75e4da1360d35c19bd69a4bffc2f51481985a"
+  },
+  "sparkle/Vendor/ed25519-sparkle/src/sha512.h": {
+    "executable": false,
+    "sha256": "647ed5784d4dcd682b9c42add2e39107582efb4df9e1362c8e5120613eb9a0ce"
+  },
+  "sparkle/Vendor/ed25519-sparkle/src/sign.c": {
+    "executable": false,
+    "sha256": "af693a4a59430cc06d4b07f82e30bf266897ecc9c75265c7fa49cfa4159cf5ec"
+  },
+  "sparkle/Vendor/ed25519-sparkle/src/verify.c": {
+    "executable": false,
+    "sha256": "a2ca7197c5f6d193c9f526d432429dfb44a65853a7ec18e10a5761334bdcf48c"
+  },
+  "sparkle/bin/old_dsa_scripts/sign_update": {
+    "executable": true,
+    "sha256": "3f73009252ee385e34d476e77a1c0ccf78195cd982ba3e243975bccc3bb414db"
+  },
+  "sparkle/common_cli/Secret.swift": {
+    "executable": false,
+    "sha256": "85539082ef5b20fd04f6c5f25703bdbc5b39646598f56ff90dfe40eb0c5a2a09"
+  },
+  "sparkle/common_cli/Signing.swift": {
+    "executable": false,
+    "sha256": "c7e502d683c84e62da5ff4d7d1579ea31b0f9489838fb808ec2205ca7c597a7f"
+  },
+  "sparkle/generate_appcast/Appcast.swift": {
+    "executable": false,
+    "sha256": "22ac0df4fe8dc7e9b01d98db3ae0dd2206a306edd31e98d2209bc922cf95e014"
+  },
+  "sparkle/generate_appcast/ArchiveItem.swift": {
+    "executable": false,
+    "sha256": "9eaadb6d22ee87ea3946fe866fee1e7825499da07e79a8f4314adf89528fdae4"
+  },
+  "sparkle/generate_appcast/Bridging-Header.h": {
+    "executable": false,
+    "sha256": "31f8d4003515bddb3f8243b187cd3fdf8aeb0cc3f9e70552b16df2a7977f5265"
+  },
+  "sparkle/generate_appcast/FeedXML.swift": {
+    "executable": false,
+    "sha256": "477c15313f6d0e312a91d4acc23dcb7023e834abd30545cae3dc38dd0a4504a5"
+  },
+  "sparkle/generate_appcast/URL+Hashing.swift": {
+    "executable": false,
+    "sha256": "2ad13a3c4b9b8cc0f4c4cf9bba8d40372c6cee9e2fb502ee95d9da2230001ebc"
+  },
+  "sparkle/generate_appcast/Unarchive.swift": {
+    "executable": false,
+    "sha256": "0a060efb49fe131e6a1808cb3cd715b8e114cd68dd6f32034d95e2c0bf791874"
+  },
+  "sparkle/generate_appcast/main.swift": {
+    "executable": false,
+    "sha256": "92877a23489bd7dfc9278bdc2f14f7a81ae7521da5566a4757e7553a48188182"
+  },
+  "sparkle/generate_keys/Bridging-Header.h": {
+    "executable": false,
+    "sha256": "a083831cb401814dd7930621efd45518bdc0ff22422a0e3dd44d8fe3bf09ce24"
+  },
+  "sparkle/generate_keys/main.swift": {
+    "executable": false,
+    "sha256": "6e6e5bfa43e98bc4be8a28c7acb1a1b48feb299d7914fbf7be16799ebe42f873"
+  },
+  "sparkle/sign_update/Bridging-Header.h": {
+    "executable": false,
+    "sha256": "0551aba7aa0c6a068fa540a58d97244812aa46fce55c23650b0f364ea9837b47"
+  },
+  "sparkle/sign_update/main.swift": {
+    "executable": false,
+    "sha256": "2abf05c401f240103ef5061e862c35dd5d1848c484ec14f956a70911d2b89948"
+  },
+  "sparkle/sparkle-cli/Info.plist": {
+    "executable": false,
+    "sha256": "0d04f5392050cf6ecd2f50ea7c06799f77878328ca3838fc707a4439cb17b852"
+  },
+  "sparkle/sparkle-cli/SPUCommandLineDriver.h": {
+    "executable": false,
+    "sha256": "3f7d8efdd5b1be0e150ecb75795e70b0cd4fadbd1b18818b2dcf7c26f0dd6171"
+  },
+  "sparkle/sparkle-cli/SPUCommandLineDriver.m": {
+    "executable": false,
+    "sha256": "0924b26df77f726afafed2bb149998c4c27813574c0a9e67ddf69cc0419490b1"
+  },
+  "sparkle/sparkle-cli/SPUCommandLineUserDriver.h": {
+    "executable": false,
+    "sha256": "525cc91b76b7c88d3f0bc476cfdf0df72c50739c31d3ff71e9da9a6bb4773c42"
+  },
+  "sparkle/sparkle-cli/SPUCommandLineUserDriver.m": {
+    "executable": false,
+    "sha256": "7e23c34763c74afbdbb7095cdd02d23343e9d0836e358e9da1099ff198e51600"
+  },
+  "sparkle/sparkle-cli/main.m": {
+    "executable": false,
+    "sha256": "6df90a46bc481a76261f1b5c1a3123572f316fa3dc4463ab4269e2f5ecd0051e"
+  },
+  "swift-nio-ssh/.gitignore": {
+    "executable": false,
+    "sha256": "40447900fd6d19f7c130adcbc6c8cf6206c98e7d92c1e9d3cb9cda18e8b12ef7"
+  },
+  "swift-nio-ssh/.spi.yml": {
+    "executable": false,
+    "sha256": "9446ec32076990ddd43bfce9517acb2d6e40af700025712717cf78bbbcea1589"
+  },
+  "swift-nio-ssh/.swiftformat": {
+    "executable": false,
+    "sha256": "79f6ae872af5fcacc4d2b9403ebb545bb3ed89e6ec95a99a0e6ce88568a04dd2"
+  },
+  "swift-nio-ssh/CODE_OF_CONDUCT.md": {
+    "executable": false,
+    "sha256": "81df3e7e1ecc56d91a2a4ed1ff9e950e82bce143aeea777cac085f9bb1dc2ce1"
+  },
+  "swift-nio-ssh/CONTRIBUTING.md": {
+    "executable": false,
+    "sha256": "75210a8e81b41bf87f3515070fae34ff3caece1a721569734c1cdac65e295812"
+  },
+  "swift-nio-ssh/LICENSE.txt": {
+    "executable": false,
+    "sha256": "cfc7749b96f63bd31c3c42b5c471bf756814053e847c10f3eb003417bc523d30"
+  },
+  "swift-nio-ssh/Package.resolved": {
+    "executable": false,
+    "sha256": "e56c8e5a57a779bd646e920d74a0a5f67472ddd9b49c0f523abd54cc0598aed7"
+  },
+  "swift-nio-ssh/Package.swift": {
+    "executable": false,
+    "sha256": "8720d46fe3ec61e002dd5b1769b24c311a1cf82043b7fea89f3aec4e1cc30195"
+  },
+  "swift-nio-ssh/Package@swift-5.4.swift": {
+    "executable": false,
+    "sha256": "bf277d78c1740d1d43a0a6abe1063e5d1f3b7f575b064cf586b038d4401d8daa"
+  },
+  "swift-nio-ssh/Package@swift-5.5.swift": {
+    "executable": false,
+    "sha256": "f9bdfab36add43ae866ec9a1ff87613320ae452bd0b336cb0db0b0b05689794d"
+  },
+  "swift-nio-ssh/README.md": {
+    "executable": false,
+    "sha256": "29d5288b1ad84ae9456e77a90665dcc3327f8d1d790f636b5dc926d1a6abdf8e"
+  },
+  "swift-nio-ssh/SECURITY.md": {
+    "executable": false,
+    "sha256": "e5d8abbe0cead31b8191818b5132f326abcbe3598968c3ae120279371f281ca5"
+  },
+  "swift-nio-ssh/Sources/NIOSSH/ByteBuffer+SSH.swift": {
+    "executable": false,
+    "sha256": "5ec034427fc71e3326fd91b50ae8c89978cda8429d9f27bc4569ca649f8522b1"
+  },
+  "swift-nio-ssh/Sources/NIOSSH/CSPRNG/CSPRNG.swift": {
+    "executable": false,
+    "sha256": "2d63c9317aaa96da075b577ca7f9755a96beaa85221148d6e79f704cfdfe781c"
+  },
+  "swift-nio-ssh/Sources/NIOSSH/Child Channels/ChildChannelOptions.swift": {
+    "executable": false,
+    "sha256": "d7307f5fc3476f2321d5b0a6b5c0fc1b8bd0bf347b2cc2aee0a8c81e2064b9fd"
+  },
+  "swift-nio-ssh/Sources/NIOSSH/Child Channels/ChildChannelStateMachine.swift": {
+    "executable": false,
+    "sha256": "4489eb66ac45b6403ee4be189f28e89a521c6d52001290f0d4f99d202b44b2b9"
+  },
+  "swift-nio-ssh/Sources/NIOSSH/Child Channels/ChildChannelUserEvents.swift": {
+    "executable": false,
+    "sha256": "ae984535b875a69418b9241272e287650ad0e516abbaa82099c8f797af0ee536"
+  },
+  "swift-nio-ssh/Sources/NIOSSH/Child Channels/ChildChannelWindowManager.swift": {
+    "executable": false,
+    "sha256": "ed7173215f992d6b52e1b894f85bbf06c420189d6df6fe57d62a5d3b0a93a8f4"
+  },
+  "swift-nio-ssh/Sources/NIOSSH/Child Channels/ChildChannelWritabilityManager.swift": {
+    "executable": false,
+    "sha256": "5ec7c4224fc6de238325255a3f6a720f4e0efafd68debfe82dd700c7ebd1a550"
+  },
+  "swift-nio-ssh/Sources/NIOSSH/Child Channels/OutboundFlowController.swift": {
+    "executable": false,
+    "sha256": "1a3686547ea1dfee5dedec5f290c3c4cfb159b9a13ff6c530731184e327ec0a3"
+  },
+  "swift-nio-ssh/Sources/NIOSSH/Child Channels/SSHChannelData.swift": {
+    "executable": false,
+    "sha256": "ba3815592b65d810a79ad35a5115489d33392c22f1bd25bd0fc9d2f92dd886bc"
+  },
+  "swift-nio-ssh/Sources/NIOSSH/Child Channels/SSHChannelIdentifier.swift": {
+    "executable": false,
+    "sha256": "60aaba9efac9be47f5f7e805f3571cbe0801c9b42c74e756d2b85f33a898983f"
+  },
+  "swift-nio-ssh/Sources/NIOSSH/Child Channels/SSHChannelMultiplexer.swift": {
+    "executable": false,
+    "sha256": "0dcd683878de1e2bc2970caa1954df407418de705a518f88aaca76b90bd4d4ec"
+  },
+  "swift-nio-ssh/Sources/NIOSSH/Child Channels/SSHChannelType.swift": {
+    "executable": false,
+    "sha256": "c84e68c1a30348ae26ca8327d5baf11b24772154a471783bf0f8b0fd4b312036"
+  },
+  "swift-nio-ssh/Sources/NIOSSH/Child Channels/SSHChildChannel.swift": {
+    "executable": false,
+    "sha256": "9062a4544c77603594cfb84330f768445bf97314bf0d2891ee2dd4c080ed7126"
+  },
+  "swift-nio-ssh/Sources/NIOSSH/Connection State Machine/Operations/AcceptsChannelMessages.swift": {
+    "executable": false,
+    "sha256": "28db3ebd6f8f17f196f2ab2649eff921db42ab7e85f91f4cb4b2a77a5f41e49b"
+  },
+  "swift-nio-ssh/Sources/NIOSSH/Connection State Machine/Operations/AcceptsKeyExchangeMessages.swift": {
+    "executable": false,
+    "sha256": "ac5e0016801fc6baf186f3bb8e86fbbb9c04e93b18906a5d2ae875e20ff22dff"
+  },
+  "swift-nio-ssh/Sources/NIOSSH/Connection State Machine/Operations/AcceptsUserAuthMessages.swift": {
+    "executable": false,
+    "sha256": "c846adc0d4edc97454a265942af6c94ddbc870f95b68aac5ea3ff46ffa2520dd"
+  },
+  "swift-nio-ssh/Sources/NIOSSH/Connection State Machine/Operations/AcceptsVersionMessages.swift": {
+    "executable": false,
+    "sha256": "7143536b042d4b0448646879a8a56f42ffe5921d91ebbdd4c436f9db91fda40d"
+  },
+  "swift-nio-ssh/Sources/NIOSSH/Connection State Machine/Operations/SendsChannelMessages.swift": {
+    "executable": false,
+    "sha256": "efb1b5672f0d09c583082a235707fb3a0108a0ccbaee6438d935e1d2efa920ee"
+  },
+  "swift-nio-ssh/Sources/NIOSSH/Connection State Machine/Operations/SendsKeyExchangeMessages.swift": {
+    "executable": false,
+    "sha256": "4550424bd52e74963fe5ec4f0c2a704a64b890ea4b563553dc028646e2de23c6"
+  },
+  "swift-nio-ssh/Sources/NIOSSH/Connection State Machine/Operations/SendsUserAuthMessages.swift": {
+    "executable": false,
+    "sha256": "b60430c95809a21fba98987c37e8bd2c3f6af104a838e0e21d8dc9add7b53b3c"
+  },
+  "swift-nio-ssh/Sources/NIOSSH/Connection State Machine/SSHConnectionStateMachine.swift": {
+    "executable": false,
+    "sha256": "46363f09bb9afd1e6eccd09b44d66ffc33d369910d2bb282cf576e81b365f077"
+  },
+  "swift-nio-ssh/Sources/NIOSSH/Connection State Machine/States/ActiveState.swift": {
+    "executable": false,
+    "sha256": "a8003a0c1633f674b89f02a7e783768aeb7de7cb2c147686099711c9e5e0dcc6"
+  },
+  "swift-nio-ssh/Sources/NIOSSH/Connection State Machine/States/IdleState.swift": {
+    "executable": false,
+    "sha256": "42983ba896238c557d166ed8fe27280c10c88b8cdc69ce93166227b19a0e477c"
+  },
+  "swift-nio-ssh/Sources/NIOSSH/Connection State Machine/States/KeyExchangeState.swift": {
+    "executable": false,
+    "sha256": "ee2ded2a8ea506a834dc882b07be4cc0bea8b0da921966f8731ffeaf5964787e"
+  },
+  "swift-nio-ssh/Sources/NIOSSH/Connection State Machine/States/ReceivedKexInitWhenActiveState.swift": {
+    "executable": false,
+    "sha256": "fd6eff9a4393ae781d7aeec031b2a170392bd985de9d516b84cb941c2a51eb22"
+  },
+  "swift-nio-ssh/Sources/NIOSSH/Connection State Machine/States/ReceivedNewKeysState.swift": {
+    "executable": false,
+    "sha256": "12ed8ab2f24276fd22a6a2600604b556a4d1fe15931cf71c6e13c51126463e3f"
+  },
+  "swift-nio-ssh/Sources/NIOSSH/Connection State Machine/States/RekeyingReceivedNewKeysState.swift": {
+    "executable": false,
+    "sha256": "2adb7aeaaa646dfce7db81a384ed2c5c0019bcb6cc031a6797f33a2ae438339d"
+  },
+  "swift-nio-ssh/Sources/NIOSSH/Connection State Machine/States/RekeyingSentNewKeysState.swift": {
+    "executable": false,
+    "sha256": "37315c96f3126bdf2ee56025487f29cabdbfc8c411d4c75bf40d1717d9a0a7ad"
+  },
+  "swift-nio-ssh/Sources/NIOSSH/Connection State Machine/States/RekeyingState.swift": {
+    "executable": false,
+    "sha256": "53fa6a9956b2f90f17555b7a37f18b2757ebcac9fb2b700b1f21f20b81cdbd4f"
+  },
+  "swift-nio-ssh/Sources/NIOSSH/Connection State Machine/States/SentKexInitWhenActiveState.swift": {
+    "executable": false,
+    "sha256": "0c6f44ce34e0c0ea595943cd28bad98c6cb3c12b6dfa62c0accaa7150c204102"
+  },
+  "swift-nio-ssh/Sources/NIOSSH/Connection State Machine/States/SentNewKeysState.swift": {
+    "executable": false,
+    "sha256": "2afa56c2dcb24b96a6e8642c0efa12a554fb30a9d910fff2440f92c0f1fa765d"
+  },
+  "swift-nio-ssh/Sources/NIOSSH/Connection State Machine/States/SentVersionState.swift": {
+    "executable": false,
+    "sha256": "130937745e5369b0c3b732ba78031b2444bf218277b5f1d6a20c59588e99e291"
+  },
+  "swift-nio-ssh/Sources/NIOSSH/Connection State Machine/States/UserAuthenticationState.swift": {
+    "executable": false,
+    "sha256": "f7625c626f2fef077a98d50c8b231c6c8dcab2f46adfec57ea105e9e96faa05b"
+  },
+  "swift-nio-ssh/Sources/NIOSSH/Constants.swift": {
+    "executable": false,
+    "sha256": "b99dc437d2a1dd7c9ca0422ba110ffbc56c93aa799e8c70d2b99cab8c87d6661"
+  },
+  "swift-nio-ssh/Sources/NIOSSH/Docs.docc/index.md": {
+    "executable": false,
+    "sha256": "784c119f890cf75321f7bdf25bf93bd7417909d1be85aece50b44989b446b9d6"
+  },
+  "swift-nio-ssh/Sources/NIOSSH/GlobalRequestDelegate.swift": {
+    "executable": false,
+    "sha256": "3f92d8910878d84631ebdc8d222e6fddb9253ab4123b15eef0d8d717ccde3723"
+  },
+  "swift-nio-ssh/Sources/NIOSSH/Key Exchange/ECDHCompatibleKey.swift": {
+    "executable": false,
+    "sha256": "07f9012585f78f2d81de44ae84ae89bf90ad7f1dcae86d5880f0dea366f94e43"
+  },
+  "swift-nio-ssh/Sources/NIOSSH/Key Exchange/EllipticCurveKeyExchange.swift": {
+    "executable": false,
+    "sha256": "51e70da2480c46db401f602a850e3cc1c60d2e993f9ae7ff134286f765e0ad03"
+  },
+  "swift-nio-ssh/Sources/NIOSSH/Key Exchange/SSHKeyExchangeResult.swift": {
+    "executable": false,
+    "sha256": "861b4c6f28a232222c0ae53a192e25c09e5405fbf4c4175c3d31f523cba2fa10"
+  },
+  "swift-nio-ssh/Sources/NIOSSH/Key Exchange/SSHKeyExchangeStateMachine.swift": {
+    "executable": false,
+    "sha256": "9fd834db2e5811ab34f9d20799d2f1b1646b6508f84ae8997d064761678cba7f"
+  },
+  "swift-nio-ssh/Sources/NIOSSH/Keys And Signatures/ClientServerAuthenticationDelegate.swift": {
+    "executable": false,
+    "sha256": "d79ad01f1d302b952259b139206ae80ee65b42e41f0e54ca608ca0b22f6b80af"
+  },
+  "swift-nio-ssh/Sources/NIOSSH/Keys And Signatures/CustomKeys.swift": {
+    "executable": false,
+    "sha256": "341a7bcf1bf206a2c0f8fb1233765c90feae039038c166e38275120b8d80907a"
+  },
+  "swift-nio-ssh/Sources/NIOSSH/Keys And Signatures/NIOSSHCertifiedPublicKey.swift": {
+    "executable": false,
+    "sha256": "5c9531c0bbbb932c2e91843dc73ccc780b81fdd00fc23485856126572190c99e"
+  },
+  "swift-nio-ssh/Sources/NIOSSH/Keys And Signatures/NIOSSHPrivateKey.swift": {
+    "executable": false,
+    "sha256": "58c833ec36dfc20b28db252cb7e1c5967f510c70f9ba2f90c8b98994f19e8349"
+  },
+  "swift-nio-ssh/Sources/NIOSSH/Keys And Signatures/NIOSSHPublicKey.swift": {
+    "executable": false,
+    "sha256": "bd2640ca543836b00f412b4c0f196dc1a303aa4f55d281d48e1df815f96c9fae"
+  },
+  "swift-nio-ssh/Sources/NIOSSH/Keys And Signatures/NIOSSHSignature.swift": {
+    "executable": false,
+    "sha256": "4b71206ba911b5de6c79798103b52d202259cb8b26be055add598aa1f7c199d5"
+  },
+  "swift-nio-ssh/Sources/NIOSSH/NIOSSHError.swift": {
+    "executable": false,
+    "sha256": "4c32f210e998981867c320ebd618c493bb19633426bb95c9669436baf474d182"
+  },
+  "swift-nio-ssh/Sources/NIOSSH/NIOSSHHandler.swift": {
+    "executable": false,
+    "sha256": "def309e75d695b7c124daeeee7c0cbaba437157f305a1942215f49d7ba385fb2"
+  },
+  "swift-nio-ssh/Sources/NIOSSH/NIOSSHSendable.swift": {
+    "executable": false,
+    "sha256": "99adc65ca0d9b577dd8c714799e64e683d530827d93c8d7bf0a42594e4dfedc0"
+  },
+  "swift-nio-ssh/Sources/NIOSSH/Role.swift": {
+    "executable": false,
+    "sha256": "2d862d76f437edb5f5732e1006ad1dd12463cb714ae062115c2a2d7f9a11bc31"
+  },
+  "swift-nio-ssh/Sources/NIOSSH/SSHClientConfiguration.swift": {
+    "executable": false,
+    "sha256": "58ede056162f0bd802d3ae90800f617f77b17b002e2a2495f3fb561b57677b50"
+  },
+  "swift-nio-ssh/Sources/NIOSSH/SSHEncryptablePacketPayload.swift": {
+    "executable": false,
+    "sha256": "af8a27440e540a4fc05f9944c91e5a4d3fd7a2e767710255d60d3cf401ab6b5a"
+  },
+  "swift-nio-ssh/Sources/NIOSSH/SSHMessages.swift": {
+    "executable": false,
+    "sha256": "f921ff9272f18271d13b7b6d36ef95dd5fec5c22b36e92a21bfa1ab7fee92571"
+  },
+  "swift-nio-ssh/Sources/NIOSSH/SSHPacketParser.swift": {
+    "executable": false,
+    "sha256": "b307a899cbbb51f70fcab08a6035962f72997daa40624b8ce5bb0398774171a0"
+  },
+  "swift-nio-ssh/Sources/NIOSSH/SSHPacketSerializer.swift": {
+    "executable": false,
+    "sha256": "d303c96a98839f89c3ec71090bf1250f175f80e81f336960335e8db8769a88f3"
+  },
+  "swift-nio-ssh/Sources/NIOSSH/SSHServerConfiguration.swift": {
+    "executable": false,
+    "sha256": "37fe8d8c5b970d48b13a63116d4a98992b99e028c7f22df71e85b98c02029506"
+  },
+  "swift-nio-ssh/Sources/NIOSSH/SSHTerminalModes.swift": {
+    "executable": false,
+    "sha256": "ed804d1ce0cbca9a6cdca44ea5f1b6808b6df4215e5e88b39b12bb14cd553b42"
+  },
+  "swift-nio-ssh/Sources/NIOSSH/TransportProtection/AESGCM.swift": {
+    "executable": false,
+    "sha256": "ec55ad0a1d5114f8c3d501089f174a19a9c064f2d37a18da54a9a2d8c7cca9c4"
+  },
+  "swift-nio-ssh/Sources/NIOSSH/TransportProtection/SSHTransportProtection.swift": {
+    "executable": false,
+    "sha256": "2b3502eb5eb4222e801ef7b786fa08aa05340404bba75ffdf28e2ab398431e9c"
+  },
+  "swift-nio-ssh/Sources/NIOSSH/User Authentication/ClientUserAuthenticationDelegate.swift": {
+    "executable": false,
+    "sha256": "07d55643eedf106874afa9601f43440e02df8e397027d63aeba22ca66f4d077b"
+  },
+  "swift-nio-ssh/Sources/NIOSSH/User Authentication/DenyAllServerAuthDelegate.swift": {
+    "executable": false,
+    "sha256": "4be6cd8a68fa09c0113fcb90adc6c9fb4ea8a3f5813174bd18efd2168cacb800"
+  },
+  "swift-nio-ssh/Sources/NIOSSH/User Authentication/ServerUserAuthenticationDelegate.swift": {
+    "executable": false,
+    "sha256": "080104fa87f2987f68c20e18d0cb887a79d19beab93e06ee44262a80c4ef91e3"
+  },
+  "swift-nio-ssh/Sources/NIOSSH/User Authentication/SimplePasswordDelegate.swift": {
+    "executable": false,
+    "sha256": "eedce400d3540cc46ae7ae6c14e50cee99aab1f39e94c0ab49e8c39253fc338e"
+  },
+  "swift-nio-ssh/Sources/NIOSSH/User Authentication/UserAuthDelegate.swift": {
+    "executable": false,
+    "sha256": "8ca05b6f679a370c313966cbcfa94633070c3e995c5535af7a4fde75c955810c"
+  },
+  "swift-nio-ssh/Sources/NIOSSH/User Authentication/UserAuthSignablePayload.swift": {
+    "executable": false,
+    "sha256": "8a50869013cbb524a71e4a9fded23571fca73dec3ee5a6c77577bb17c564ea89"
+  },
+  "swift-nio-ssh/Sources/NIOSSH/User Authentication/UserAuthenticationMethod.swift": {
+    "executable": false,
+    "sha256": "6e5ea74a4a0e2543fd9b300b738f7fe816c1bdb4931ee9e7b137ba48e1349bcf"
+  },
+  "swift-nio-ssh/Sources/NIOSSH/User Authentication/UserAuthenticationStateMachine.swift": {
+    "executable": false,
+    "sha256": "e105a77659865a7006220bd396b1395f1537a667cc3dec7c638855a609801850"
+  },
+  "swift-nio-ssh/Sources/NIOSSHClient/ExecHandler.swift": {
+    "executable": false,
+    "sha256": "3bb1a9650737fabd52badb32eea4a0c212b7e1d7df3f32c44b44dafdfd108cba"
+  },
+  "swift-nio-ssh/Sources/NIOSSHClient/GlueHandler.swift": {
+    "executable": false,
+    "sha256": "216c5d724c51e1b84c4b1422918d85768878c5b9bb93452df3c7f3f03913e999"
+  },
+  "swift-nio-ssh/Sources/NIOSSHClient/InteractivePasswordPromptDelegate.swift": {
+    "executable": false,
+    "sha256": "1d90691d40edd8deb9e483abeaa1d9cce65c1a897a14b50d56f06ef0fe62c208"
+  },
+  "swift-nio-ssh/Sources/NIOSSHClient/PortForwardingServer.swift": {
+    "executable": false,
+    "sha256": "564f538ebd0126e9d9b2f2c57309491aa95def3a6a154f3dedceca7c70586cf4"
+  },
+  "swift-nio-ssh/Sources/NIOSSHClient/SimpleCLIParser.swift": {
+    "executable": false,
+    "sha256": "8043214dcd6940ade845519008b969e79d23d7807982d2d314a7a5b38ddb1869"
+  },
+  "swift-nio-ssh/Sources/NIOSSHClient/main.swift": {
+    "executable": false,
+    "sha256": "3b8de09c68523a1fefa190d97a6ecdb59b5f408512a47e5f03702b8c5c39ce77"
+  },
+  "swift-nio-ssh/Sources/NIOSSHPerformanceTester/Benchmark.swift": {
+    "executable": false,
+    "sha256": "415f450f0c37546758c43c37bd529c215ab3557eb086d90b2d3223ed43cd3504"
+  },
+  "swift-nio-ssh/Sources/NIOSSHPerformanceTester/BenchmarkHandshake.swift": {
+    "executable": false,
+    "sha256": "910d4160a9dcee5080f0152f3485c9b7a445014df110df875a59a1dbb3ef0db9"
+  },
+  "swift-nio-ssh/Sources/NIOSSHPerformanceTester/BenchmarkLinearThroughput.swift": {
+    "executable": false,
+    "sha256": "4207781af8ee9bda0c9a2f9b8b6a303d55c19cc4d9701cead3b68007692a5688"
+  },
+  "swift-nio-ssh/Sources/NIOSSHPerformanceTester/main.swift": {
+    "executable": false,
+    "sha256": "01ee84f28e8e64b9b82b0208c5496fd59d741507c7de0c7179e45243f8005903"
+  },
+  "swift-nio-ssh/Sources/NIOSSHPerformanceTester/shared.swift": {
+    "executable": false,
+    "sha256": "d47cba1c0b2432e86b5e87c7e792a16f2885b3e3ffa53b7ffb307f59668d0949"
+  },
+  "swift-nio-ssh/Sources/NIOSSHServer/DataToBufferCodec.swift": {
+    "executable": false,
+    "sha256": "284bb014e5b288bf37e5397d2cae70425bd90e025eda8d3985530e059d14154a"
+  },
+  "swift-nio-ssh/Sources/NIOSSHServer/ExecHandler.swift": {
+    "executable": false,
+    "sha256": "6c856fd6d479ebe5e0eaa9101356f06e94ceee9f052d67d77c893e6867bd6074"
+  },
+  "swift-nio-ssh/Sources/NIOSSHServer/GlueHandler.swift": {
+    "executable": false,
+    "sha256": "216c5d724c51e1b84c4b1422918d85768878c5b9bb93452df3c7f3f03913e999"
+  },
+  "swift-nio-ssh/Sources/NIOSSHServer/RemotePortForwarding.swift": {
+    "executable": false,
+    "sha256": "071ec0e6f03b223fc708c0c15f305314dce9bbc7d73f378864a67a987a53afef"
+  },
+  "swift-nio-ssh/Sources/NIOSSHServer/main.swift": {
+    "executable": false,
+    "sha256": "09ceabc7d27ab489883c4b7688c8627e2a4ca14f653b9dd276bb281f6087705e"
+  },
+  "swift-nio-ssh/Tests/LinuxMain.swift": {
+    "executable": false,
+    "sha256": "5d029e0a0a107d50263dcc266fb619e54bb2325e46c96fb45c2470e9e3aa8391"
+  },
+  "swift-nio-ssh/Tests/NIOSSHTests/AESGCMTests.swift": {
+    "executable": false,
+    "sha256": "4cfc75fa11976b04ca6ce4ede040fe2d80179fc71ad37d253418bcb5340888cd"
+  },
+  "swift-nio-ssh/Tests/NIOSSHTests/ByteBuffer+SSHTests.swift": {
+    "executable": false,
+    "sha256": "8cd64ee537f7266e66da2b086023a85a7c61bfe7a90788f245e4b1b4b50b32e7"
+  },
+  "swift-nio-ssh/Tests/NIOSSHTests/CertificateAuthenticationIntegrationTests.swift": {
+    "executable": false,
+    "sha256": "418579a5f079b281f38d2bcdbbda95b1bd7c59e41a34328465a9295aff58241c"
+  },
+  "swift-nio-ssh/Tests/NIOSSHTests/CertifiedKeyTests.swift": {
+    "executable": false,
+    "sha256": "35d4cbec9ee9eec49bc59b59a85617fd9ddbd1208bd4530958b4578f28f410a8"
+  },
+  "swift-nio-ssh/Tests/NIOSSHTests/ChildChannelMultiplexerTests.swift": {
+    "executable": false,
+    "sha256": "c783e5b33b4749792a8daf071487b9f6c9f3ee61ed815662dd2c0a2d02c211c8"
+  },
+  "swift-nio-ssh/Tests/NIOSSHTests/CustomHostKeyAlgorithmNamesTests.swift": {
+    "executable": false,
+    "sha256": "56f37b31581931178aa27956e886694e2259192134b1e2595837ce63591c8216"
+  },
+  "swift-nio-ssh/Tests/NIOSSHTests/CustomUserAuthAlgorithmNameTests.swift": {
+    "executable": false,
+    "sha256": "7fa25e1eb3e6aea8e88731831f17845b76a53aa210d6176dc1005e2e98924ad6"
+  },
+  "swift-nio-ssh/Tests/NIOSSHTests/ECKeyExchangeTests.swift": {
+    "executable": false,
+    "sha256": "29019ace76c3feade3266cb314d99fed327bde9d9eca682cec8ef5746c5146f9"
+  },
+  "swift-nio-ssh/Tests/NIOSSHTests/EndToEndTests.swift": {
+    "executable": false,
+    "sha256": "e220a6b2211fe41c1549512d3382a652acbfc4a85b2973b23d4407accb689221"
+  },
+  "swift-nio-ssh/Tests/NIOSSHTests/FuzzResultTests.swift": {
+    "executable": false,
+    "sha256": "a1b5ac9524689df4173c5384ea39841e644dde403713c84916675f5880640f69"
+  },
+  "swift-nio-ssh/Tests/NIOSSHTests/HostKeyTests.swift": {
+    "executable": false,
+    "sha256": "837ae6474e19030a733cd085de329b2e85cd999922039b1fb00e969ca11293da"
+  },
+  "swift-nio-ssh/Tests/NIOSSHTests/NIOSSHSignatureTests.swift": {
+    "executable": false,
+    "sha256": "0137f1b068a353ba2ef9da4f0b29629ff73490f8214d37b5ae9696e590fd3fa8"
+  },
+  "swift-nio-ssh/Tests/NIOSSHTests/SSHConfigurationCertificateTests.swift": {
+    "executable": false,
+    "sha256": "e2b8a44fe0829681609a66eef1b3ae2f8ed78217e2979413c31fd4c3b6200e4f"
+  },
+  "swift-nio-ssh/Tests/NIOSSHTests/SSHConnectionStateMachineTests.swift": {
+    "executable": false,
+    "sha256": "f73b11fd07953efadf81d972e34c48de63da5bbeaab7a51fd452b1f0b2c23541"
+  },
+  "swift-nio-ssh/Tests/NIOSSHTests/SSHEncryptedTrafficTests.swift": {
+    "executable": false,
+    "sha256": "b008a035ad3298f1cadeeb8de2d9a2248ba2644655009b797ac072abfd5b0908"
+  },
+  "swift-nio-ssh/Tests/NIOSSHTests/SSHHandlerTests.swift": {
+    "executable": false,
+    "sha256": "38cd743baf6f7a9e5c85f9e21054369ebf7239d5c44542a6a8fca40bd2238bb0"
+  },
+  "swift-nio-ssh/Tests/NIOSSHTests/SSHKeyExchangeCertificateTests.swift": {
+    "executable": false,
+    "sha256": "0640bb1007473f07178e03bd8a6dc47de9106e5d9f140879aeb2ecb9258fdce9"
+  },
+  "swift-nio-ssh/Tests/NIOSSHTests/SSHKeyExchangeStateMachineTests.swift": {
+    "executable": false,
+    "sha256": "de968e904553081fe8ca9eaafd7a90e540f6f2c138681329719c3e3583a10e17"
+  },
+  "swift-nio-ssh/Tests/NIOSSHTests/SSHMessagesTests.swift": {
+    "executable": false,
+    "sha256": "5289f5eb3b1147aa74cee6fb03a5d454a4d1f1c45a1015a5f5ad1ed3012d0bc5"
+  },
+  "swift-nio-ssh/Tests/NIOSSHTests/SSHPackerSerializerTests.swift": {
+    "executable": false,
+    "sha256": "35a1e7fc03d7144d6487a3dc32982f7715a239b022f2be11a27dde5e22b74ee4"
+  },
+  "swift-nio-ssh/Tests/NIOSSHTests/SSHPacketParserTests.swift": {
+    "executable": false,
+    "sha256": "02d01a8ea2dabbba7328f4703817fd8597f0e827e44b701c0a4d36ee42d6c06a"
+  },
+  "swift-nio-ssh/Tests/NIOSSHTests/UserAuthenticationStateMachineTests.swift": {
+    "executable": false,
+    "sha256": "dd1195401c8d708a256d2165a0c3e028a8844f9798655aa9ece83756a85c9fa9"
+  },
+  "swift-nio-ssh/Tests/NIOSSHTests/Utilities.swift": {
+    "executable": false,
+    "sha256": "de4ffab714ecee1fad5e0d974ebc90f2f340a5db4feb297146b5e55096f5e1c9"
+  },
+  "swift-nio-ssh/Tests/NIOSSHTests/UtilitiesTests.swift": {
+    "executable": false,
+    "sha256": "cf908dd35c89e59d0ecb5627bfade2a9dc67b04419fb792ce4933c60339dcff5"
+  },
+  "swift-nio-ssh/dev/git.commit.template": {
+    "executable": false,
+    "sha256": "7036dbad704c6663d9ea38e3c1e7ade16ce53cd6ef27ae99f2612609918d9a4c"
+  },
+  "swift-nio-ssh/docker/Dockerfile": {
+    "executable": false,
+    "sha256": "3677a3ba016f96a7bffbf2e54d801f90248d990c93c61eacb683684dd8082af5"
+  },
+  "swift-nio-ssh/docker/docker-compose.1804.54.yaml": {
+    "executable": false,
+    "sha256": "b741e33ec3e4206e7f8d1f37057971ad5daa79c6c334eaab5947c7aee1023edf"
+  },
+  "swift-nio-ssh/docker/docker-compose.2004.55.yaml": {
+    "executable": false,
+    "sha256": "3b831c5b2906aeecd6b396eabad57c9a0cdbe9dce898efeb22136fd8bff5fd2e"
+  },
+  "swift-nio-ssh/docker/docker-compose.2004.56.yaml": {
+    "executable": false,
+    "sha256": "43f0312d533f538b633406d7a3168e01c5dea173a4d140646f0db2d67a929ef4"
+  },
+  "swift-nio-ssh/docker/docker-compose.2004.57.yaml": {
+    "executable": false,
+    "sha256": "135e299064d4c47da7f4dbb55a8b405b1d4c6da38f65fd9904a78882dabf34f6"
+  },
+  "swift-nio-ssh/docker/docker-compose.2004.main.yaml": {
+    "executable": false,
+    "sha256": "25e73280e9d950bac288b389312b131f6909e0bc50d124535ecb5d7f1656fc74"
+  },
+  "swift-nio-ssh/docker/docker-compose.yaml": {
+    "executable": false,
+    "sha256": "65bfbc6f21ff00e4bcb148e199a9100fa09eec17720f612fd81d23ad71aba750"
+  },
+  "swift-nio-ssh/scripts/check_no_api_breakages.sh": {
+    "executable": true,
+    "sha256": "49d4b140b6ab4472593a7b1975644a8ff3ceb1150044247b53279a2d5743345b"
+  },
+  "swift-nio-ssh/scripts/generate_docs.sh": {
+    "executable": true,
+    "sha256": "a12d36f8f78fc3734ebe27a7ee3a7a22cd4e2dda0552ba24da92e08975f57bcb"
+  },
+  "swift-nio-ssh/scripts/soundness.sh": {
+    "executable": true,
+    "sha256": "8bcf218650af1bb1ae8cd8374ffc4970a8cbf9e93988e2f0cbba740d86da0226"
+  }
+}

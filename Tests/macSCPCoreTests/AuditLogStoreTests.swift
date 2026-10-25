@@ -1,0 +1,126 @@
+import Foundation
+import Testing
+@testable import macSCPCore
+
+@Suite("AuditLogStore")
+struct AuditLogStoreTests {
+    /// `maxEntries` is `nil` for the production default (`init(directory:)`)
+    /// or a small cap for a rolling-eviction test that must stay
+    /// O(cap), not O(productionCap) — `rollingCapKeepsNewest` below.
+    private func makeStore(maxEntries: Int? = nil) throws -> (AuditLogStore, URL) {
+        let dir = FileManager.default.temporaryDirectory
+            .appendingPathComponent("audit-tests-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        let store = maxEntries.map { AuditLogStore(directory: dir, maxEntries: $0) }
+            ?? AuditLogStore(directory: dir)
+        return (store, dir)
+    }
+
+    private func event(_ detail: String, kind: AuditEvent.Kind = .transferFinished) -> AuditEvent {
+        AuditEvent(kind: kind, detail: detail)
+    }
+
+    @Test func appendAndReadRoundtrip() throws {
+        let (store, dir) = try makeStore()
+        defer { try? FileManager.default.removeItem(at: dir) }
+        let id = UUID()
+        store.append(event("first"), for: id)
+        store.append(event("second", kind: .rename), for: id)
+        let events = store.events(for: id)
+        #expect(events.map(\.detail) == ["first", "second"])
+        #expect(events[1].kind == .rename)
+        // Other sessions are isolated.
+        #expect(store.events(for: UUID()).isEmpty)
+    }
+
+    /// Exercises the same rolling-eviction property the production cap
+    /// (`AuditLogStore.maxEntriesPerSession`, 1000) enforces, but at a small
+    /// injected cap: this test's runtime is O(smallCap), not
+    /// O(productionCap), because it appends `smallCap + 1` events rather
+    /// than 1001. The production value itself is pinned separately by
+    /// `productionDefaultCapIs1000` below.
+    @Test func rollingCapKeepsNewest() throws {
+        let smallCap = 5
+        let (store, dir) = try makeStore(maxEntries: smallCap)
+        defer { try? FileManager.default.removeItem(at: dir) }
+        let id = UUID()
+        for index in 0...smallCap {  // one over the cap
+            store.append(event("e\(index)"), for: id)
+        }
+        let events = store.events(for: id)
+        #expect(events.count == smallCap)
+        #expect(events.first?.detail == "e1")   // oldest ("e0") evicted
+        #expect(events.last?.detail == "e\(smallCap)")
+    }
+
+    /// Pins the documented production default (M9b design spec) on BOTH
+    /// exits: the constant AND `init(directory:)`'s actual cap. Pinning only
+    /// the constant left a gap — `init(directory:)` could stop reading
+    /// `maxEntriesPerSession` and hardcode a different cap of its own, and
+    /// this test would still be green. `rollingCapKeepsNewest` above no
+    /// longer exercises either directly, so both need their own pin.
+    @Test func productionDefaultCapIs1000() throws {
+        #expect(AuditLogStore.maxEntriesPerSession == 1000)
+        let (store, dir) = try makeStore()
+        defer { try? FileManager.default.removeItem(at: dir) }
+        #expect(store.maxEntries == 1000)
+    }
+
+    @Test func clearAndDeleteRemoveEverything() throws {
+        let (store, dir) = try makeStore()
+        defer { try? FileManager.default.removeItem(at: dir) }
+        let id = UUID()
+        store.append(event("x"), for: id)
+        store.clear(for: id)
+        #expect(store.events(for: id).isEmpty)
+        store.append(event("y"), for: id)
+        store.deleteLog(for: id)
+        #expect(store.events(for: id).isEmpty)
+        #expect(!FileManager.default.fileExists(
+            atPath: dir.appendingPathComponent("\(id).json").path(percentEncoded: false)))
+    }
+
+    @Test func corruptFileReadsAsEmpty() throws {
+        let (store, dir) = try makeStore()
+        defer { try? FileManager.default.removeItem(at: dir) }
+        let id = UUID()
+        try Data("not json".utf8).write(to: dir.appendingPathComponent("\(id).json"))
+        #expect(store.events(for: id).isEmpty)
+        // A later append recovers the file (starts fresh rather than throwing).
+        store.append(event("fresh"), for: id)
+        #expect(store.events(for: id).map(\.detail) == ["fresh"])
+    }
+
+    /// M9b/T4 review (finding 2): `append` now only hands the write off to a
+    /// private serial queue instead of blocking the caller — this proves the
+    /// cache stays coherent across that hand-off. Not timing-based: a
+    /// synchronous `events(for:)` right after three `append` calls must
+    /// still see all three, because `events(for:)`'s `queue.sync` can only
+    /// run after every `append` submitted before it has been applied to the
+    /// cache (FIFO on a serial queue is the flush).
+    @Test func appendDoesNotBlockAndEventsStaysCoherent() throws {
+        let (store, dir) = try makeStore()
+        defer { try? FileManager.default.removeItem(at: dir) }
+        let id = UUID()
+        store.append(event("one"), for: id)
+        store.append(event("two"), for: id)
+        store.append(event("three"), for: id)
+        let events = store.events(for: id)
+        #expect(events.map(\.detail) == ["one", "two", "three"])
+    }
+
+    @Test func unwritableDirectoryNeverThrowsOrDisturbs() throws {
+        // Directory path that is actually a FILE (M9a pattern): every write
+        // fails internally; append must swallow it silently.
+        let file = FileManager.default.temporaryDirectory
+            .appendingPathComponent("audit-blocked-\(UUID().uuidString)")
+        try Data().write(to: file)
+        defer { try? FileManager.default.removeItem(at: file) }
+        let store = AuditLogStore(directory: file)
+        let id = UUID()
+        store.append(event("lost"), for: id)   // must not throw/trap
+        store.clear(for: id)
+        store.deleteLog(for: id)
+        #expect(store.events(for: id).isEmpty)
+    }
+}

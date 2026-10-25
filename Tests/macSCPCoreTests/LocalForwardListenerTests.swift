@@ -1,0 +1,806 @@
+import Foundation
+import MacSCPTestSupport
+import NIOCore
+import NIOPosix
+import Testing
+
+@testable import macSCPCore
+
+/// The local-forward listener with a FAKE `direct-tcpip` factory: instead of
+/// an SSH child channel, the factory hands back a plain loopback connection
+/// to an echo server this test hosts. That keeps everything here on
+/// 127.0.0.1 with no server, no container and no credentials, while still
+/// exercising the real `ServerBootstrap`, the real accept path and the real
+/// `BytePump` — the SSH half is proven separately, against the rig, in
+/// `TunnelRigITests`.
+///
+/// Every listener binds port 0 and every wait is an `await`; nothing here
+/// holds a fixed port or a wall-clock bound of its own (the suite's
+/// `.timeLimit` is the only deadline).
+@Suite("LocalForwardListener", .timeLimit(.minutes(1)))
+struct LocalForwardListenerTests {
+
+    @Test func bytesTravelToTheFactorysChannelAndBack() async throws {
+        let echo = try await EchoServer.start()
+        let listener = LocalForwardListener()
+        let seen = TunnelEventRecorder()
+        do {
+            let port = try await listener.start(
+                bind: "127.0.0.1", localPort: 0, host: "irrelevant.example", remotePort: 1,
+                directTCPIPFactory: echo.factory(), observer: { seen.record($0) })
+            #expect(port > 0)
+
+            let inbox = TextInbox()
+            let client = try await connectClient(port: port, inbox: inbox)
+            try await awaitCancellably(client.writeAndFlush(ByteBuffer(string: "through the tunnel")))
+            try await pollUntil("the echo comes back through the forward") {
+                inbox.text == "through the tunnel"
+            }
+            try await pollUntil("the connection is reported open") { seen.events.contains(.opened) }
+
+            client.close(promise: nil)
+            try await awaitCancellably(client.closeFuture)
+        } catch {
+            await listener.stop()
+            await echo.stop()
+            throw error
+        }
+        await listener.stop()
+        await echo.stop()
+    }
+
+    /// The listener's own port is reported after the bind, and a second
+    /// listener asking for that same port is refused with the port in the
+    /// failure — the sentence a user needs to free it.
+    @Test func bindingAPortThatIsAlreadyBoundReportsItInUse() async throws {
+        let echo = try await EchoServer.start()
+        let first = LocalForwardListener()
+        let second = LocalForwardListener()
+        do {
+            let port = try await first.start(
+                bind: "127.0.0.1", localPort: 0, host: "irrelevant.example", remotePort: 1,
+                directTCPIPFactory: echo.factory())
+            #expect(first.boundPort == port)
+
+            await #expect(throws: TunnelFailure.portInUse(port: port)) {
+                _ = try await second.start(
+                    bind: "127.0.0.1", localPort: port, host: "irrelevant.example", remotePort: 1,
+                    directTCPIPFactory: echo.factory())
+            }
+            #expect(second.boundPort == nil)
+        } catch {
+            await second.stop()
+            await first.stop()
+            await echo.stop()
+            throw error
+        }
+        await second.stop()
+        await first.stop()
+        await echo.stop()
+    }
+
+    /// A bind address this machine does not have is reported as that, with
+    /// the address — not as the generic "could not start listening".
+    /// `192.0.2.1` is TEST-NET-1 (RFC 5737): never assigned to a real
+    /// interface, and a bind sends nothing on the wire. Measured 2026-09-18:
+    /// NIO throws `IOError` errno 49 (`EADDRNOTAVAIL`) for it.
+    @Test func bindingAnAddressThisMachineDoesNotHaveNamesTheAddress() async throws {
+        let listener = LocalForwardListener()
+        await #expect(throws: TunnelFailure.bindAddressUnavailable(address: "192.0.2.1")) {
+            _ = try await listener.start(
+                bind: "192.0.2.1", localPort: 0, host: "irrelevant.example", remotePort: 1,
+                directTCPIPFactory: { _, _ in throw TunnelFailure.alreadyStarted })
+        }
+        #expect(listener.boundPort == nil)
+        await listener.stop()
+    }
+
+    /// A port the system does not let this process bind is reported as
+    /// that, with the port. Measured 2026-09-18 on macOS 26.6.2 — NOT on
+    /// macOS 15, which CI runs — as a user that is not root: a bind to
+    /// `127.0.0.1` port 1, the one this test makes, maps to
+    /// `bindPermissionDenied(port: 1)`, i.e. `IOError` errno 13 (`EACCES`).
+    /// The same probe found `0.0.0.0` port 81 binding, so this binds
+    /// loopback, never the wildcard. Skipped as root, which was not
+    /// measured and is not expected to be refused.
+    @Test(.enabled(if: geteuid() != 0, "root may bind a port below 1024"))
+    func bindingAPrivilegedLoopbackPortWithoutThePrivilegeIsReportedAsDenied() async throws {
+        let listener = LocalForwardListener()
+        await #expect(throws: TunnelFailure.bindPermissionDenied(port: 1)) {
+            _ = try await listener.start(
+                bind: "127.0.0.1", localPort: 1, host: "irrelevant.example", remotePort: 1,
+                directTCPIPFactory: { _, _ in throw TunnelFailure.alreadyStarted })
+        }
+        #expect(listener.boundPort == nil)
+        await listener.stop()
+    }
+
+    /// The errno mapping itself, for errnos a loopback bind does not
+    /// produce on demand: the three a person can act on are cases of their
+    /// own, and any other errno — or an error that is no errno at all —
+    /// still yields `bindFailed` with the log's sentence for that error.
+    @Test func anErrnoWithoutACaseOfItsOwnStillYieldsBindFailed() {
+        func failure(_ errno: CInt) -> TunnelFailure {
+            LocalForwardListener.bindFailure(
+                IOError(errnoCode: errno, reason: "bind"), bind: "198.51.100.7", port: 4242)
+        }
+        #expect(failure(EADDRINUSE) == .portInUse(port: 4242))
+        #expect(failure(EADDRNOTAVAIL) == .bindAddressUnavailable(address: "198.51.100.7"))
+        #expect(failure(EACCES) == .bindPermissionDenied(port: 4242))
+
+        let other = IOError(errnoCode: EINVAL, reason: "bind")
+        #expect(
+            LocalForwardListener.bindFailure(other, bind: "127.0.0.1", port: 4242)
+                == .bindFailed(reason: DialSupport.reason(for: other)))
+        let notAnErrno = NSError(domain: "test.domain", code: 7)
+        #expect(
+            LocalForwardListener.bindFailure(notAnErrno, bind: "127.0.0.1", port: 4242)
+                == .bindFailed(reason: DialSupport.reason(for: notAnErrno)))
+    }
+
+    /// `stop()` closes the server channel AND every pair it accepted, and
+    /// returns only once they are gone — so the connected client sees its
+    /// own channel close.
+    @Test func stopClosesAnAcceptedPair() async throws {
+        let echo = try await EchoServer.start()
+        let listener = LocalForwardListener()
+        let seen = TunnelEventRecorder()
+        do {
+            let port = try await listener.start(
+                bind: "127.0.0.1", localPort: 0, host: "irrelevant.example", remotePort: 1,
+                directTCPIPFactory: echo.factory(), observer: { seen.record($0) })
+
+            let inbox = TextInbox()
+            let client = try await connectClient(port: port, inbox: inbox)
+            try await awaitCancellably(client.writeAndFlush(ByteBuffer(string: "hold this open")))
+            try await pollUntil("the echo proves the pair is glued") {
+                inbox.text == "hold this open"
+            }
+
+            await listener.stop()
+
+            try await awaitCancellably(client.closeFuture)
+            #expect(listener.boundPort == nil)
+            let closed = seen.events.contains { event in
+                if case .closed = event { return true }
+                return false
+            }
+            #expect(closed)
+        } catch {
+            await listener.stop()
+            await echo.stop()
+            throw error
+        }
+        await echo.stop()
+    }
+
+    /// A factory that cannot open the channel — the server refusing
+    /// `direct-tcpip`, the destination unreachable behind it — closes the
+    /// connection it was accepted for and reports `channelOpenFailed`.
+    ///
+    /// The reason is the mapped one. `FactoryRefused` carries the
+    /// destination in a stored property precisely so that a
+    /// `String(describing:)` mapping would put it in the reason; the
+    /// expectation below is that it does not.
+    @Test func aFactoryFailureClosesTheConnectionAndReportsIt() async throws {
+        let listener = LocalForwardListener()
+        let failures = TunnelFailureRecorder()
+        do {
+            let port = try await listener.start(
+                bind: "127.0.0.1", localPort: 0, host: "irrelevant.example", remotePort: 1,
+                directTCPIPFactory: { _, _ in throw FactoryRefused() },
+                onFailure: { failures.record($0) })
+
+            let client = try await connectClient(port: port, inbox: TextInbox())
+            try await awaitCancellably(client.closeFuture)
+            try await pollUntil("the failure is reported") { failures.failures.count == 1 }
+
+            let reported = try #require(failures.failures.first)
+            #expect(reported == .channelOpenFailed(reason: DialSupport.reason(for: FactoryRefused())))
+            guard case .channelOpenFailed(let reason) = reported else { return }
+            let describesStoredProperties = reason.contains(FactoryRefused.destination)
+            #expect(describesStoredProperties == false)
+        } catch {
+            await listener.stop()
+            throw error
+        }
+        await listener.stop()
+    }
+
+    /// A `TunnelFailure` the factory raises itself travels OUT unchanged.
+    ///
+    /// It used to be re-mapped through `DialSupport.reason(for:)`, whose
+    /// default arm reduces an error it does not spell out to
+    /// `localizedDescription` — and `TunnelFailure` is not a
+    /// `LocalizedError`, so what came out was "The operation couldn't be
+    /// completed. (macSCPCore.TunnelFailure error 2.)". The factory's
+    /// sentence is the only one that says why the SERVER refused, and it was
+    /// replaced by a case index.
+    @Test func aFactorysOwnTunnelFailureKeepsItsReason() async throws {
+        let refusal = "the server refuses forwarding"
+        let listener = LocalForwardListener()
+        let failures = TunnelFailureRecorder()
+        do {
+            let port = try await listener.start(
+                bind: "127.0.0.1", localPort: 0, host: "irrelevant.example", remotePort: 1,
+                directTCPIPFactory: { _, _ in
+                    throw TunnelFailure.channelOpenFailed(reason: refusal)
+                },
+                onFailure: { failures.record($0) })
+
+            let client = try await connectClient(port: port, inbox: TextInbox())
+            try await awaitCancellably(client.closeFuture)
+            try await pollUntil("the failure is reported") { failures.failures.count == 1 }
+
+            #expect(failures.failures.first == .channelOpenFailed(reason: refusal))
+        } catch {
+            await listener.stop()
+            throw error
+        }
+        await listener.stop()
+    }
+
+    /// A failure AFTER the factory answered closes the channel it opened, and
+    /// says so: `pumpFailed`, not `channelOpenFailed` — the server was
+    /// willing, and there is something of its to clean up.
+    ///
+    /// The failure is provoked through the `.negotiated` seam: the
+    /// negotiation closes the accepted connection and then names a
+    /// destination anyway, so the factory opens a live channel and
+    /// `BytePump.install` then fails on the closed local side. That is the
+    /// shape that actually leaks — with the pump not glued, the remote
+    /// channel learns nothing from the local one closing, and only the
+    /// catch's own `close` reaches it.
+    @Test func aFailureAfterTheOpenClosesTheOpenedChannelAndSaysSo() async throws {
+        let echo = try await EchoServer.start()
+        let listener = LocalForwardListener()
+        let failures = TunnelFailureRecorder()
+        let opened = OpenedChannelBox()
+        let echoFactory = echo.factory()
+        do {
+            let port = try await listener.start(
+                bind: "127.0.0.1", localPort: 0,
+                destination: .negotiated { channel in
+                    // Close the accepted side, and WAIT for it, so the
+                    // failure below is the pipeline being gone rather than a
+                    // race with it.
+                    channel.close(promise: nil)
+                    try await awaitCancellably(channel.closeFuture)
+                    return ClosingNegotiation()
+                },
+                directTCPIPFactory: { host, port in
+                    let channel = try await echoFactory(host, port)
+                    opened.set(channel)
+                    return channel
+                },
+                onFailure: { failures.record($0) })
+
+            let client = try await connectClient(port: port, inbox: TextInbox())
+            try await awaitCancellably(client.closeFuture)
+            try await pollUntil("the failure is reported") { failures.failures.count == 1 }
+
+            let reported = try #require(failures.failures.first)
+            let isPumpFailure: Bool
+            if case .pumpFailed = reported { isPumpFailure = true } else { isPumpFailure = false }
+            #expect(isPumpFailure, "\(reported)")
+
+            let throughTheServer = try #require(opened.channel)
+            try await awaitCancellably(throughTheServer.closeFuture)
+            #expect(throughTheServer.isActive == false)
+        } catch {
+            await listener.stop()
+            await echo.stop()
+            throw error
+        }
+        await listener.stop()
+        await echo.stop()
+    }
+
+    /// A negotiated client that is gone by the time its reply is written —
+    /// it asked for a destination and hung up before the answer — is the
+    /// CLIENT's failure, not the tunnel's: the pair is closed and nothing is
+    /// reported. The tunnel's own failure on a second connection IS
+    /// reported, and waiting for exactly that one is what makes the absence
+    /// of the first mean something.
+    @Test func aClientGoneBeforeItsReplyIsNotReportedAsAFailure() async throws {
+        let echo = try await EchoServer.start()
+        let listener = LocalForwardListener()
+        let failures = TunnelFailureRecorder()
+        let seen = TunnelEventRecorder()
+        let dials = DialCounter()
+        let echoFactory = echo.factory()
+        let refusal = TunnelFailure.channelOpenFailed(reason: "the server refused the second one")
+        do {
+            let port = try await listener.start(
+                bind: "127.0.0.1", localPort: 0,
+                destination: .negotiated { _ in ReplyFailingNegotiation() },
+                directTCPIPFactory: { host, port in
+                    if dials.next() == 1 { return try await echoFactory(host, port) }
+                    throw refusal
+                },
+                observer: { seen.record($0) },
+                onFailure: { failures.record($0) })
+
+            let goneClient = try await connectClient(port: port, inbox: TextInbox())
+            try await awaitCancellably(goneClient.closeFuture)
+            try await pollUntil("the first pair was installed and closed") {
+                seen.events.contains(.opened) && seen.events.count == 2
+            }
+
+            let refusedClient = try await connectClient(port: port, inbox: TextInbox())
+            try await awaitCancellably(refusedClient.closeFuture)
+            try await pollUntil("the tunnel's own failure is reported") {
+                failures.failures.contains(refusal)
+            }
+            #expect(failures.failures == [refusal])
+        } catch {
+            await listener.stop()
+            await echo.stop()
+            throw error
+        }
+        await listener.stop()
+        await echo.stop()
+    }
+
+    /// A hand-over that fails for a reason of its OWN — not a reply that
+    /// could not reach the client — is the tunnel's failure, and is reported
+    /// exactly once, as a pump failure: the channel through the server was
+    /// open and the pump installed, so the tunnel is the side that broke.
+    ///
+    /// Recorded 2026-09-17 in `docs/BACKLOG.md` ("A SOCKS5 reply write's own
+    /// handler-removal failure is no longer reported"): the accept path's
+    /// `catch where replying` swallowed every error `confirm` threw, so
+    /// `SOCKS5Handshake.succeed`'s own `removeHandler` failing went as
+    /// unobserved as the client-gone case it was folded in with.
+    /// `aClientGoneBeforeItsReplyIsNotReportedAsAFailure` above is the other
+    /// half: the same moment, the client's failure, still not reported.
+    ///
+    /// **"Once" is read after an ordering point, not after a poll.**
+    /// Recorded as a deferred minor on 2026-09-19 and cleared 2026-09-27:
+    /// this case used to poll for a non-empty list and read `count == 1` on
+    /// the very next line, which races a duplicate rather than excluding
+    /// one — the number it read was "how many had arrived by the time the
+    /// first one had", and a second report a tick later was invisible.
+    ///
+    /// What replaces the race is a later event from the same reporting
+    /// path, and no clock anywhere (CLAUDE.md, "A wall-clock ceiling in a
+    /// test measures the runner" — a bound here would measure the runner
+    /// exactly as one there would). TWO clients go through the same
+    /// listener, one after the other, and the count is read only after:
+    ///
+    /// 1. the SECOND client's own failure has been reported — a full
+    ///    accept, negotiation, channel open through the echo server, pump
+    ///    install and failing hand-over of real work, during which any
+    ///    duplicate belonging to the first client would have had to
+    ///    arrive; and
+    /// 2. `listener.stop()` has returned, which closes the server socket
+    ///    and awaits the `closeFuture` of every channel either connection
+    ///    still holds. `accepted`'s catch arm closes both channels and
+    ///    then calls `onFailure` with no suspension in between, so a
+    ///    connection whose channels this has seen close has already
+    ///    reported whatever it is ever going to report.
+    ///
+    /// **What this case still cannot see, measured rather than assumed.**
+    /// 2026-09-27, against a planted second `onFailure?(failure)` fired
+    /// from a detached task 20 ms after the first: red in 0 of 10 runs.
+    /// The ordering point above is a few milliseconds of loopback work,
+    /// and a duplicate scheduled beyond it lands after the count is read.
+    /// Buying it would take a wait, a wait long enough to be reliable is a
+    /// wall-clock bound, and a bound here measures the runner. So the
+    /// runtime half claims only what it gives — every duplicate up to the
+    /// ordering point — and the rest of "once" is a structural claim,
+    /// pinned by `theAcceptPathHasOneReportingSite` below, which is red in
+    /// 10 of 10 against that same plant because the plant is a second
+    /// call site.
+    ///
+    /// The positive beside the count: both reports are `pumpFailed`, so a
+    /// listener that reported nothing at all cannot satisfy it either.
+    @Test func aHandOversOwnFailureIsReportedOnce() async throws {
+        let echo = try await EchoServer.start()
+        let listener = LocalForwardListener()
+        let failures = TunnelFailureRecorder()
+        let seen = TunnelEventRecorder()
+        do {
+            let port = try await listener.start(
+                bind: "127.0.0.1", localPort: 0,
+                destination: .negotiated { _ in HandOverFailingNegotiation() },
+                directTCPIPFactory: echo.factory(),
+                observer: { seen.record($0) },
+                onFailure: { failures.record($0) })
+
+            for expected in 1...2 {
+                let client = try await connectClient(port: port, inbox: TextInbox())
+                try await awaitCancellably(client.closeFuture)
+                try await pollUntil("hand-over failure \(expected) is reported") {
+                    failures.failures.count >= expected
+                }
+            }
+        } catch {
+            await listener.stop()
+            await echo.stop()
+            throw error
+        }
+        // The drain is part of the ordering point, so it happens BEFORE the
+        // count is read and not in a cleanup step after it.
+        await listener.stop()
+        await echo.stop()
+
+        let reported = failures.failures
+        #expect(reported.count == 2, "\(reported)")
+        let allPumpFailures = reported.allSatisfy {
+            if case .pumpFailed = $0 { return true }
+            return false
+        }
+        #expect(allPumpFailures, "\(reported)")
+    }
+
+    /// The structural half of "reported exactly once", and the half that
+    /// holds however late a duplicate would arrive: `LocalForwardListener`
+    /// calls its `onFailure` from ONE place, the accept path's final
+    /// `catch`, which is the last statement that arm runs. One call site
+    /// per accepted connection is what makes "once" a property of the
+    /// shape rather than of the schedule.
+    ///
+    /// Read through `SourceCorpus.code`, which blanks comments AND string
+    /// literals, so the four comments in that file that discuss when
+    /// `onFailure` is not called cannot be counted as call sites
+    /// (CLAUDE.md, "Source-scanning guards read comments too").
+    ///
+    /// Both checks are positive — two exact counts, neither of which a
+    /// scan that matched nothing could satisfy (CLAUDE.md, "Guards that
+    /// name what they watch"): the second one alone would pass on a file
+    /// that had lost its reporting entirely, and the first says the
+    /// observer is still threaded through the accept path at all.
+    ///
+    /// Counted at HEAD on 2026-09-27, in the blanked view: five
+    /// `onFailure: ` — three parameter declarations (`start` public,
+    /// `start` module-internal, `accepted`) and two hand-ons, `start`
+    /// public to `start` module-internal and `start` module-internal to
+    /// `accepted` — and one `onFailure?(`.
+    @Test func theAcceptPathHasOneReportingSite() throws {
+        let file = SourceCorpus.url(of: .sources)
+            .appendingPathComponent("macSCPCore/Tunnels/LocalForwardListener.swift")
+        let code = try SourceCorpus.code(of: file)
+
+        let threading = code.components(separatedBy: "onFailure: ").count - 1
+        #expect(threading == 5, "the scan read \(threading) onFailure parameters and hand-ons")
+
+        let callSites = code.components(separatedBy: "onFailure?(").count - 1
+        #expect(callSites == 1, "the scan read \(callSites) onFailure call sites")
+    }
+
+    /// One listener binds once. A second `start` — with or without a `stop()`
+    /// in between — is refused rather than silently binding a port whose
+    /// connections `OpenForwards` would then drop on the floor.
+    @Test func aListenerCannotBeStartedTwice() async throws {
+        let echo = try await EchoServer.start()
+        let listener = LocalForwardListener()
+        do {
+            let port = try await listener.start(
+                bind: "127.0.0.1", localPort: 0, host: "irrelevant.example", remotePort: 1,
+                directTCPIPFactory: echo.factory())
+            #expect(port > 0)
+
+            await #expect(throws: TunnelFailure.alreadyStarted) {
+                _ = try await listener.start(
+                    bind: "127.0.0.1", localPort: 0, host: "irrelevant.example", remotePort: 1,
+                    directTCPIPFactory: echo.factory())
+            }
+
+            await listener.stop()
+
+            await #expect(throws: TunnelFailure.alreadyStarted) {
+                _ = try await listener.start(
+                    bind: "127.0.0.1", localPort: 0, host: "irrelevant.example", remotePort: 1,
+                    directTCPIPFactory: echo.factory())
+            }
+        } catch {
+            await listener.stop()
+            await echo.stop()
+            throw error
+        }
+        await echo.stop()
+    }
+
+    /// Ordering, on a target that GREETS FIRST — sshd, SMTP, IMAP, MySQL all
+    /// do, and the rig's dynamic case talks to sshd.
+    ///
+    /// The reply frame `05 00 00 01 …` must reach the client before the
+    /// target's banner, because a SOCKS5 client parses the first ten bytes
+    /// after CONNECT as its reply. The pump starts the SSH-child side
+    /// reading during `install`, which runs BEFORE `confirm` writes that
+    /// reply — so without a gate the banner and the reply race each other
+    /// across an event-loop hop, and the client can be handed a banner where
+    /// its reply should be.
+    ///
+    /// A real loopback server stands in for the greeting target: the banner
+    /// is on the wire before the factory's channel is even handed back, so
+    /// the first read on the remote side delivers it immediately.
+    @Test func aNegotiatedForwardRepliesBeforeTheTargetsBanner() async throws {
+        let banner = "SSH-2.0-macSCP-rig\r\n"
+        let greeter = try await GreetingServer.start(banner: banner)
+        let listener = SOCKS5Listener()
+        do {
+            let port = try await listener.start(
+                bind: "127.0.0.1", localPort: 0, directTCPIPFactory: greeter.factory())
+
+            let inbox = SOCKSByteInbox()
+            let client = try await awaitCancellably(
+                ClientBootstrap(group: MultiThreadedEventLoopGroup.singleton)
+                    .channelInitializer { channel in
+                        channel.pipeline.addHandler(SOCKSByteCollector(inbox: inbox))
+                    }
+                    .connect(host: "127.0.0.1", port: port))
+
+            try await awaitCancellably(client.writeAndFlush(ByteBuffer(bytes: [0x05, 0x01, 0x00])))
+            try await pollUntil("the method selection") { inbox.bytes.count >= 2 }
+            #expect(Array(inbox.bytes.prefix(2)) == [0x05, 0x00])
+
+            // `05 01 00 01 7f 00 00 01 <port>` — CONNECT to 127.0.0.1, whose
+            // port the fake factory ignores.
+            let connectFrame: [UInt8] = [0x05, 0x01, 0x00, 0x01, 127, 0, 0, 1, 0x00, 0x50]
+            try await awaitCancellably(client.writeAndFlush(ByteBuffer(bytes: connectFrame)))
+
+            let expected = 2 + 10 + banner.utf8.count
+            try await pollUntil("the reply and the banner") { inbox.bytes.count >= expected }
+
+            let afterGreeting = Array(inbox.bytes.dropFirst(2))
+            #expect(
+                Array(afterGreeting.prefix(4)) == [0x05, 0x00, 0x00, 0x01],
+                "the first ten bytes after CONNECT must be the reply, not the banner")
+            #expect(String(decoding: afterGreeting.dropFirst(10), as: UTF8.self) == banner)
+
+            client.close(promise: nil)
+            try await awaitCancellably(client.closeFuture)
+        } catch {
+            await listener.stop()
+            await greeter.stop()
+            throw error
+        }
+        await listener.stop()
+        await greeter.stop()
+    }
+
+    private func connectClient(port: Int, inbox: TextInbox) async throws -> Channel {
+        try await awaitCancellably(
+            ClientBootstrap(group: MultiThreadedEventLoopGroup.singleton)
+                .channelInitializer { channel in
+                    channel.pipeline.addHandler(TextCollector(inbox: inbox))
+                }
+                .connect(host: "127.0.0.1", port: port))
+    }
+}
+
+// MARK: - Helpers
+
+/// A negotiation that names a destination and does nothing else. Its
+/// `confirm` and `reject` are no-ops because the test that uses it never
+/// gets that far — the accept path fails between the factory and them.
+private struct ClosingNegotiation: ForwardNegotiation {
+    let host = "irrelevant.example"
+    let port = 1
+
+    func confirm(on channel: Channel) async throws {}
+    func reject(_ failure: TunnelFailure, on channel: Channel) async {}
+}
+
+/// A negotiation whose reply cannot be written: the client it would go to
+/// is gone. It says so the way `SOCKS5Negotiation` does — with
+/// `ForwardReplyUndelivered`, the one `confirm` failure that is the
+/// client's.
+private struct ReplyFailingNegotiation: ForwardNegotiation {
+    let host = "irrelevant.example"
+    let port = 1
+
+    func confirm(on channel: Channel) async throws { throw ForwardReplyUndelivered() }
+    func reject(_ failure: TunnelFailure, on channel: Channel) async {}
+}
+
+/// A negotiation whose hand-over fails for a reason of its own, with the
+/// client still there — what `SOCKS5Handshake.succeed`'s own
+/// `removeHandler` failing looks like to the accept path.
+private struct HandOverFailingNegotiation: ForwardNegotiation {
+    struct HandOverBroke: Error {}
+
+    let host = "irrelevant.example"
+    let port = 1
+
+    func confirm(on channel: Channel) async throws { throw HandOverBroke() }
+    func reject(_ failure: TunnelFailure, on channel: Channel) async {}
+}
+
+private final class DialCounter: @unchecked Sendable {
+    private let lock = NSLock()
+    private var count = 0
+
+    func next() -> Int {
+        lock.lock()
+        defer { lock.unlock() }
+        count += 1
+        return count
+    }
+}
+
+private final class OpenedChannelBox: @unchecked Sendable {
+    private let lock = NSLock()
+    private var stored: Channel?
+
+    var channel: Channel? {
+        lock.lock()
+        defer { lock.unlock() }
+        return stored
+    }
+
+    func set(_ channel: Channel) {
+        lock.lock()
+        stored = channel
+        lock.unlock()
+    }
+}
+
+/// A loopback server that GREETS FIRST: it writes `banner` the moment a
+/// connection is accepted, the way sshd, SMTP, IMAP and MySQL do. Standing
+/// in for "the destination behind the SSH server" in the ordering test.
+private struct GreetingServer {
+    let channel: Channel
+
+    static func start(banner: String) async throws -> GreetingServer {
+        let channel = try await awaitCancellably(
+            ServerBootstrap(group: MultiThreadedEventLoopGroup.singleton)
+                .serverChannelOption(ChannelOptions.socketOption(.so_reuseaddr), value: 1)
+                .childChannelInitializer { channel in
+                    channel.pipeline.addHandler(GreetingHandler(banner: banner))
+                }
+                .bind(host: "127.0.0.1", port: 0))
+        return GreetingServer(channel: channel)
+    }
+
+    func factory() -> LocalForwardListener.DirectTCPIPFactory {
+        let port = channel.localAddress?.port ?? 0
+        return { _, _ in
+            try await awaitCancellably(
+                ClientBootstrap(group: MultiThreadedEventLoopGroup.singleton)
+                    .channelOption(ChannelOptions.autoRead, value: false)
+                    .channelOption(ChannelOptions.allowRemoteHalfClosure, value: true)
+                    .connect(host: "127.0.0.1", port: port))
+        }
+    }
+
+    func stop() async {
+        channel.close(promise: nil)
+        try? await awaitCancellably(channel.closeFuture)
+    }
+}
+
+private final class GreetingHandler: ChannelInboundHandler, @unchecked Sendable {
+    typealias InboundIn = ByteBuffer
+    typealias OutboundOut = ByteBuffer
+
+    private let banner: String
+
+    init(banner: String) { self.banner = banner }
+
+    func channelActive(context: ChannelHandlerContext) {
+        context.writeAndFlush(wrapOutboundOut(ByteBuffer(string: banner)), promise: nil)
+        context.fireChannelActive()
+    }
+}
+
+/// Bytes, not text: SOCKS5 frames are binary and `String(buffer:)` would
+/// mangle them. `RemoteForwardTests` has a `private` pair of the same shape;
+/// these are `private` too, so the two files do not collide.
+private final class SOCKSByteInbox: @unchecked Sendable {
+    private let lock = NSLock()
+    private var collected: [UInt8] = []
+
+    var bytes: [UInt8] {
+        lock.lock()
+        defer { lock.unlock() }
+        return collected
+    }
+
+    func append(_ chunk: [UInt8]) {
+        lock.lock()
+        collected += chunk
+        lock.unlock()
+    }
+}
+
+private final class SOCKSByteCollector: ChannelInboundHandler, @unchecked Sendable {
+    typealias InboundIn = ByteBuffer
+
+    private let inbox: SOCKSByteInbox
+
+    init(inbox: SOCKSByteInbox) { self.inbox = inbox }
+
+    func channelRead(context: ChannelHandlerContext, data: NIOAny) {
+        var buffer = unwrapInboundIn(data)
+        inbox.append(buffer.readBytes(length: buffer.readableBytes) ?? [])
+    }
+}
+
+private struct FactoryRefused: Error {
+    static let destination = "10.0.0.9:5432"
+    let target = FactoryRefused.destination
+}
+
+/// A loopback echo server standing in for "the destination behind the SSH
+/// server". The listener's factory hands back a fresh connection to it for
+/// every accepted forward.
+private struct EchoServer {
+    let channel: Channel
+
+    static func start() async throws -> EchoServer {
+        let channel = try await awaitCancellably(
+            ServerBootstrap(group: MultiThreadedEventLoopGroup.singleton)
+                .serverChannelOption(ChannelOptions.socketOption(.so_reuseaddr), value: 1)
+                .childChannelInitializer { channel in
+                    channel.pipeline.addHandler(EchoHandler())
+                }
+                .bind(host: "127.0.0.1", port: 0))
+        return EchoServer(channel: channel)
+    }
+
+    func factory() -> LocalForwardListener.DirectTCPIPFactory {
+        let port = channel.localAddress?.port ?? 0
+        return { _, _ in
+            try await awaitCancellably(
+                ClientBootstrap(group: MultiThreadedEventLoopGroup.singleton)
+                    .channelOption(ChannelOptions.autoRead, value: false)
+                    .channelOption(ChannelOptions.allowRemoteHalfClosure, value: true)
+                    .connect(host: "127.0.0.1", port: port))
+        }
+    }
+
+    func stop() async {
+        channel.close(promise: nil)
+        try? await awaitCancellably(channel.closeFuture)
+    }
+}
+
+private final class EchoHandler: ChannelInboundHandler, @unchecked Sendable {
+    typealias InboundIn = ByteBuffer
+    typealias OutboundOut = ByteBuffer
+
+    func channelRead(context: ChannelHandlerContext, data: NIOAny) {
+        context.write(wrapOutboundOut(unwrapInboundIn(data)), promise: nil)
+    }
+
+    func channelReadComplete(context: ChannelHandlerContext) {
+        context.flush()
+    }
+}
+
+private final class TunnelEventRecorder: @unchecked Sendable {
+    private let lock = NSLock()
+    private var recorded: [TunnelConnectionEvent] = []
+
+    var events: [TunnelConnectionEvent] {
+        lock.lock()
+        defer { lock.unlock() }
+        return recorded
+    }
+
+    func record(_ event: TunnelConnectionEvent) {
+        lock.lock()
+        recorded.append(event)
+        lock.unlock()
+    }
+}
+
+private final class TunnelFailureRecorder: @unchecked Sendable {
+    private let lock = NSLock()
+    private var recorded: [TunnelFailure] = []
+
+    var failures: [TunnelFailure] {
+        lock.lock()
+        defer { lock.unlock() }
+        return recorded
+    }
+
+    func record(_ failure: TunnelFailure) {
+        lock.lock()
+        recorded.append(failure)
+        lock.unlock()
+    }
+}

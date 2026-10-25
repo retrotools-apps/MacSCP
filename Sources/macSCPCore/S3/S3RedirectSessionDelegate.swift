@@ -1,0 +1,241 @@
+import Foundation
+import os
+
+/// The S3 dial's answer to "your endpoint wants to send this request
+/// somewhere else". It asks `S3RedirectDecision` and carries out the answer:
+/// a same-origin target is rebuilt through the signing path and followed, a
+/// foreign one is refused and recorded.
+///
+/// **Deliberately not `WebDAVSessionDelegate`, and deliberately not a shared
+/// base.** That one is also a `URLSessionTaskDelegate`, but it answers a
+/// different question — credentials and certificates — and the two share
+/// nothing beyond the protocol's shape. Folding them together would put two
+/// policies in one type so that a change to either has to be read against
+/// the other.
+///
+/// This delegate could not exist before 2026-08-29: S3 ran on
+/// `URLSession.shared`, which cannot carry a delegate, so there was no
+/// redirect control in that path at all. The dial builds its own ephemeral
+/// session now, and this rides on it.
+///
+/// `@unchecked Sendable` for the same reason `WebDAVSessionDelegate` is: the
+/// one piece of mutable state is a recorded refusal behind an `NSLock`.
+final class S3RedirectSessionDelegate: NSObject, URLSessionTaskDelegate, @unchecked Sendable {
+    private let config: S3ConnectionConfig
+
+    private static let logger = Logger(
+        subsystem: "retroTools.MacSCP", category: "S3RedirectSessionDelegate")
+
+    private let lock = NSLock()
+    private var refusal: RemoteFSError?
+
+    /// The redirect this delegate refused, as the error to report, or `nil`
+    /// if none was.
+    ///
+    /// An error and not a sentence since 2026-09-28. Three of the four
+    /// refusals below are named `RemoteFSFinding`s, which carry a catalogue
+    /// key and so reach a reader in their own language; the fourth — a
+    /// foreign origin — cannot be one, because its sentence names two
+    /// origins Foundation parsed out of a `Location` header the endpoint
+    /// wrote, and a finding carries no foreign words. So it stays the
+    /// `.connectionFailed` with the localized two-origin sentence it has
+    /// carried since 2026-08-29, and the two kinds travel together as the
+    /// error they already are rather than as a common sentence.
+    ///
+    /// All four read as a connection failure: `.connectionFailed` by its
+    /// own case, the three findings through
+    /// `RemoteFSFinding.readsAsConnectionFailure`. That is what keeps the
+    /// transfer queue classifying a redirect refused mid-transfer as
+    /// resumable exactly as it did while `S3HTTPChannel.refusedRedirect()`
+    /// built a `.connectionFailed` out of this text
+    /// (`S3RedirectRefusalFindingTests`).
+    ///
+    /// It has to be recorded rather than derived from the request's own
+    /// outcome, because refusing a redirect is not an error at the
+    /// `URLSession` level: the 3xx response is handed to the caller as if
+    /// the endpoint had answered it, so the request reads as a plain
+    /// "HTTP status 302" and nothing says a redirect was declined. Same
+    /// arrangement, and the same reason, as
+    /// `WebDAVSessionDelegate.lastForeignChallenge`.
+    ///
+    /// Sticky for the life of the delegate, and first refusal wins: the
+    /// first one is what explains any that follow.
+    var lastRefusedRedirect: RemoteFSError? {
+        lock.lock(); defer { lock.unlock() }
+        return refusal
+    }
+
+    /// Holds the endpoint's credentials because re-signing is the whole
+    /// point: it signs the redirect's own target the way the first request
+    /// was signed. Warning: `config` carries the secret access key — never
+    /// log, interpolate or persist it.
+    init(config: S3ConnectionConfig) {
+        self.config = config
+    }
+
+    // MARK: - URLSessionTaskDelegate
+
+    /// Answering with `nil` is what refuses: `URLSession` then stops
+    /// following and delivers the redirect response itself, which
+    /// `S3FileSystem` turns into the recorded refusal rather than into the
+    /// bare status.
+    ///
+    /// Every redirect status runs through the same decision. 301/302/303
+    /// rewrite the method to GET and 307/308 preserve it; that is
+    /// Foundation's behaviour and it stays Foundation's, so what gets
+    /// signed here is the method of the request that is actually about to
+    /// be made.
+    func urlSession(
+        _ session: URLSession, task: URLSessionTask,
+        willPerformHTTPRedirection response: HTTPURLResponse,
+        newRequest request: URLRequest,
+        completionHandler: @escaping (URLRequest?) -> Void
+    ) {
+        // The origin being left is the one that ANSWERED, not the one first
+        // asked: a chain of same-origin hops is judged hop by hop, so a
+        // second redirect is compared against where the first one landed.
+        let current = response.url ?? task.currentRequest?.url ?? task.originalRequest?.url
+        guard let current, let target = request.url else {
+            record(.redirectUnreadable)
+            completionHandler(nil)
+            return
+        }
+
+        let decision = S3RedirectDecision.decide(from: current, to: target)
+        guard decision == .reSignAndFollow else {
+            if let message = decision.refusalMessage { record(foreignOrigin: message) }
+            completionHandler(nil)
+            return
+        }
+
+        let method = request.httpMethod ?? task.originalRequest?.httpMethod ?? "GET"
+        // A body that only exists as a stream cannot be read twice, so a
+        // request needing one cannot be reproduced — and a signature over
+        // bytes that will not be resent is worse than a refusal. The S3
+        // path builds no such body today (every one is a `Data` in memory
+        // or absent), which is the assumption `S3RequestSigning.reSigned`
+        // records; this is where a future streaming upload would announce
+        // itself instead of silently signing the wrong thing.
+        if request.httpBodyStream != nil || task.originalRequest?.httpBodyStream != nil {
+            record(.redirectBodyNotResendable)
+            completionHandler(nil)
+            return
+        }
+
+        do {
+            let signed = try S3RequestSigning.reSigned(
+                target: target, method: method, body: Self.body(for: method, request, task),
+                signedHeaders: Self.carriedSignedHeaders(method: method, task: task),
+                unsignedHeaders: Self.carriedUnsignedHeaders(task: task),
+                config: config)
+            completionHandler(signed)
+        } catch {
+            // The thrown error's `localizedDescription` used to be appended
+            // here and is DROPPED, which is the point of the finding: a
+            // finding is this module's own text in four languages, and a
+            // foreign error's sentence inside it would be untranslated words
+            // from somewhere else. Nothing a reader can act on goes with it
+            // — every error `S3RequestSigning.reSigned` throws says some
+            // shape of "this target could not be signed", which is what the
+            // finding says.
+            record(.redirectNotResignable)
+            completionHandler(nil)
+        }
+    }
+
+    /// The body of the request that is about to be made. A redirect that
+    /// rewrote the method to GET has no body; one that preserved it keeps
+    /// the bytes of the original.
+    private static func body(
+        for method: String, _ proposed: URLRequest, _ task: URLSessionTask
+    ) -> Data? {
+        guard !Self.bodylessMethods.contains(method.uppercased()) else { return nil }
+        return proposed.httpBody ?? task.originalRequest?.httpBody
+    }
+
+    private static let bodylessMethods: Set<String> = ["GET", "HEAD"]
+
+    /// The headers the first request had signed beyond the ones the signer
+    /// produces for itself — `x-amz-copy-source` for a server-side copy,
+    /// `Content-MD5` for a `DeleteObjects` batch, `Content-Type` — carried
+    /// into the new signature.
+    ///
+    /// The signer's own output (`x-amz-date`, `x-amz-content-sha256`,
+    /// `x-amz-security-token`) is deliberately NOT carried: it is computed
+    /// fresh for the new target, and copying it would put a stale timestamp
+    /// and a payload hash for the old body into the new canonical request.
+    ///
+    /// Carried only while the method survives the redirect. 301/302/303
+    /// rewrite the request to a GET, and a GET carrying a copy source or a
+    /// checksum for a body it no longer has is not the same request under a
+    /// new name.
+    private static func carriedSignedHeaders(
+        method: String, task: URLSessionTask
+    ) -> [String: String] {
+        guard method.uppercased() == task.originalRequest?.httpMethod?.uppercased() else {
+            return [:]
+        }
+        let headers = task.originalRequest?.allHTTPHeaderFields ?? [:]
+        return headers.filter { name, _ in
+            let lowered = name.lowercased()
+            if signerOwnedHeaders.contains(lowered) { return false }
+            return lowered.hasPrefix("x-amz-") || lowered == "content-md5"
+                || lowered == "content-type"
+        }
+    }
+
+    private static let signerOwnedHeaders: Set<String> = [
+        "x-amz-date", "x-amz-content-sha256", "x-amz-security-token",
+    ]
+
+    /// `Range` and `If-Match` are set on a download AFTER it is signed —
+    /// AWS does not require it to be signed — so it is carried the same way
+    /// here, outside the signature, rather than quietly becoming a signed
+    /// header on the second hop.
+    private static func carriedUnsignedHeaders(task: URLSessionTask) -> [String: String] {
+        let headers = task.originalRequest?.allHTTPHeaderFields ?? [:]
+        return headers.filter { ["range", "if-match"].contains($0.key.lowercased()) }
+    }
+
+    /// A named refusal. The log gets the finding's own fixed English
+    /// (`logSentence`), not its localized `message`: the diagnostic log is
+    /// not localized, the `TunnelFailureKind` arrangement.
+    private func record(_ finding: RemoteFSFinding) {
+        store(.finding(finding), logging: finding.logSentence)
+    }
+
+    /// The one refusal that is not a finding — see `lastRefusedRedirect`.
+    /// `message` is `S3RedirectDecision.refusalMessage`, already localized
+    /// and already naming both origins.
+    private func record(foreignOrigin message: String) {
+        store(.connectionFailed(reason: message), logging: message)
+    }
+
+    /// Recorded and logged: a redirect this product declined to follow is
+    /// worth a line whether or not anybody reads the error it produces. The
+    /// logged text is `.public` — it is either this module's own English or
+    /// two origins that Foundation parsed out of URLs, and in neither case
+    /// a path, a query or a credential.
+    ///
+    /// First refusal wins, for both entry points above: one lock, one
+    /// `alreadyRecorded` gate, so a finding cannot be overwritten by a
+    /// later foreign-origin refusal or the other way round.
+    ///
+    /// Both directions, and the second one is spelled out because it was
+    /// measured missing (Task 4 review, 2026-09-28):
+    /// `S3RedirectRefusalFindingTests.theFirstRefusalWinsAcrossBothKinds`
+    /// offered a finding first and a foreign origin second, and nothing in
+    /// the tree noticed a `record(_ finding:)` that skipped this gate — the
+    /// whole suite stayed green under that plant. The case runs the sequence
+    /// both ways round now, and the same plant is red.
+    private func store(_ refused: RemoteFSError, logging sentence: String) {
+        lock.lock()
+        let alreadyRecorded = refusal != nil
+        if !alreadyRecorded { refusal = refused }
+        lock.unlock()
+        guard !alreadyRecorded else { return }
+        if DiagnosticLog.shared.isEnabled(.error) {
+            Self.logger.error("\(sentence, privacy: .public)")
+        }
+    }
+}

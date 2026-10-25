@@ -1,0 +1,602 @@
+import Foundation
+import MacSCPTestSupport
+import Testing
+@testable import macSCPCore
+
+// Tests use isolated temp roots; nothing here touches shared global state.
+//
+// The time limit is a hang bound, not an assertion on elapsed time: the
+// write-back waits below go through `returnedOrCancelled`, so a waiter that
+// never resumes ends the case at the limit instead of holding the process
+// until CI's step timeout (final review of the 2026-09-19 small follow-ups).
+@Suite("EditSessionManager", .timeLimit(.minutes(2)))
+@MainActor
+struct EditSessionManagerTests {
+
+    // MARK: - Test signal (same pattern as TransferQueueViewModelTests/TransferEngineTests)
+
+    /// One-shot gate: `wait()` suspends until `fire()` is called (or
+    /// resolves immediately if `fire()` already happened). Lets a test pin a
+    /// mock download mid-flight without a real sleep.
+    ///
+    /// `@unchecked Sendable` behind an `NSLock` rather than an `actor`:
+    /// `wait()` routes through `awaitResumptionThrowing`
+    /// (`Tests/MacSCPTestSupport/AwaitResumption.swift`), whose body closure
+    /// must be `@Sendable` to run on the unstructured task that watches for
+    /// cancellation — an actor's isolated state cannot be touched from a
+    /// `@Sendable` closure that way, so the lock takes over the isolation
+    /// an actor used to provide. This also drops the old per-waiter `UUID`
+    /// map and its `cancelWaiter`, the same simplification as
+    /// `TransferQueueViewModelTests.TestSignal`: `awaitResumptionThrowing`
+    /// already guarantees a cancelled wait resumes with `CancellationError`
+    /// exactly once, so an orphaned continuation left behind by a
+    /// cancellation is simply resumed, harmlessly, the next time `fire()`
+    /// runs.
+    final class TestSignal: @unchecked Sendable {
+        private let lock = NSLock()
+        private var fired = false
+        private var continuations: [CheckedContinuation<Void, any Error>] = []
+
+        func fire() {
+            let pending: [CheckedContinuation<Void, any Error>] = lock.withLock {
+                fired = true
+                defer { continuations.removeAll() }
+                return continuations
+            }
+            for continuation in pending { continuation.resume() }
+        }
+
+        func wait() async throws {
+            try await awaitResumptionThrowing { (continuation: CheckedContinuation<Void, any Error>) in
+                let shouldResumeNow = self.lock.withLock { () -> Bool in
+                    if self.fired { return true }
+                    self.continuations.append(continuation)
+                    return false
+                }
+                if shouldResumeNow { continuation.resume() }
+            }
+        }
+    }
+
+    /// Wraps a `MockRemoteFileSystem` and gates `readStream` on `TestSignal`s
+    /// so a test can pause a download mid-flight — `entered` fires as soon as
+    /// the read starts, `gate` (if set) blocks the read until released. Also
+    /// counts `readStream` calls, the basis of the "downloads once" assertion.
+    actor GatedRemoteFileSystem: RemoteFileSystem {
+        private let inner: MockRemoteFileSystem
+        private let entered: TestSignal?
+        private let gate: TestSignal?
+        private let writeEntered: TestSignal?
+        private let writeGate: TestSignal?
+        private(set) var readStreamCallCount = 0
+        private(set) var writeCallCount = 0
+        /// Number of `write` calls currently in flight, and the max ever seen —
+        /// the basis of the "write-backs never run concurrently" assertion.
+        private var concurrentWrites = 0
+        private(set) var maxConcurrentWrites = 0
+
+        init(
+            inner: MockRemoteFileSystem, entered: TestSignal? = nil, gate: TestSignal? = nil,
+            writeEntered: TestSignal? = nil, writeGate: TestSignal? = nil
+        ) {
+            self.inner = inner
+            self.entered = entered
+            self.gate = gate
+            self.writeEntered = writeEntered
+            self.writeGate = writeGate
+        }
+
+        func list(path: String) async throws -> [RemoteFileItem] {
+            try await inner.list(path: path)
+        }
+
+        func stat(path: String) async throws -> RemoteFileItem {
+            try await inner.stat(path: path)
+        }
+
+        func readStream(path: String, fromOffset offset: UInt64) async throws -> AsyncThrowingStream<Data, Error> {
+            try await readStream(path: path, fromOffset: offset, ifMatching: nil)
+        }
+
+        /// The gate and the counter live on THIS spelling, and the plain one
+        /// above delegates here — so a read that carries a validator is
+        /// gated and counted exactly like one that does not, and the
+        /// validator reaches `inner`. Both spellings are overridden, which
+        /// is what keeps the delegation from recursing through the
+        /// protocol's extension default (see `RemoteFileSystem`'s own note
+        /// on the two-argument/three-argument pair).
+        func readStream(
+            path: String, fromOffset offset: UInt64, ifMatching tag: String?
+        ) async throws -> AsyncThrowingStream<Data, Error> {
+            readStreamCallCount += 1
+            entered?.fire()
+            if let gate { try await gate.wait() }
+            return try await inner.readStream(path: path, fromOffset: offset, ifMatching: tag)
+        }
+
+        /// Forwarded rather than defaulted, with `statWithEntityTag` below,
+        /// for the reason the two liveness-probe wrappers forward them: the
+        /// protocol's defaults answer out of THIS wrapper — `nil`, and a
+        /// two-call composition — so a validator the manager reads would
+        /// never reach the file system behind the gate.
+        func entityTag(path: String) async throws -> String? {
+            try await inner.entityTag(path: path)
+        }
+
+        func statWithEntityTag(
+            path: String
+        ) async throws -> (item: RemoteFileItem, entityTag: String?) {
+            try await inner.statWithEntityTag(path: path)
+        }
+
+        func write(path: String, mode: WriteMode, contents: AsyncThrowingStream<Data, Error>) async throws {
+            writeCallCount += 1
+            concurrentWrites += 1
+            maxConcurrentWrites = max(maxConcurrentWrites, concurrentWrites)
+            writeEntered?.fire()
+            if let writeGate { try await writeGate.wait() }
+            defer { concurrentWrites -= 1 }
+            try await inner.write(path: path, mode: mode, contents: contents)
+        }
+
+        func delete(path: String) async throws {
+            try await inner.delete(path: path)
+        }
+
+        func createDirectory(at path: String) async throws {
+            try await inner.createDirectory(at: path)
+        }
+
+        func rename(from: String, to: String) async throws {
+            try await inner.rename(from: from, to: to)
+        }
+
+        func setPermissions(path: String, permissions: UInt32) async throws {
+            try await inner.setPermissions(path: path, permissions: permissions)
+        }
+
+        func deleteTree(at path: String) async throws {
+            try await inner.deleteTree(at: path)
+        }
+
+        func homeDirectoryPath() async throws -> String {
+            try await inner.homeDirectoryPath()
+        }
+
+        func disconnect() async {
+            await inner.disconnect()
+        }
+    }
+
+    // MARK: - Helpers
+
+    /// Number of upload items currently in the queue (the write-backs).
+    private func uploadCount(_ queue: TransferQueueViewModel) -> Int {
+        queue.items.filter { $0.direction == .upload }.count
+    }
+
+    /// Number of download items currently in the queue.
+    private func downloadCount(_ queue: TransferQueueViewModel) -> Int {
+        queue.items.filter { $0.direction == .download }.count
+    }
+
+    /// Polls (with `Task.yield`) for a condition so tests don't sleep on the
+    /// real clock. Bounded so a regression fails instead of hanging.
+    private func waitUntil(
+        _ condition: @MainActor () -> Bool, limit: Int = 200_000
+    ) async {
+        var iterations = 0
+        while !condition() && iterations < limit {
+            await Task.yield()
+            iterations += 1
+        }
+    }
+
+    /// Remote source/destination double for one file under `/dir/<name>`. The
+    /// tree entry lets the transfer engine `stat` the source for its size.
+    private func makeRemote(name: String, content: Data) -> MockRemoteFileSystem {
+        MockRemoteFileSystem(
+            tree: ["/dir": [
+                RemoteFileItem(name: name, path: "/dir/\(name)", kind: .file, size: UInt64(content.count)),
+            ]],
+            files: ["/dir/\(name)": content])
+    }
+
+    // MARK: - 0: the gate forwards a validator
+
+    /// `GatedRemoteFileSystem` hands a validator to the file system behind
+    /// it instead of answering out of the protocol's extension defaults.
+    ///
+    /// Recorded 2026-09-24 as a backlog row, with the two liveness-probe
+    /// wrappers: it wraps a real file system and forwards every other call,
+    /// but took the defaults for `readStream(path:fromOffset:ifMatching:)`,
+    /// `entityTag(path:)` and `statWithEntityTag(path:)`, so a validator
+    /// handed in was answered by the default and never reached the mock.
+    /// Harmless while the mock took the same defaults; this is the case that
+    /// would have caught it once it did not.
+    ///
+    /// The gate and the counter also have to keep working through the new
+    /// spelling, which is the second reading here: a validator-carrying read
+    /// is counted exactly like a plain one.
+    ///
+    /// Sensitivity measured, not assumed (2026-09-25): the three plants
+    /// recorded on `LivenessProbeWrapperForwardingTests` — one per
+    /// requirement, each restoring the defaulted behaviour — each came back
+    /// `RESULT: RED — 2 test(s) ran`, naming this case and that one.
+    @Test func aValidatorHandedToTheGateReachesTheFileSystemBehindIt() async throws {
+        let handed = "\"handed-in\""
+        let held = "\"held\""
+        let inner = MockRemoteFileSystem(
+            tree: ["/dir": [RemoteFileItem(name: "a.txt", path: "/dir/a.txt", kind: .file, size: 1)]],
+            files: ["/dir/a.txt": Data("x".utf8)],
+            entityTags: ["/dir/a.txt": held])
+        let gated = GatedRemoteFileSystem(inner: inner)
+
+        // A read carrying a precondition: the mock refuses one whose tag has
+        // moved on, exactly as an HTTP backend does, so the throw IS the
+        // evidence that the tag arrived. A dropped validator reads no
+        // precondition at all and hands back a body.
+        await #expect(throws: RemoteFSError.self) {
+            _ = try await gated.readStream(path: "/dir/a.txt", fromOffset: 1, ifMatching: handed)
+        }
+        let seen = await inner.lastIfMatching["/dir/a.txt"]
+        #expect(seen == handed, """
+            the gate dropped the validator — it took the protocol's default, \
+            which forwards the read WITHOUT the precondition.
+            """)
+        #expect(await gated.readStreamCallCount == 1, """
+            a validator-carrying read was not counted, so the gate's own \
+            counter and signals no longer see every read that goes through it.
+            """)
+
+        #expect(try await gated.entityTag(path: "/dir/a.txt") == held, """
+            `entityTag` answered out of the protocol's default (`nil`) rather \
+            than out of the file system behind the gate.
+            """)
+
+        let both = try await gated.statWithEntityTag(path: "/dir/a.txt")
+        #expect(both.entityTag == held)
+        #expect(await inner.statWithEntityTagCallCounts["/dir/a.txt"] == 1, """
+            the one-round-trip spelling never reached the file system behind \
+            the gate — the gate composed `stat` and `entityTag` itself, which \
+            is a second billed request per object against an HTTP backend.
+            """)
+    }
+
+    // MARK: - 1: download via the queue, return URL
+
+    @Test func beginEditingDownloadsViaQueueAndReturnsURL() async throws {
+        let content = Data("remote content".utf8)
+        let remote = makeRemote(name: "a.txt", content: content)
+        let queue = TransferQueueViewModel()
+        let manager = EditSessionManager(
+            sessionID: UUID(), queue: queue,
+            debounceInterval: .zero, sleep: { _ in })
+
+        let url = try await manager.beginEditing(
+            remotePath: "/dir/a.txt", fileName: "a.txt",
+            source: remote, destinationForUploads: remote)
+
+        // The download appears in the bar as exactly one finished download.
+        #expect(downloadCount(queue) == 1)
+        #expect(queue.items.first(where: { $0.direction == .download })?.status == .finished)
+        // The local file exists with the remote's content.
+        #expect(FileManager.default.fileExists(atPath: url.path(percentEncoded: false)))
+        #expect(try Data(contentsOf: url) == content)
+        #expect(manager.activeEdits.count == 1)
+        #expect(manager.activeEdits.first?.remotePath == "/dir/a.txt")
+
+        await manager.stopAll()
+    }
+
+    // MARK: - 2: re-editing the same path reuses the local copy
+
+    @Test func beginEditingTwiceReturnsSameURLNoSecondDownload() async throws {
+        let content = Data("x".utf8)
+        let remote = makeRemote(name: "a.txt", content: content)
+        let queue = TransferQueueViewModel()
+        let manager = EditSessionManager(
+            sessionID: UUID(), queue: queue,
+            debounceInterval: .zero, sleep: { _ in })
+
+        let first = try await manager.beginEditing(
+            remotePath: "/dir/a.txt", fileName: "a.txt",
+            source: remote, destinationForUploads: remote)
+        let second = try await manager.beginEditing(
+            remotePath: "/dir/a.txt", fileName: "a.txt",
+            source: remote, destinationForUploads: remote)
+
+        #expect(first == second)
+        #expect(downloadCount(queue) == 1)          // NO second download
+        #expect(manager.activeEdits.count == 1)
+
+        await manager.stopAll()
+    }
+
+    // MARK: - 2b: two OVERLAPPING beginEditing calls for the same path (the
+    // race a post-download-only "already editing" registration misses)
+    // download exactly once (M5e/T3 fix).
+
+    @Test func concurrentBeginEditingSameFileDownloadsOnce() async throws {
+        let content = Data("v1".utf8)
+        let remote = makeRemote(name: "a.txt", content: content)
+        let entered = TestSignal()
+        let gate = TestSignal()
+        let gated = GatedRemoteFileSystem(inner: remote, entered: entered, gate: gate)
+        let queue = TransferQueueViewModel()
+        // No kernel watcher: see `twoFastChangesTriggerSingleUpload`.
+        let manager = EditSessionManager(
+            sessionID: UUID(), queue: queue,
+            debounceInterval: .zero, sleep: { _ in }, watchesLocalFile: false)
+
+        // First call starts the download and blocks on `gate` mid-`readStream`.
+        async let first = manager.beginEditing(
+            remotePath: "/dir/a.txt", fileName: "a.txt",
+            source: gated, destinationForUploads: gated)
+        try await entered.wait()
+
+        // Second, OVERLAPPING call for the SAME remotePath — fired while the
+        // first download is still in flight (the "fast double-double-click").
+        async let second = manager.beginEditing(
+            remotePath: "/dir/a.txt", fileName: "a.txt",
+            source: gated, destinationForUploads: gated)
+        // Give the second call a beat to actually reach (and be reserved
+        // behind) the first call's in-flight entry before releasing the gate.
+        for _ in 0..<50 { await Task.yield() }
+
+        gate.fire()
+
+        let firstURL = try await first
+        let secondURL = try await second
+
+        // Same URL, exactly one download, exactly one registered edit.
+        #expect(firstURL == secondURL)
+        #expect(await gated.readStreamCallCount == 1)
+        #expect(downloadCount(queue) == 1)
+        #expect(manager.activeEdits.count == 1)
+
+        // The one registered edit uploads once for a single change. The
+        // watcher count itself follows from `activeEdits.count == 1` above:
+        // `downloadAndRegister` adds the edit and its watcher together.
+        let editID = try #require(manager.activeEdits.first?.id)
+        try Data("v2".utf8).write(to: firstURL)
+        manager.handleFileEvent(editID: editID)
+
+        let settled = await returnedOrCancelled { await manager.awaitWriteBacksSettled(editID: editID) }
+        #expect(settled.returned == .signalled, "the write-backs never settled")
+        #expect(uploadCount(queue) == 1)
+
+        await manager.stopAll()
+    }
+
+    // MARK: - 3: a detected change triggers exactly one upload after debounce
+
+    @Test func fileChangeTriggersOneUploadAfterDebounce() async throws {
+        let content = Data("v1".utf8)
+        let remote = makeRemote(name: "a.txt", content: content)
+        let queue = TransferQueueViewModel()
+        // No kernel watcher: see `twoFastChangesTriggerSingleUpload`.
+        let manager = EditSessionManager(
+            sessionID: UUID(), queue: queue,
+            debounceInterval: .zero, sleep: { _ in }, watchesLocalFile: false)
+
+        let url = try await manager.beginEditing(
+            remotePath: "/dir/a.txt", fileName: "a.txt",
+            source: remote, destinationForUploads: remote)
+        let editID = try #require(manager.activeEdits.first?.id)
+
+        // Locally edit the file, then feed the watcher's event path directly
+        // (the DispatchSource layer is a thin seam over `handleFileEvent`).
+        try Data("v2".utf8).write(to: url)
+        manager.handleFileEvent(editID: editID)
+
+        let settled = await returnedOrCancelled { await manager.awaitWriteBacksSettled(editID: editID) }
+        #expect(settled.returned == .signalled, "the write-backs never settled")
+        #expect(uploadCount(queue) == 1)
+        #expect(queue.items.first(where: { $0.direction == .upload })?.status == .finished)
+        #expect(await remote.writtenData(at: "/dir/a.txt") == Data("v2".utf8))
+
+        await manager.stopAll()
+    }
+
+    // MARK: - 4: two fast changes coalesce into a single upload
+
+    @Test func twoFastChangesTriggerSingleUpload() async throws {
+        let remote = makeRemote(name: "a.txt", content: Data("v1".utf8))
+        let queue = TransferQueueViewModel()
+        // No kernel watcher: the two `handleFileEvent` calls below are the
+        // only change notifications. With one armed, the write below was a
+        // third, and whenever it reached the main queue after the zero-length
+        // debounce had fired it became a second upload (2026-09-19: 1 of 8
+        // sampled full runs, measured in the CI-starvation plan's Task 2 fix
+        // round, `afterq3` — `docs/BACKLOG.md`, "The flake
+        // `EditSessionManagerTests.twoFastChangesTriggerSingleUpload`"; 14
+        // of 5000 repetitions of this test next to 40 CPU-bound processes,
+        // small-follow-ups Task 2).
+        let manager = EditSessionManager(
+            sessionID: UUID(), queue: queue,
+            debounceInterval: .zero, sleep: { _ in }, watchesLocalFile: false)
+
+        let url = try await manager.beginEditing(
+            remotePath: "/dir/a.txt", fileName: "a.txt",
+            source: remote, destinationForUploads: remote)
+        let editID = try #require(manager.activeEdits.first?.id)
+
+        try Data("v2".utf8).write(to: url)
+        // Two events back-to-back on the MainActor: the first debounce task is
+        // cancelled by the second before it can fire — one upload survives.
+        manager.handleFileEvent(editID: editID)
+        manager.handleFileEvent(editID: editID)
+
+        // The final count, not the first moment the count is 1: a surviving
+        // first debounce would set `uploadPending`, and its second upload is
+        // only enqueued once the first one has finished.
+        let settled = await returnedOrCancelled { await manager.awaitWriteBacksSettled(editID: editID) }
+        #expect(settled.returned == .signalled, "the write-backs never settled")
+        #expect(uploadCount(queue) == 1)
+
+        await manager.stopAll()
+    }
+
+    // MARK: - 4b: overlapping saves of one edit serialize (no concurrent
+    // write-backs, latest content wins) — M5e final-review fix.
+
+    @Test func overlappingSavesForOneEditSerializeWriteBacks() async throws {
+        let remote = makeRemote(name: "a.txt", content: Data("v1".utf8))
+        // Gate only the WRITE path so the download completes normally, then the
+        // first write-back can be pinned mid-flight.
+        let writeEntered = TestSignal()
+        let writeGate = TestSignal()
+        let gated = GatedRemoteFileSystem(
+            inner: remote, writeEntered: writeEntered, writeGate: writeGate)
+        let queue = TransferQueueViewModel()
+        // No kernel watcher: see `twoFastChangesTriggerSingleUpload`.
+        let manager = EditSessionManager(
+            sessionID: UUID(), queue: queue,
+            debounceInterval: .zero, sleep: { _ in }, watchesLocalFile: false)
+
+        let url = try await manager.beginEditing(
+            remotePath: "/dir/a.txt", fileName: "a.txt",
+            source: gated, destinationForUploads: gated)
+        let editID = try #require(manager.activeEdits.first?.id)
+
+        // First save → write-back #1 starts and blocks inside `write`.
+        try Data("v2".utf8).write(to: url)
+        manager.handleFileEvent(editID: editID)
+        try await writeEntered.wait()
+
+        // Second save while #1 is still in flight. This must NOT start a second
+        // concurrent write-back to the SAME remote path; it coalesces into a
+        // pending flag instead.
+        try Data("v3".utf8).write(to: url)
+        manager.handleFileEvent(editID: editID)
+        // Give any (wrongly) enqueued second upload a chance to reach `write`.
+        for _ in 0..<500 { await Task.yield() }
+
+        #expect(uploadCount(queue) == 1)
+        #expect(await gated.maxConcurrentWrites == 1)
+
+        // Release #1. Its completion must enqueue EXACTLY ONE more write-back,
+        // which reads the latest ("v3") content — still never concurrent.
+        writeGate.fire()
+        let settled = await returnedOrCancelled { await manager.awaitWriteBacksSettled(editID: editID) }
+        #expect(settled.returned == .signalled, "the write-backs never settled")
+        #expect(uploadCount(queue) == 2)
+        #expect(queue.items.filter { $0.direction == .upload }
+            .allSatisfy { $0.status == .finished })
+        #expect(await gated.maxConcurrentWrites == 1)
+        #expect(await gated.writeCallCount == 2)
+        #expect(await remote.writtenData(at: "/dir/a.txt") == Data("v3".utf8))
+
+        await manager.stopAll()
+    }
+
+    // MARK: - 5: stopAll deletes the temp dir and silences further events
+
+    @Test func stopAllDeletesTempDirAndSilencesEvents() async throws {
+        let remote = makeRemote(name: "a.txt", content: Data("v1".utf8))
+        let queue = TransferQueueViewModel()
+        let manager = EditSessionManager(
+            sessionID: UUID(), queue: queue,
+            debounceInterval: .zero, sleep: { _ in })
+
+        let url = try await manager.beginEditing(
+            remotePath: "/dir/a.txt", fileName: "a.txt",
+            source: remote, destinationForUploads: remote)
+        let editID = try #require(manager.activeEdits.first?.id)
+
+        await manager.stopAll()
+
+        // Temp file (and its directory) are gone.
+        #expect(!FileManager.default.fileExists(atPath: url.path(percentEncoded: false)))
+        #expect(manager.activeEdits.isEmpty)
+
+        // A further event for the (now stopped) edit triggers nothing.
+        manager.handleFileEvent(editID: editID)
+        // Give any (wrongly) scheduled debounce task a chance to run.
+        for _ in 0..<50 { await Task.yield() }
+        #expect(uploadCount(queue) == 0)
+
+        // stopAll is idempotent.
+        await manager.stopAll()
+    }
+
+    // MARK: - 6: pathHash is deterministic and filesystem-safe
+
+    @Test func pathHashIsStableAndSafe() {
+        #expect(EditSessionManager.pathHash("/dir/a.txt") == EditSessionManager.pathHash("/dir/a.txt"))
+        #expect(EditSessionManager.pathHash("/dir/a.txt") != EditSessionManager.pathHash("/dir/b.txt"))
+        let hash = EditSessionManager.pathHash("/some/deep/path with spaces/x.y")
+        #expect(!hash.isEmpty)
+        #expect(!hash.contains("/"))
+    }
+
+    // MARK: - 7: atomic save (rename-swap) survival with a REAL DispatchSource
+
+    /// Integration-style: uses a real `DispatchSource` on a real temp file. An
+    /// editor's atomic save replaces the watched file via `rename`, unlinking
+    /// the inode our fd points at; the watcher must reopen at the same path and
+    /// keep firing. Assertions are retry-friendly (bounded polling), not timed.
+    @Test func atomicSaveSurvivesReopenAndUploads() async throws {
+        let content = Data("v1".utf8)
+        let remote = makeRemote(name: "a.txt", content: content)
+        let queue = TransferQueueViewModel()
+        // Real DispatchSource + real (short) debounce so the reopen path runs
+        // end to end without a slow 500 ms wait.
+        let manager = EditSessionManager(
+            sessionID: UUID(), queue: queue,
+            debounceInterval: .milliseconds(10))
+
+        let url = try await manager.beginEditing(
+            remotePath: "/dir/a.txt", fileName: "a.txt",
+            source: remote, destinationForUploads: remote)
+        let path = url.path(percentEncoded: false)
+
+        // Atomic save: write a sibling temp file and rename it over the target.
+        let tmp = url.deletingLastPathComponent()
+            .appendingPathComponent("a.txt.sb-tmp", isDirectory: false)
+        try Data("v2".utf8).write(to: tmp)
+        #expect(rename(tmp.path(percentEncoded: false), path) == 0)
+
+        // The rename event must reach us and produce an upload.
+        await waitUntil { uploadCount(queue) >= 1 }
+        #expect(uploadCount(queue) >= 1)
+
+        // Prove the watcher SURVIVED: modify the replacement file in place and
+        // expect a further upload from the reopened descriptor.
+        let uploadsAfterRename = uploadCount(queue)
+        // Small settle so the reopen has attached before the next write.
+        for _ in 0..<200 { await Task.yield() }
+        try Data("v3".utf8).write(to: url)
+
+        await waitUntil { uploadCount(queue) > uploadsAfterRename }
+        #expect(uploadCount(queue) > uploadsAfterRename)
+
+        await manager.stopAll()
+    }
+
+    // MARK: - 8: sweepOrphanedTempDirectories removes orphaned trees at launch (M6a)
+
+    /// Only `stopAll` cleans a session's subtree, so a hard-killed app run
+    /// leaves orphaned `macscp-edit/<uuid>/...` directories behind forever.
+    /// The startup sweep must remove the whole tree unconditionally, and be
+    /// safe to call again on an already-missing tree.
+    @Test func sweepOrphanedTempDirectoriesRemovesOrphanedTreeAndIsIdempotent() throws {
+        // Isolated root (M6b): a UUID directory directly under the process
+        // temp dir, NOT the shared `macscp-edit` root other tests may use.
+        let root = FileManager.default.temporaryDirectory
+            .appendingPathComponent(UUID().uuidString, isDirectory: true)
+        let orphanDirectory = root.appendingPathComponent(UUID().uuidString, isDirectory: true)
+        try FileManager.default.createDirectory(at: orphanDirectory, withIntermediateDirectories: true)
+        let probe = orphanDirectory.appendingPathComponent("probe.txt", isDirectory: false)
+        try Data("orphan".utf8).write(to: probe)
+        #expect(FileManager.default.fileExists(atPath: probe.path(percentEncoded: false)))
+
+        EditSessionManager.sweepOrphanedTempDirectories(root: root)
+
+        #expect(!FileManager.default.fileExists(atPath: root.path(percentEncoded: false)))
+
+        // Idempotent: a second call on an already-missing tree does not throw.
+        EditSessionManager.sweepOrphanedTempDirectories(root: root)
+    }
+}

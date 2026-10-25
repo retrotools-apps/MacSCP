@@ -1,0 +1,16 @@
+{
+  "pins": [
+    {
+      "identity": "sparkle",
+      "location": "https://github.com/sparkle-project/Sparkle",
+      "state": {"version": "2.9.6", "revision": "ac2def288cbff5cfc7df3ffef6abdf45b72bcb0a"},
+      "project": "Sparkle.xcodeproj/project.pbxproj"
+    },
+    {
+      "identity": "sparkle-argument-parser",
+      "location": "https://github.com/apple/swift-argument-parser",
+      "state": {"version": "0.4.4", "revision": "83b23d940471b313427da226196661856f6ba3e0"},
+      "project": "Package.swift"
+    }
+  ]
+}

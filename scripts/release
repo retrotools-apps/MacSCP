@@ -1,0 +1,30 @@
+#!/bin/bash
+# Build a free GitHub DMG: ad-hoc app signature, no Apple certificate/notarization.
+# Sparkle signs the final archive separately in scripts/generate-appcast.
+set -euo pipefail
+cd "$(dirname "$0")/.."
+[[ "${MACSCP_DISTRIBUTION:-direct}" == direct ]] || {
+    echo "error: scripts/release produces GitHub releases, not Store submissions" >&2; exit 1;
+}
+VERSION="${MACSCP_VERSION:-$(< VERSION)}"
+# Validate the version before using it as a filename or replacing any output.
+python3 scripts/release-notes "v$VERSION" >/dev/null
+APP="dist/MacSCP.app"
+DMG="dist/MacSCP-${VERSION}.dmg"
+[ -z "$(git status --porcelain)" ] || {
+    echo "error: working tree not clean — commit or stash first" >&2; exit 1;
+}
+[[ ! -e "$DMG" ]] || {
+    echo "error: release DMG already exists; preserve it outside dist before rebuilding" >&2; exit 1;
+}
+MACSCP_VERSION="$VERSION" scripts/package-app
+bash scripts/sign-app --ad-hoc "$APP"
+codesign --verify --deep --strict "$APP"
+
+# Keep staging isolated and never delete an existing release or shared directory.
+STAGING="$(mktemp -d .build/dmg-staging.XXXXXX)"
+ditto "$APP" "$STAGING/MacSCP.app"
+ln -s /Applications "$STAGING/Applications"
+hdiutil create -volname "MacSCP" -srcfolder "$STAGING" -format UDZO "$DMG"
+hdiutil verify "$DMG"
+echo "GITHUB DMG READY (ad-hoc signed, not notarized): $DMG"

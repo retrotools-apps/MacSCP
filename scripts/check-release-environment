@@ -1,0 +1,12 @@
+#!/bin/bash
+# GitHub distribution requires only the Sparkle update-signing secret.
+# Signature verification after packaging validates its matching public key.
+set -euo pipefail
+missing=0
+for name in MACSCP_SPARKLE_PRIVATE_KEY; do
+    if [ -z "${!name:-}" ]; then
+        echo "::error::Missing release configuration: $name. Check GitHub Actions secrets and variables."
+        missing=1
+    fi
+done
+exit "$missing"

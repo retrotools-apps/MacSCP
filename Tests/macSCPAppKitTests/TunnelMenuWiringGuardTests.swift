@@ -1,0 +1,520 @@
+import Foundation
+import MacSCPTestSupport
+import Testing
+
+@testable import MacSCPAppKit
+@testable import macSCPCore
+
+/// The session row's "Port forwarding" submenu, the sheet behind it, and the
+/// one boundary both of them are on the safe side of: neither dials
+/// (port-forwarding plan, Task 6).
+///
+/// Two kinds of check live here, and the split is deliberate.
+///
+/// - **Values.** Which sessions may carry a forwarding at all is
+///   `SessionRowTunnelMenuPlan.build`'s answer, so it is driven directly.
+///   That answer comes from `TunnelCarriers.carries`, not a copy of it:
+///   the cases below are red under a mutated
+///   `TunnelCarriers.carries`, and were green under the same mutation while
+///   the copy stood.
+/// - **Source.** That the row draws what the plan says, that every entry
+///   takes its title from the catalogue, and that nothing but the manager
+///   starts a runner, are claims about text — `SessionSidebar` cannot be
+///   instantiated in this project (no render harness, the boundary every
+///   other guard in this target states) and a call site cannot be counted
+///   from a running program.
+///
+/// Every source scan reads the COMMENT-BLANKED view (CLAUDE.md,
+/// "Source-scanning guards read comments too"): this file's own prose names
+/// each needle, and so does the code it scans. Catalogue-key claims read the
+/// comments-only view instead — blanking the literals would delete the very
+/// thing being checked — sliced at the range found in the strict one, which
+/// is safe because both views preserve the raw source's length.
+@Suite("Tunnel menu wiring guard")
+struct TunnelMenuWiringGuardTests {
+
+    // MARK: - Values: who may carry a forwarding
+
+    private static func sshSession(jump: StoredSession.JumpSpec? = nil, loginSetID: UUID? = nil)
+        -> StoredSession
+    {
+        StoredSession(
+            name: "web", loginSetID: loginSetID, kind: .ssh,
+            ssh: StoredSSHConfig(host: "example.invalid", username: "tester", jump: jump))
+    }
+
+    private static func profile(session: UUID) -> TunnelProfile {
+        TunnelProfile(
+            sessionID: session, name: "web",
+            kind: .local(bind: "127.0.0.1", localPort: 8080, host: "internal", remotePort: 80))
+    }
+
+    /// The positive: a plain SSH session offers the submenu, with one entry
+    /// per stored profile.
+    @Test func aPlainSSHSessionOffersTheSubmenu() {
+        let session = Self.sshSession()
+        let profile = Self.profile(session: session.id)
+        let plan = SessionRowTunnelMenuPlan.build(
+            for: session, profiles: [profile], state: { _ in .stopped })
+
+        #expect(plan.isShown)
+        #expect(plan.entries.map(\.profile) == [profile])
+        #expect(plan.entries.allSatisfy { !$0.isRunning })
+    }
+
+    /// Only a backend with SSH channel support can carry a forwarding.
+    @Test func aSessionThatCouldNotCarryOneIsOfferedNothing() {
+        let cases: [(String, StoredSession)] = [
+            ("S3", StoredSession(name: "bucket", kind: .s3)),
+            ("WebDAV", StoredSession(name: "drive", kind: .webdav)),
+        ]
+        for (why, session) in cases {
+            let plan = SessionRowTunnelMenuPlan.build(
+                for: session, profiles: [Self.profile(session: session.id)],
+                state: { _ in .stopped })
+            #expect(plan == .hidden, "a session with \(why) was offered a forwarding submenu")
+            #expect(plan.entries.isEmpty)
+        }
+    }
+
+    @Test func jumpAndLoginSetCarriersAreOfferedForwardingControls() {
+        for session in [Self.sshSession(loginSetID: UUID()),
+                        Self.sshSession(jump: .init(host: "gateway.example", username: "operator"))] {
+            let plan = SessionRowTunnelMenuPlan.build(for: session, profiles: [], state: { _ in .stopped })
+            #expect(plan.isShown)
+        }
+    }
+
+    /// A checkmark means running, and "running" is the manager's own
+    /// predicate — a `.failed` profile is unchecked, so clicking it starts it
+    /// again, which is the state table's own `.failed → .start`.
+    @Test func onlyARunningProfileIsChecked() {
+        let session = Self.sshSession()
+        let running = Self.profile(session: session.id)
+        let failed = Self.profile(session: session.id)
+        let plan = SessionRowTunnelMenuPlan.build(
+            for: session, profiles: [running, failed],
+            state: { id in
+                id == running.id ? .active(connections: 1) : .failed(.portInUse(port: 8080))
+            })
+
+        #expect(plan.entries.first(where: { $0.id == running.id })?.isRunning == true)
+        #expect(plan.entries.first(where: { $0.id == failed.id })?.isRunning == false)
+    }
+
+    // MARK: - Source: where the files are
+
+    /// `#filePath` here is
+    /// `<repoRoot>/Tests/macSCPAppKitTests/TunnelMenuWiringGuardTests.swift`;
+    /// three `deletingLastPathComponent()` calls recover the repo root
+    /// regardless of `swift test`'s working directory.
+    private static let repoRoot: URL = URL(fileURLWithPath: #filePath)
+        .deletingLastPathComponent().deletingLastPathComponent()
+        .deletingLastPathComponent()
+
+    private static let appKitRoot = repoRoot.appendingPathComponent("Sources/MacSCPAppKit")
+    private static let sidebarFile = appKitRoot.appendingPathComponent("SessionSidebar.swift")
+    private static let sheetFile = appKitRoot.appendingPathComponent("TunnelProfilesSheet.swift")
+    private static let managerFile = appKitRoot.appendingPathComponent("TunnelManager.swift")
+    private static let sheetsFile = appKitRoot.appendingPathComponent("ContentView+Sheets.swift")
+    private static let contentViewFile = appKitRoot.appendingPathComponent("ContentView.swift")
+    private static let lifecycleFile = appKitRoot
+        .appendingPathComponent("ContentView+Lifecycle.swift")
+
+    /// The submenu's own statement, anchored on the one line that decides
+    /// whether it is drawn at all. Carries no string literal, so it is found
+    /// in the strict view and holds up in either.
+    private static let submenuAnchor = "if case .shown(let tunnelEntries) = tunnelPlan"
+
+    private static func text(of file: URL) throws -> String {
+        try SourceCorpus.text(of: file)
+    }
+
+    /// The submenu's body in both views: code only, and code plus literals.
+    /// One range, sliced twice — see this suite's header for why that is
+    /// safe.
+    private static func submenuBodies() throws -> (strict: String, withLiterals: String) {
+        let strict = try SourceCorpus.code(of: sidebarFile)
+        let range = try TransferQueueBarCancelGuardTests.declarationBodyRange(
+            of: submenuAnchor, in: strict)
+        return (
+            TransferQueueBarCancelGuardTests.slice(range, of: strict),
+            TransferQueueBarCancelGuardTests.slice(
+                range, of: try SourceCorpus.commentFree(of: sidebarFile))
+        )
+    }
+
+    // MARK: - Source: the row draws what the plan says
+
+    @Test func theRowAsksThePlanAndDecidesNothingItself() throws {
+        let strict = try SourceCorpus.code(of: Self.sidebarFile)
+        #expect(
+            strict.contains("SessionRowTunnelMenuPlan.build("),
+            "the session row no longer builds a tunnel menu plan — re-anchor this guard")
+
+        let body = try Self.submenuBodies().strict
+        #expect(body.count > 200, "the scanned submenu span is too small to be the submenu")
+
+        // The negative, with the positive above it: the submenu itself must
+        // read no fact about the session that the plan already read. A
+        // `session.kind` or a `jump` test HERE would be a second, unmeasured
+        // copy of the visibility rule — the exact shape this project keeps
+        // paying for.
+        for forbidden in ["session.kind", ".jump", "loginSetID"] {
+            #expect(
+                !body.contains(forbidden),
+                "the submenu decides visibility itself (\"\(forbidden)\") instead of asking the plan")
+        }
+    }
+
+    /// Every entry that carries a TITLE reads it from the catalogue. The one
+    /// entry that does not is the per-profile row, whose label is the
+    /// profile's own name — user data, which is never localized and never
+    /// spelled here.
+    @Test func everyTitledEntryReadsItsTitleFromTheCatalogue() throws {
+        let lines = try Self.submenuBodies().withLiterals.components(separatedBy: "\n")
+        let titled = lines.filter { $0.contains("Button(") || $0.contains("Menu(") }
+        #expect(titled.count >= 4, "the submenu's titled entries are gone — re-anchor this guard")
+        for line in titled {
+            #expect(
+                line.contains("L10n.string("),
+                "a submenu entry carries a title that is not a catalogue lookup: \(line.trimmingCharacters(in: .whitespaces))")
+        }
+    }
+
+    /// Every `tunnel.*` key this task's three surfaces read, derived from
+    /// their source rather than listed here — a list would be a second copy
+    /// of the same names, and the one that goes stale.
+    ///
+    /// Resolution is asked through `L10n` itself, so this checks the lookup
+    /// the running app performs. That the other three catalogues declare the
+    /// same keys is `LocalizationParityTests`' standing job.
+    @Test func everyTunnelKeyResolvesInTheCatalogue() throws {
+        var keys: Set<String> = []
+        // Compiled once, here, rather than once per scanned file.
+        let tunnelKeyCall = try Regex(#"L10n\.string\(\s*"(tunnel\.[^"]+)""#)
+        for file in [Self.sidebarFile, Self.sheetFile,
+                     Self.appKitRoot.appendingPathComponent("TunnelHostKeyPrompt.swift")] {
+            let source = try SourceCorpus.commentFree(of: file)
+            // `\s*` after the parenthesis, and it is load-bearing: a
+            // `L10n.string(` whose key sits on the NEXT line is how six of
+            // these keys are written (the call wraps), and a pattern
+            // demanding the quote immediately after the parenthesis found 42
+            // of the 48 while reporting success — counted 2026-09-06 against
+            // the catalogue.
+            for match in source.ranges(of: tunnelKeyCall) {
+                let call = String(source[match])
+                guard let start = call.range(of: "\"") else { continue }
+                let rest = call[start.upperBound...]
+                guard let end = rest.range(of: "\"") else { continue }
+                keys.insert(String(rest[..<end.lowerBound]))
+            }
+        }
+        // 49, RECOUNTED on 2026-09-06 by running this test's own regex over
+        // those three files: 43 in the profiles sheet, 5 in the sidebar, 1 in
+        // the host-key prompt, 49 distinct. It was written as 48 and as
+        // "every `tunnel.*` key in the catalogue", and both halves were
+        // wrong: the count missed `tunnel.glyph.tooltip %@`
+        // (`SessionSidebar.swift`), and the catalogue holds 63 `tunnel.*`
+        // keys (`grep -c '"tunnel\.' Sources/MacSCPAppKit/Resources/
+        // en.lproj/Localizable.strings`, counted the same day). The other 14
+        // are Task 7's surfaces — `TunnelAutostartSheet.swift`,
+        // `TunnelDockPresence.swift`, `LoginItem.swift`,
+        // `MacSCPCommands.swift`, `SettingsView.swift` — and
+        // `TunnelPresenceWiringGuardTests
+        // .everyKeyTheseSurfacesReadResolvesInTheCatalogue` resolves those.
+        // The floor is lower than the count so that adding one
+        // key is not a test edit, and high enough that a pattern which
+        // silently stopped matching most of them (see above) fails here.
+        #expect(keys.count >= 45, "found \(keys.count) tunnel keys — re-anchor this guard")
+        for key in keys.sorted() {
+            #expect(
+                L10n.string(key, "ZZ-UNRESOLVED-ZZ") != "ZZ-UNRESOLVED-ZZ",
+                "the catalogue answers nothing for \"\(key)\"")
+        }
+    }
+
+    /// The two effects the ROW holds are fired in exactly two places, and
+    /// both are inside the submenu.
+    ///
+    /// This is the property `SessionRowActivationWiringTests`' Guard K holds
+    /// for the sidebar's other three host-reaching effects by a different
+    /// route: it forbids the ROW to declare one at all, because those three
+    /// act on the session the row already names and can therefore be
+    /// forwarded as an input. A forwarding entry cannot — it acts on ONE
+    /// PROFILE of that session, which no `SessionRowInput` carries — so the
+    /// row holds the effects, and what is guarded instead is where they are
+    /// fired: any other function of `SessionSidebar.swift` (a tap handler, a
+    /// hover, `activate`) firing one would be a dial reachable by a gesture.
+    ///
+    /// Positive first: each firing exists exactly once. A scan for
+    /// "nowhere outside the submenu" over a file that fires neither would
+    /// pass while the feature was gone.
+    @Test func aForwardingIsStartedOnlyFromInsideTheSubmenu() throws {
+        let strict = try SourceCorpus.code(of: Self.sidebarFile)
+        let range = try TransferQueueBarCancelGuardTests.declarationBodyRange(
+            of: Self.submenuAnchor, in: strict)
+
+        for needle in ["SessionRowTunnelActivation.start(", "SessionRowTunnelActivation.startAll("] {
+            let positions = Self.positions(of: needle, in: strict)
+            #expect(
+                positions.count == 1,
+                "`\(needle)` is fired \(positions.count) time(s) in SessionSidebar.swift, expected 1")
+            for position in positions {
+                #expect(
+                    range.contains(position),
+                    """
+                    `\(needle)` is fired outside the "Port forwarding" submenu — a forwarding \
+                    dials the user's host, and a firing anywhere else in this file is one a \
+                    gesture can reach.
+                    """)
+            }
+        }
+    }
+
+    /// Every character index at which `needle` starts, over the whole text.
+    private static func positions(of needle: String, in text: String) -> [Int] {
+        text.ranges(of: needle).map { text.distance(from: text.startIndex, to: $0.lowerBound) }
+    }
+
+    // MARK: - Source: only the manager starts a runner
+
+    /// One place in the App layer calls a runner's `start(decider:)`, and it
+    /// is the manager. Anywhere else would be a tunnel nothing tracks: no
+    /// mirrored state, no entry in `runningCount`, and nothing for the quit
+    /// chain's `stopAll()` to stop.
+    ///
+    /// Positive: the manager IS in the set. A scan that found nothing at all
+    /// would otherwise report success over an empty answer.
+    @Test func theManagerIsTheOnlyCallerOfARunnersStart() throws {
+        // `.start(decider:` — with the leading dot, which is the CALL and
+        // not the declaration (fix round 1). The needle without it was also
+        // matched by `func start(decider: HostKeyDecider) async` in the
+        // protocol at the top of `TunnelManager.swift`, so the positive
+        // below was satisfied by the declaration alone: deleting the real
+        // call would have left this guard green.
+        let callers = try Self.appKitFiles().filter { file in
+            try SourceCorpus.code(of: file)
+                .contains(".start(decider:")
+        }.map(\.lastPathComponent).sorted()
+
+        #expect(
+            callers.contains("TunnelManager.swift"),
+            "nothing in the App layer starts a runner any more — re-anchor this guard")
+        #expect(
+            callers == ["TunnelManager.swift"],
+            "a runner is started outside TunnelManager: \(callers)")
+    }
+
+    /// The manager resolves the complete saved SSH carrier and jump, never
+    /// shell or environment credentials. The nearby positive assertion
+    /// anchors the negative guard to the actual runner dial.
+    ///
+    /// The span is the `connect` closure, anchored on the line that builds
+    /// the runner. `liveRunner` itself cannot be the anchor: its parameter
+    /// list carries a default closure argument, so a brace-balanced read
+    /// from the first `{` after the declaration scans that default value.
+    @Test func theDialResolvesSavedTargetAndJumpCredentialsWithoutShellSources() throws {
+        let strict = try SourceCorpus.code(of: Self.managerFile)
+        let range = try TransferQueueBarCancelGuardTests.declarationBodyRange(
+            of: "return TunnelRunner(profile: profile, connect:", in: strict)
+        let body = TransferQueueBarCancelGuardTests.slice(range, of: strict)
+
+        #expect(
+            body.contains("TunnelConnection.connect("),
+            "the scanned span is not the runner's dial — re-anchor this guard")
+        #expect(
+            body.contains("TunnelSSHConfiguration.resolve("),
+            "the forwarding's dial no longer resolves the saved SSH carrier and jump")
+        #expect(
+            !body.contains("secretSources(for:"),
+            """
+            the forwarding's dial is back on the command line's secret chain: it reads \
+            MACSCP_PASSWORD ahead of the keychain and cannot reach a managed key's own \
+            passphrase slot at all.
+            """)
+    }
+
+    /// The sheet asks the manager and dials nothing itself — the same
+    /// boundary, one surface further out. A sheet that connected for itself
+    /// would answer the TOFU question in a place no test reaches, and would
+    /// hold a connection no `stopAll()` knows about.
+    ///
+    /// The negative reads the strict view (a comment ABOUT `connect(` must
+    /// not satisfy it), and the two positives beside it assert that the file
+    /// being scanned is one that acts at all.
+    @Test func theSheetAsksTheManagerAndDialsNothing() throws {
+        let strict = try SourceCorpus.code(of: Self.sheetFile)
+        #expect(strict.contains("manager.start("), "the sheet no longer starts anything")
+        #expect(strict.contains("manager.stop("), "the sheet no longer stops anything")
+        for forbidden in ["TunnelConnection.connect(", "CitadelFileSystem.connect(", "TunnelRunner("] {
+            #expect(
+                !strict.contains(forbidden),
+                "the profile sheet dials for itself (\"\(forbidden)\")")
+        }
+    }
+
+    // MARK: - One sheet at a time
+
+    /// The window presents ONE forwarding sheet, and which one is a value.
+    ///
+    /// Round 1 attached two `.sheet` modifiers to the same view: macOS
+    /// SwiftUI presents one per presenter, so the second never appeared —
+    /// and the one that never appeared was the host-key question, whose
+    /// dial then parked on a continuation nobody could resolve.
+    @Test func theSheetPlanNeverPresentsTwoThingsAtOnce() {
+        let session = Self.sshSession()
+        let candidate = HostKeyCandidate(
+            host: "example.invalid", port: 22, keyType: "ssh-ed25519", publicKeyBase64: "")
+
+        #expect(TunnelSheetPlan.item(profilesSession: nil, hostKeyCandidate: nil) == nil)
+        #expect(
+            TunnelSheetPlan.item(profilesSession: session, hostKeyCandidate: nil)
+                == .profiles(session))
+        #expect(
+            TunnelSheetPlan.item(profilesSession: nil, hostKeyCandidate: candidate)
+                == .hostKey(candidate))
+        // The precedence that makes the split work: while the profile sheet
+        // is up it keeps the window, and the question is drawn inside it.
+        #expect(
+            TunnelSheetPlan.item(profilesSession: session, hostKeyCandidate: candidate)
+                == .profiles(session),
+            "a host-key question took the window away from the open profile sheet")
+    }
+
+    /// Distinct ids, so `.sheet(item:)` re-presents when the thing on screen
+    /// actually changes — and a candidate's id carries its full identity
+    /// (host, port, key type, public key), never a secret.
+    @Test func theSheetItemsAreIdentifiedApart() {
+        let session = Self.sshSession()
+        let first = HostKeyCandidate(
+            host: "one.invalid", port: 22, keyType: "ssh-ed25519", publicKeyBase64: "AAAA")
+        let second = HostKeyCandidate(
+            host: "one.invalid", port: 22, keyType: "ssh-ed25519", publicKeyBase64: "BBBB")
+        let ids = [
+            TunnelSheetItem.profiles(session).id,
+            TunnelSheetItem.hostKey(first).id,
+            TunnelSheetItem.hostKey(second).id,
+        ]
+        #expect(Set(ids).count == 3)
+    }
+
+    /// The window's side of it, read from source: exactly one `.sheet` shows
+    /// either, and both live inside it.
+    @Test func theWindowPresentsBothForwardingSheetsThroughOnePresentation() throws {
+        let strict = try SourceCorpus.code(of: Self.sheetsFile)
+        for needle in ["TunnelProfilesSheet(", "TunnelHostKeyPromptView("] {
+            #expect(
+                Self.positions(of: needle, in: strict).count == 1,
+                "`\(needle)` is presented \(Self.positions(of: needle, in: strict).count) times by the window, expected 1")
+        }
+        let range = try TransferQueueBarCancelGuardTests.declarationBodyRange(
+            of: ".sheet(item: tunnelSheetBinding)", in: strict)
+        for needle in ["TunnelProfilesSheet(", "TunnelHostKeyPromptView("] {
+            for position in Self.positions(of: needle, in: strict) {
+                #expect(
+                    range.contains(position),
+                    """
+                    `\(needle)` is presented by a second `.sheet` on the window — macOS \
+                    SwiftUI presents one sheet per presenter, so one of them never appears.
+                    """)
+            }
+        }
+    }
+
+    /// The sheet's side: while the profile sheet has the window, it is the
+    /// one that draws the question — nested inside itself, which is an
+    /// ordinary presentation and not a second sheet on one presenter.
+    @Test func theProfileSheetDrawsTheQuestionWhileItIsUp() throws {
+        let strict = try SourceCorpus.code(of: Self.sheetFile)
+        #expect(
+            Self.positions(of: "TunnelHostKeyPromptView(", in: strict).count == 1,
+            "the profile sheet no longer draws the host-key question it can raise")
+        #expect(
+            strict.contains("bridge.resolve(trust: false)"),
+            "dismissing the profile sheet's question no longer refuses it — the dial would park")
+    }
+
+    // MARK: - The window opens and closes its bridge
+
+    /// The bridge is closed when the window disappears and opened again
+    /// when it appears — and BOTH halves are wiring, which is what round 2
+    /// left unpinned.
+    ///
+    /// Round 2's probe mutated `revalidate()`'s BODY and called that a
+    /// measurement of the fix; deleting the CALL from `onAppear` left the
+    /// whole suite green (`grep tunnelHostKeyBridge Tests/` came back empty).
+    /// That is the same mistake round 1 made with the secret chain: a test
+    /// over the function is not a test over the call.
+    ///
+    /// Each span is anchored inside `lifecycleAndToolbar`'s own body — never
+    /// on a declaration whose parameter list could carry a default closure,
+    /// which is the trap two other guards in this task hit — and each is
+    /// checked for the bridge lifecycle operations it owns.
+    @Test func theWindowOpensItsBridgeOnAppearAndClosesItOnDisappear() throws {
+        let strict = try SourceCorpus.code(of: Self.lifecycleFile)
+        let body = try TransferQueueBarCancelGuardTests.declarationBody(
+            of: "func lifecycleAndToolbar<Content: View>(_ content: Content) -> some View",
+            in: strict)
+
+        let onAppear = try TransferQueueBarCancelGuardTests.declarationBody(
+            of: ".onAppear", in: body)
+        let onDisappear = try TransferQueueBarCancelGuardTests.declarationBody(
+            of: ".onDisappear", in: body)
+
+        #expect(
+            onAppear.contains("tunnelHostKeyBridge.revalidate("),
+            """
+            the window no longer reopens its host-key bridge on appear: a bridge closed by \
+            any of the disappear/appear pairs SwiftUI sends for its own reasons would refuse \
+            every unknown host key for the rest of that window's life, with no prompt shown.
+            """)
+        #expect(
+            onDisappear.contains("tunnelHostKeyBridge.invalidate("),
+            """
+            the window no longer closes its host-key bridge on disappear: a question raised \
+            after it is gone parks a dial on a continuation no sheet is watching, and \
+            `TunnelRunner.stop()` — which waits for that run task — holds the quit behind it.
+            """)
+
+        // The swap, which reads as plausible in either place and is wrong in
+        // both: an `onAppear` that closes the bridge, an `onDisappear` that
+        // opens it.
+        #expect(
+            !onAppear.contains("tunnelHostKeyBridge.invalidate("),
+            "the window CLOSES its host-key bridge when it appears")
+        #expect(
+            !onDisappear.contains("tunnelHostKeyBridge.revalidate("),
+            "the window REOPENS its host-key bridge when it disappears")
+    }
+
+    // MARK: - A deleted session
+
+    /// The App-level half of the Task 1 hand-off: the window registers the
+    /// MANAGER's observer (which stops the runners) on the session list it
+    /// builds. The Core half — that `delete(_:)` tells its observers at all
+    /// — is `TunnelStoreTests`'.
+    @Test func theWindowRegistersTheManagersDeletionObserver() throws {
+        let strict = try SourceCorpus.code(of: Self.contentViewFile)
+        #expect(
+            strict.contains("SessionListViewModel("),
+            "ContentView no longer builds a session list — re-anchor this guard")
+        #expect(
+            strict.contains("addDeletionObserver(TunnelManager.shared.deletionObserver)"),
+            """
+            the window no longer registers the tunnel manager's deletion observer: a deleted \
+            session would keep its forwardings running, with no menu left to stop them from.
+            """)
+    }
+
+    /// Every `.swift` file of the App target, found rather than listed: the
+    /// target's own directory and one level below it, read through
+    /// `SourceCorpus`.
+    private static func appKitFiles() throws -> [URL] {
+        let base = SourceCorpus.key(appKitRoot) + "/"
+        return try SourceCorpus.files(under: appKitRoot).filter {
+            $0.pathExtension == "swift"
+                && SourceCorpus.key($0).dropFirst(base.count).split(separator: "/").count <= 2
+        }
+    }
+}

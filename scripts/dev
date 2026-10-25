@@ -1,0 +1,68 @@
+#!/bin/bash
+# Use one incremental, host-architecture build tree for local development.
+set -euo pipefail
+REPO="$(cd "$(dirname "$0")/.." && pwd)"
+cd "$REPO"
+
+COMMAND="${1:-build}"
+if [[ $# -gt 0 ]]; then shift; fi
+case "$COMMAND" in
+    build|run|test) ;;
+    *) echo "Usage: scripts/dev {build|run|test} [arguments...]" >&2; exit 2 ;;
+esac
+FLAGS=(--scratch-path "$REPO/.build" --build-system swiftbuild --disable-automatic-resolution)
+if [[ -n "${MACSCP_JOBS:-}" ]]; then
+    if [[ ! "$MACSCP_JOBS" =~ ^[1-9][0-9]*$ ]]; then
+        echo "error: MACSCP_JOBS must be a positive integer" >&2
+        exit 2
+    fi
+    FLAGS+=(--jobs "$MACSCP_JOBS")
+fi
+scripts/check-vendor
+SIGN_DEV=false
+if [[ "$COMMAND" != test ]]; then
+    # Public certificate fingerprint and Team ID only, never shell code or
+    # secrets. Explicit environment configuration always takes precedence.
+    if [[ -z "${MACSCP_SIGN_IDENTITY:-}" && -z "${MACSCP_TEAM_ID:-}" && -f "$REPO/.macscp-signing" ]]; then
+        if ! {
+            IFS= read -r MACSCP_SIGN_IDENTITY
+            IFS= read -r MACSCP_TEAM_ID
+        } < "$REPO/.macscp-signing"; then
+            echo "error: .macscp-signing must contain the identity and Team ID on two lines" >&2
+            exit 1
+        fi
+        [[ -n "$MACSCP_SIGN_IDENTITY" && -n "$MACSCP_TEAM_ID" ]] || {
+            echo "error: incomplete .macscp-signing configuration" >&2; exit 1;
+        }
+        export MACSCP_SIGN_IDENTITY MACSCP_TEAM_ID
+    fi
+    if [[ -n "${MACSCP_SIGN_IDENTITY:-}" || -n "${MACSCP_TEAM_ID:-}" ]]; then
+        bash scripts/sign-app --check
+        SIGN_DEV=true
+    else
+        echo "warning: no persistent signing identity configured; this development build remains ad hoc and Keychain may request access again after recompilation" >&2
+    fi
+fi
+sign_development_binary() {
+    if [[ "$SIGN_DEV" == true ]]; then
+        bash scripts/sign-app --executable "$1"
+    fi
+}
+case "$COMMAND" in
+    build)
+        swift build "${FLAGS[@]}" --product MacSCP "$@"
+        if [[ "$SIGN_DEV" == true ]]; then
+            BIN_PATH="$(swift build "${FLAGS[@]}" --product MacSCP "$@" --show-bin-path)"
+            sign_development_binary "$BIN_PATH/MacSCP"
+        fi
+        ;;
+    run)
+        swift build "${FLAGS[@]}" --product MacSCP
+        BIN_PATH="$(swift build "${FLAGS[@]}" --product MacSCP --show-bin-path)"
+        sign_development_binary "$BIN_PATH/MacSCP"
+        # Do not invoke swift run after signing: another link could replace
+        # the signed executable with an ad-hoc product before launch.
+        exec "$BIN_PATH/MacSCP" "$@"
+        ;;
+    test) exec swift test "${FLAGS[@]}" "$@" ;;
+esac

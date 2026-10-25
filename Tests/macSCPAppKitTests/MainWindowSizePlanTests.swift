@@ -1,0 +1,779 @@
+import Foundation
+import MacSCPTestSupport
+import Testing
+@testable import MacSCPAppKit
+
+/// Guards `MainWindowSizePlan` (next build of 2026-09-17, Task 3: the main
+/// window comes back at the size it was used at) and the window-geometry
+/// wiring in `ContentView` that executes it.
+///
+/// The decisions are tested as values. AppKit's actual autosave behavior
+/// requires a window-level integration check, not a duplicate in-memory model.
+///
+/// Known blind spot: SOURCE TEXT only for the wiring — nothing here runs a
+/// window.
+@MainActor
+@Suite("MainWindowSizePlan and the main window's size wiring")
+struct MainWindowSizePlanTests {
+    private static let browser = CGSize(width: 1400, height: 900)
+    private static let form = MainWindowSizePlan.formSize
+    private static let floor = MainWindowSizePlan.browserFloor
+
+    // MARK: - Which size a connect grows to
+
+    @Test func closingOrDisconnectingTheLastConnectionPreservesWindowGeometry() throws {
+        for (file, anchor) in [
+            (Self.lifecycleFile, "func performClose(_ tab: SessionTab) async {"),
+            (Self.lifecycleFile, "func performCloseOthers(of tab: SessionTab) async {"),
+            (Self.contentViewFile, "func disconnectToForm(_ tab: SessionTab) -> Task<Void, Never>? {"),
+        ] {
+            let body = try Self.body(of: anchor, in: file)
+            #expect(body.contains("teardown("))
+            #expect(!body.contains("shrinkIfPristine("))
+            #expect(!body.contains("resizeWindow("))
+            #expect(!body.contains("setFrame("))
+        }
+    }
+
+    @Test func withoutARememberedSizeAConnectGrowsAFormWindowToTheFloor() {
+        #expect(MainWindowSizePlan.connectGrowth(current: Self.form, remembered: nil) == Self.floor)
+    }
+
+    @Test func withARememberedSizeAConnectGrowsAFormWindowToIt() {
+        #expect(MainWindowSizePlan.connectGrowth(current: Self.form, remembered: Self.browser)
+            == Self.browser)
+    }
+
+    /// A remembered size below the floor does not make a connected window
+    /// smaller than a connected window may be.
+    @Test func aRememberedSizeBelowTheFloorGrowsToTheFloorInThatDimension() {
+        let narrow = CGSize(width: 800, height: 1000)
+        #expect(MainWindowSizePlan.connectGrowth(current: Self.form, remembered: narrow)
+            == CGSize(width: Self.floor.width, height: 1000))
+    }
+
+    /// A connect only ever grows: a window already at least the target in
+    /// both dimensions is left alone, and one larger in one dimension keeps
+    /// that dimension.
+    @Test func aConnectNeverShrinksTheWindow() {
+        #expect(MainWindowSizePlan.connectGrowth(current: Self.browser, remembered: Self.browser) == nil)
+        #expect(MainWindowSizePlan.connectGrowth(
+            current: CGSize(width: 2000, height: 500), remembered: Self.browser)
+            == CGSize(width: 2000, height: 900))
+    }
+
+    /// The primary window's remembered size is the persisted one — it is
+    /// what survives a relaunch — and the in-memory one only stands in when
+    /// nothing was persisted yet.
+    @Test func thePrimaryWindowRemembersThePersistedSize() {
+        let inMemory = CGSize(width: 1000, height: 700)
+        #expect(MainWindowSizePlan.rememberedBrowserSize(
+            isPrimaryWindow: true, inMemory: nil, persisted: Self.browser) == Self.browser)
+        #expect(MainWindowSizePlan.rememberedBrowserSize(
+            isPrimaryWindow: true, inMemory: inMemory, persisted: Self.browser) == Self.browser)
+        #expect(MainWindowSizePlan.rememberedBrowserSize(
+            isPrimaryWindow: true, inMemory: inMemory, persisted: nil) == inMemory)
+    }
+
+    /// A window opened by a move persists nothing and reads nothing
+    /// persisted: the persisted size is the primary window's.
+    @Test func aSecondaryWindowRemembersOnlyItsOwnSize() {
+        let inMemory = CGSize(width: 1000, height: 700)
+        #expect(MainWindowSizePlan.rememberedBrowserSize(
+            isPrimaryWindow: false, inMemory: nil, persisted: Self.browser) == nil)
+        #expect(MainWindowSizePlan.rememberedBrowserSize(
+            isPrimaryWindow: false, inMemory: inMemory, persisted: Self.browser) == inMemory)
+    }
+
+    // MARK: - What a shrink does
+
+    @Test func onlyAPristineWindowLargerThanTheFormShrinks() {
+        #expect(MainWindowSizePlan.shrink(
+            current: Self.browser, isPristine: false, isPrimaryWindow: true, isFullScreen: false,
+            frameAutosaveSuspended: false) == nil)
+        #expect(MainWindowSizePlan.shrink(
+            current: Self.form, isPristine: true, isPrimaryWindow: true, isFullScreen: false,
+            frameAutosaveSuspended: false) == nil)
+    }
+
+    /// The primary window, shrinking from its browser size: the size is
+    /// persisted, and the autosave is suspended BEFORE the shrink so the
+    /// form size is never written as the window's frame.
+    @Test func thePrimaryWindowPersistsItsBrowserSizeAndSuspendsTheAutosave() {
+        #expect(MainWindowSizePlan.shrink(
+            current: Self.browser, isPristine: true, isPrimaryWindow: true, isFullScreen: false,
+            frameAutosaveSuspended: false)
+            == .init(browserSize: Self.browser, persistsBrowserSize: true, suspendsFrameAutosave: true))
+    }
+
+    /// Already suspended means already shrunk once: what the window is at
+    /// now is a form window the user dragged larger, not a browser size, so
+    /// it does not replace the persisted one.
+    @Test func aSecondShrinkWhileSuspendedPersistsNothing() {
+        let draggedForm = CGSize(width: Self.form.width + 100, height: Self.form.height + 40)
+        #expect(MainWindowSizePlan.shrink(
+            current: draggedForm, isPristine: true, isPrimaryWindow: true, isFullScreen: false,
+            frameAutosaveSuspended: true)
+            == .init(browserSize: draggedForm, persistsBrowserSize: false, suspendsFrameAutosave: true))
+    }
+
+    @Test func aSecondaryWindowShrinksWithoutPersistingOrSuspending() {
+        #expect(MainWindowSizePlan.shrink(
+            current: Self.browser, isPristine: true, isPrimaryWindow: false, isFullScreen: false,
+            frameAutosaveSuspended: false)
+            == .init(browserSize: Self.browser, persistsBrowserSize: false, suspendsFrameAutosave: false))
+    }
+
+    // MARK: - The autosave and the live-resize recording
+
+    @Test func theAutosaveNameIsEmptyExactlyWhileSuspended() {
+        #expect(MainWindowSizePlan.frameAutosaveName(frameAutosaveSuspended: false, primaryName: "p") == "p")
+        #expect(MainWindowSizePlan.frameAutosaveName(frameAutosaveSuspended: true, primaryName: "p") == "")
+    }
+
+    @Test func aConnectResumesTheAutosaveOnlyForASuspendedPrimaryWindow() {
+        #expect(MainWindowSizePlan.resumesFrameAutosave(isPrimaryWindow: true, frameAutosaveSuspended: true))
+        #expect(!MainWindowSizePlan.resumesFrameAutosave(isPrimaryWindow: true, frameAutosaveSuspended: false))
+        #expect(!MainWindowSizePlan.resumesFrameAutosave(isPrimaryWindow: false, frameAutosaveSuspended: true))
+    }
+
+    /// A drag of the window's edge is the size a user chose — recorded only
+    /// for the primary window, only while its active tab shows a connected
+    /// browser (fix round 1: not merely "not pristine", which two unconnected
+    /// form tabs also are), never in full screen, and only while the autosave
+    /// is writing too, so the two never disagree.
+    @Test func onlyAConnectedPrimaryWindowWithItsAutosaveOnRecordsALiveResize() {
+        #expect(MainWindowSizePlan.persistsLiveResize(
+            isPrimaryWindow: true, isActiveTabConnected: true, isFullScreen: false,
+            frameAutosaveSuspended: false))
+        #expect(!MainWindowSizePlan.persistsLiveResize(
+            isPrimaryWindow: true, isActiveTabConnected: false, isFullScreen: false,
+            frameAutosaveSuspended: false))
+        #expect(!MainWindowSizePlan.persistsLiveResize(
+            isPrimaryWindow: true, isActiveTabConnected: true, isFullScreen: false,
+            frameAutosaveSuspended: true))
+        #expect(!MainWindowSizePlan.persistsLiveResize(
+            isPrimaryWindow: false, isActiveTabConnected: true, isFullScreen: false,
+            frameAutosaveSuspended: false))
+    }
+
+    /// Full screen (fix round 1): a Split View divider drag can end a live
+    /// resize, and its size is the screen's, not one the user chose.
+    @Test func aLiveResizeInFullScreenIsNotRecorded() {
+        #expect(!MainWindowSizePlan.persistsLiveResize(
+            isPrimaryWindow: true, isActiveTabConnected: true, isFullScreen: true,
+            frameAutosaveSuspended: false))
+    }
+
+    /// Full screen (fix round 1): a disconnect there still shrinks the way it
+    /// always did, but the full-screen size is not persisted as the browser
+    /// size.
+    @Test func aShrinkInFullScreenPersistsNothing() {
+        #expect(MainWindowSizePlan.shrink(
+            current: Self.browser, isPristine: true, isPrimaryWindow: true, isFullScreen: true,
+            frameAutosaveSuspended: false)
+            == .init(browserSize: Self.browser, persistsBrowserSize: false, suspendsFrameAutosave: true))
+    }
+
+    /// Re-setting the autosave name applies the stored frame at once, placed
+    /// on `NSScreen.main` rather than on the window's own screen (measured by
+    /// the Task 3 reviewer): a window on one display jumped to the other.
+    /// The frame the window had before the name was set wins back.
+    @Test func aFrameMovedByResumingTheAutosaveIsRestored() {
+        let before = CGRect(x: 100, y: 200, width: 1400, height: 900)
+        let movedToMain = CGRect(x: 1540, y: 200, width: 1400, height: 900)
+        #expect(MainWindowSizePlan.frameToRestore(beforeResume: before, afterResume: movedToMain)
+            == before)
+        #expect(MainWindowSizePlan.frameToRestore(beforeResume: before, afterResume: before) == nil)
+    }
+
+    // MARK: - The launch-time restore
+
+    /// The two displays the launch-time cases below are measured against:
+    /// a built-in one at the origin and an external one to its right.
+    private static let builtIn = CGRect(x: 0, y: 0, width: 1512, height: 982)
+    private static let external = CGRect(x: 1512, y: 0, width: 1920, height: 1080)
+
+    /// The launch-time twin of `frameToRestore` above, and the decision this
+    /// task had to take: a window that has just been created has no earlier
+    /// frame of its own — only the placeholder AppKit chose for it — so "its
+    /// own display" is the STORED frame's display, and the frame to put back
+    /// is the stored frame itself.
+    @Test func aStoredFrameAppliedOntoTheMainDisplayIsPutBackOnItsOwn() {
+        let stored = CGRect(x: 1600, y: 100, width: 1400, height: 900)
+        let appliedOnMain = CGRect(x: 88, y: 100, width: 1400, height: 900)
+        #expect(MainWindowSizePlan.launchFrameToRestore(
+            stored: stored, applied: appliedOnMain, screens: [Self.builtIn, Self.external])
+            == stored)
+    }
+
+    /// The stored frame was already on the main display, so AppKit applied
+    /// it unchanged: nothing to put back, and the window is not touched.
+    @Test func aStoredFrameAlreadyOnTheMainDisplayIsLeftAlone() {
+        let stored = CGRect(x: 100, y: 60, width: 1400, height: 900)
+        #expect(MainWindowSizePlan.launchFrameToRestore(
+            stored: stored, applied: stored, screens: [Self.builtIn, Self.external]) == nil)
+    }
+
+    /// A first launch has nothing stored. The frame the window has then is
+    /// the placeholder AppKit chose, which is not a frame to restore to.
+    @Test func withNothingStoredTheWindowStaysWhereAppKitPutIt() {
+        let placeholder = CGRect(x: 0, y: 0, width: 700, height: 460)
+        #expect(MainWindowSizePlan.launchFrameToRestore(
+            stored: nil, applied: placeholder, screens: [Self.builtIn, Self.external]) == nil)
+    }
+
+    /// The display the frame was saved on is not attached any more, so no
+    /// attached screen shows any part of it. AppKit's placement is then the
+    /// only visible one, and putting the stored frame back would open the
+    /// window where nobody can see it.
+    @Test func aStoredFrameOnADisplayThatIsGoneIsLeftWhereAppKitPutIt() {
+        let stored = CGRect(x: 1600, y: 100, width: 1400, height: 900)
+        let appliedOnMain = CGRect(x: 88, y: 100, width: 1400, height: 900)
+        #expect(MainWindowSizePlan.launchFrameToRestore(
+            stored: stored, applied: appliedOnMain, screens: [Self.builtIn]) == nil)
+    }
+
+    /// The gate on the launch-time put-back, as a value.
+    ///
+    /// Review round 1: this decision was the one of the four in that change
+    /// that stayed inline in `ContentView`, and it is the one that can move
+    /// a window a user is holding. Measured against the committed tree:
+    /// deleting it left 93 of 93 green with two unused-variable warnings as
+    /// the only signal, and dropping only its `!=` half left 93 of 93 green
+    /// with no warning at all — while snapping the primary window back to
+    /// the stored frame on every repaint.
+    ///
+    /// Review round 2: lifting it into the plan was not enough while it
+    /// took two `String`s the caller filled from two reads. Binding those
+    /// reads to the wrong labels was green at 94 of 94. It now takes one
+    /// `AppliedAutosaveName`, whose two fields are a `String` and a `Bool`
+    /// and cannot be exchanged.
+    ///
+    /// AppKit applies the stored frame when a window is given a NON-EMPTY
+    /// autosave name it did not already carry, and only then. `name` is the
+    /// primary name or the empty string — `applyFrameAutosave(to:)` sets
+    /// nothing but `frameAutosaveName`'s two answers — and `wasSetNow` is
+    /// either, so the domain is FOUR cells, counted in the pass that writes
+    /// this, and all four are below. A fifth SITUATION, the refused write,
+    /// shares a cell with the second rather than adding one.
+    @Test func onlyANewNonEmptyAutosaveNameCanHaveAppliedAStoredFrame() {
+        let suspended = MainWindowSizePlan.frameAutosaveName(
+            frameAutosaveSuspended: true, primaryName: ContentView.primaryFrameAutosaveName)
+        let writing = MainWindowSizePlan.frameAutosaveName(
+            frameAutosaveSuspended: false, primaryName: ContentView.primaryFrameAutosaveName)
+        #expect(suspended != writing, """
+            the plan's two autosave names are the same string, so the cells below are not four \
+            cases — re-anchor this test.
+            """)
+        // (name: primary, wasSetNow: true) — the first resolve at launch.
+        // AppKit has just applied whatever was stored under that name.
+        #expect(MainWindowSizePlan.restoresAtLaunch(
+            .init(name: writing, wasSetNow: true)))
+        // (name: primary, wasSetNow: false) — an ordinary body update.
+        // `WindowAccessor` calls back on every one of them and the window
+        // already carries the name, so nothing was applied. This is the
+        // cell the dropped `!=` half let through in round 1.
+        #expect(!MainWindowSizePlan.restoresAtLaunch(
+            .init(name: writing, wasSetNow: false)))
+        // The same cell by the other route, which the two-`String` version
+        // could not tell apart from "no change" at all: the write was
+        // REFUSED. `NSWindow.setFrameAutosaveName(_:)` answers `false` when
+        // another window already owns the name and leaves the old one in
+        // place, so the window carries a non-empty name that this call did
+        // not put there, and no frame was applied under it.
+        #expect(!MainWindowSizePlan.restoresAtLaunch(
+            .init(name: "another.window", wasSetNow: false)))
+        // (name: "", wasSetNow: true) — `shrinkIfPristine()`. Setting the
+        // EMPTY name is the suspension, and applies no frame.
+        #expect(!MainWindowSizePlan.restoresAtLaunch(
+            .init(name: suspended, wasSetNow: true)))
+        // (name: "", wasSetNow: false) — a body update while the
+        // suspension stands, and `AppliedAutosaveName.none`, which is what
+        // a window that did not resolve answers.
+        #expect(!MainWindowSizePlan.restoresAtLaunch(
+            .init(name: suspended, wasSetNow: false)))
+        #expect(!MainWindowSizePlan.restoresAtLaunch(.none))
+    }
+
+    /// AppKit's autosave descriptor is `"x y w h sx sy sw sh"` — the
+    /// window's frame followed by the screen's. Only the first four are
+    /// read; a descriptor that is not all numbers is not parsed past, since
+    /// dropping a token would read the next number as this field.
+    @Test func theStoredFrameIsReadFromAppKitsAutosaveDescriptor() {
+        #expect(MainWindowSizePlan.storedFrame(descriptor: "1600 100 1400 900 1512 0 1920 1080")
+            == CGRect(x: 1600, y: 100, width: 1400, height: 900))
+        #expect(MainWindowSizePlan.storedFrame(descriptor: "-1920 -200 1400 900 -1920 -200 1920 1080")
+            == CGRect(x: -1920, y: -200, width: 1400, height: 900))
+        #expect(MainWindowSizePlan.storedFrame(descriptor: nil) == nil)
+        #expect(MainWindowSizePlan.storedFrame(descriptor: "") == nil)
+        #expect(MainWindowSizePlan.storedFrame(descriptor: "1600 100 1400") == nil)
+        #expect(MainWindowSizePlan.storedFrame(descriptor: "1600 x 1400 900 1512") == nil)
+        #expect(MainWindowSizePlan.storedFrame(descriptor: "1600 100 0 900 1512 0 1920 1080") == nil)
+    }
+
+    /// The key helper's FORMAT, against a second copy of it written here —
+    /// which catches a typo in the helper and nothing else (review round 1:
+    /// this comment used to claim the app therefore reads the frame AppKit
+    /// wrote, which is an AppKit fact no pure suite can reach). That the
+    /// format is the one AppKit actually uses rests on
+    /// `ContentView.resizeWindow(toWidth:height:)`'s recorded note, and on
+    /// the maintainer's sight check; nothing here runs a window.
+    ///
+    /// The name comes from the real static property, not from a third copy
+    /// of the string.
+    @Test func theStoredFrameIsReadUnderAppKitsOwnDefaultsKey() {
+        #expect(MainWindowSizePlan.frameDefaultsKey(autosaveName: ContentView.primaryFrameAutosaveName)
+            == "NSWindow Frame " + ContentView.primaryFrameAutosaveName)
+    }
+
+    // MARK: - Source guards
+
+    private static let repoRoot: URL = URL(fileURLWithPath: #filePath)
+        .deletingLastPathComponent().deletingLastPathComponent()
+        .deletingLastPathComponent()
+    private static let sourceDir = repoRoot.appendingPathComponent("Sources/MacSCPAppKit")
+    private static let contentViewFile = sourceDir.appendingPathComponent("ContentView.swift")
+    private static let lifecycleFile = sourceDir.appendingPathComponent("ContentView+Lifecycle.swift")
+    private static let detailFile = sourceDir.appendingPathComponent("ContentView+Detail.swift")
+    private static let planFile = sourceDir.appendingPathComponent("MainWindowSizePlan.swift")
+
+    private static func code(of url: URL) throws -> String {
+        try SourceCorpus.code(of: url)
+    }
+
+    private static func body(of anchor: String, in url: URL) throws -> String {
+        let source = try code(of: url)
+        return try #require(SourceSpan.body(after: anchor, in: source), """
+            \(url.lastPathComponent) no longer declares \(anchor) — re-anchor this guard.
+            """)
+    }
+
+    /// Every Swift file of the App target, at ANY depth. Not
+    /// `SourceCorpus.children(of:)`, which by construction does not descend:
+    /// `Sources/MacSCPAppKit/Presentation/` then sits outside every count and
+    /// every negative below, which is CLAUDE.md's "a negative check whose
+    /// SPAN is wrong can never match, and reads like one that is satisfied"
+    /// applied to the walk the checks rest on rather than to any one of them.
+    ///
+    /// Measured on 2026-09-27, not argued: a second writer of
+    /// `settingsStore.mainWindowBrowserSize` and a `resizeWindow(toWidth: 900,`
+    /// call were planted in that subdirectory. Each was green 3 of 3 against
+    /// the flat listing and red 3 of 3 against this walk.
+    /// `theSizeWalkDescendsIntoSubdirectories` is the positive beside it.
+    private static func appSwiftFiles() throws -> [URL] {
+        try SourceCorpus.files(under: sourceDir).filter { $0.pathExtension == "swift" }
+    }
+
+    private static func occurrences(of needle: String) throws -> Int {
+        var count = 0
+        for file in try appSwiftFiles() {
+            count += try code(of: file).components(separatedBy: needle).count - 1
+        }
+        return count
+    }
+
+    private static func offset(of needle: String, in body: String) -> String.Index? {
+        body.range(of: needle)?.lowerBound
+    }
+
+    @Test func theConnectPathGrowsThroughThePlan() throws {
+        let grow = try Self.body(of: "func growToBrowserSize() {", in: Self.lifecycleFile)
+        #expect(grow.contains("MainWindowSizePlan.rememberedBrowserSize("))
+        #expect(grow.contains("MainWindowSizePlan.connectGrowth("))
+        #expect(grow.contains("MainWindowSizePlan.resumesFrameAutosave("))
+        let resize = try #require(Self.offset(of: "resizeWindow(", in: grow))
+        let save = try #require(Self.offset(of: "saveFrame(usingName:", in: grow))
+        let resume = try #require(Self.offset(of: "applyFrameAutosave(", in: grow))
+        #expect(resize < save, "the grown frame must be the one saved before the autosave resumes")
+        #expect(save < resume, "the frame is saved before the name is set again")
+        // Fix round 1: the frame is captured before the name is set again
+        // and put back after it, through the plan, without animation.
+        let capture = try #require(Self.offset(of: "= window.frame", in: grow))
+        let decide = try #require(Self.offset(of: "MainWindowSizePlan.frameToRestore(", in: grow))
+        let restore = try #require(Self.offset(of: "window.setFrame(", in: grow))
+        #expect(save < capture && capture < resume,
+            "the frame must be captured after the save and before the name is set again")
+        #expect(resume < decide && decide < restore,
+            "the restore must be decided and applied after the name is set again")
+        let contentView = try Self.code(of: Self.contentViewFile)
+        #expect(contentView.contains("growToBrowserSize()"),
+            "ContentView.swift's connect path no longer calls growToBrowserSize()")
+    }
+
+    @Test func theShrinkGoesThroughThePlanAndSuspendsBeforeItResizes() throws {
+        let shrink = try Self.body(of: "func shrinkIfPristine() {", in: Self.lifecycleFile)
+        #expect(shrink.contains("MainWindowSizePlan.shrink("))
+        let persist = try #require(Self.offset(of: "mainWindowBrowserSize = ", in: shrink))
+        let suspend = try #require(Self.offset(of: "frameAutosaveSuspended = true", in: shrink))
+        let apply = try #require(Self.offset(of: "applyFrameAutosave(", in: shrink))
+        let resize = try #require(Self.offset(of: "resizeWindow(", in: shrink))
+        #expect(persist < resize)
+        #expect(suspend < apply, "the suspension must reach the window before the shrink")
+        #expect(apply < resize, "a shrink with the autosave still on writes the form size")
+    }
+
+    /// The declaration the two guards below read, spelled once.
+    private static let autosaveDeclaration = "func applyFrameAutosave(to window: NSWindow?) -> MainWindowSizePlan.AppliedAutosaveName {"
+
+    @Test func theAutosaveNameComesFromThePlan() throws {
+        let autosave = try Self.body(of: Self.autosaveDeclaration, in: Self.lifecycleFile)
+        #expect(autosave.contains("MainWindowSizePlan.frameAutosaveName("))
+        #expect(autosave.contains("setFrameAutosaveName("))
+    }
+
+    @Test func aLiveResizeIsRecordedThroughThePlan() throws {
+        let handler = try Self.body(
+            of: "func handleWindowDidEndLiveResize(_ notification: Notification) {",
+            in: Self.lifecycleFile)
+        #expect(handler.contains("MainWindowSizePlan.persistsLiveResize("))
+        #expect(handler.contains("mainWindowBrowserSize = "))
+        let detail = try Self.code(of: Self.detailFile)
+        #expect(detail.contains("NSWindow.didEndLiveResizeNotification"))
+        #expect(detail.contains("handleWindowDidEndLiveResize"))
+    }
+
+    /// The primary-window property's name, read from its declaration rather
+    /// than spelled: `var <name>: Bool { seed == nil }`.
+    private static func primaryWindowProperty() throws -> String {
+        let source = try code(of: contentViewFile)
+        let pattern = try CompiledPattern.regex(#"var (\w+): Bool \{ seed == nil \}"#)
+        let match = try #require(pattern.firstMatch(
+            in: source, range: NSRange(source.startIndex..., in: source)), """
+                ContentView.swift no longer declares the primary-window property as \
+                `var …: Bool { seed == nil }` — re-anchor this guard.
+                """)
+        let name = try #require(Range(match.range(at: 1), in: source))
+        return String(source[name])
+    }
+
+    /// The `Bool` parameter labels `MainWindowSizePlan.<function>` declares,
+    /// in declaration order, read from the plan's own signature rather than
+    /// spelled here.
+    ///
+    /// Splitting on depth-zero commas, not on every comma: a parameter whose
+    /// type carried one (`(Bool, Bool)`, a default of `[a, b]`) would
+    /// otherwise be cut in half and neither half would look like a `Bool`.
+    private static func boolParameters(of function: String) throws -> [String] {
+        let source = try code(of: planFile)
+        let anchor = "static func \(function)("
+        let start = try #require(source.range(of: anchor), """
+            MainWindowSizePlan.swift no longer declares `\(anchor)` — re-anchor this guard.
+            """)
+        let list = try #require(Self.parenthesised(from: start.upperBound, in: source), """
+            `\(anchor)`'s parameter list does not close — re-anchor this guard.
+            """)
+        return Self.topLevelArguments(in: list).compactMap { parameter in
+            guard let colon = parameter.firstIndex(of: ":"),
+                  parameter[colon...].dropFirst().trimmingCharacters(in: .whitespacesAndNewlines)
+                    .hasPrefix("Bool")
+            else { return nil }
+            // `label name: Type` declares an argument label and a distinct
+            // internal name; the label is the first word.
+            return parameter[..<colon].split(whereSeparator: \.isWhitespace).first.map(String.init)
+        }
+    }
+
+    /// The text between `open`'s own `(` — which must be the character just
+    /// before `from` — and the `)` that balances it.
+    private static func parenthesised(from start: String.Index, in source: String) -> String? {
+        var depth = 1
+        var index = start
+        while index < source.endIndex {
+            if source[index] == "(" { depth += 1 }
+            if source[index] == ")" {
+                depth -= 1
+                if depth == 0 { return String(source[start..<index]) }
+            }
+            index = source.index(after: index)
+        }
+        return nil
+    }
+
+    /// An argument (or parameter) list cut at its depth-zero commas.
+    private static func topLevelArguments(in list: String) -> [String] {
+        var arguments: [String] = []
+        var depth = 0
+        var current = ""
+        for character in list {
+            switch character {
+            case "(", "[": depth += 1
+            case ")", "]": depth -= 1
+            case "," where depth == 0:
+                arguments.append(current.trimmingCharacters(in: .whitespacesAndNewlines))
+                current = ""
+                continue
+            default: break
+            }
+            current.append(character)
+        }
+        let last = current.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !last.isEmpty { arguments.append(last) }
+        return arguments
+    }
+
+    /// What EVERY call to `MainWindowSizePlan.<function>` inside `body`
+    /// passes for each argument label, as written — one dictionary per call,
+    /// in order of appearance.
+    ///
+    /// Every call, not the first (fix round 1). The form this replaces took
+    /// `body.range(of:)` and read ONE call, so a second call to the same plan
+    /// function in the same body was invisible: a planted
+    /// `MainWindowSizePlan.persistsLiveResize(isPrimaryWindow: true, …)`
+    /// beside the real one in `handleWindowDidEndLiveResize` was green here
+    /// and RED against the guard this whole test replaced, which counted the
+    /// label's occurrences across the entire body. The callers assert HOW
+    /// MANY calls came back, which is what keeps the loop from checking
+    /// nothing.
+    ///
+    /// A call whose parenthesis never closes fails here rather than being
+    /// skipped: a call this cannot bound is a call it must not drop.
+    private static func argumentLists(to function: String, in body: String) throws -> [[String: String]] {
+        let anchor = "MainWindowSizePlan.\(function)("
+        var lists: [[String: String]] = []
+        var search = body.startIndex..<body.endIndex
+        while let hit = body.range(of: anchor, range: search) {
+            search = hit.upperBound..<body.endIndex
+            let list = try #require(Self.parenthesised(from: hit.upperBound, in: body), """
+                a call to `\(anchor)` does not close — re-anchor this guard.
+                """)
+            var passed: [String: String] = [:]
+            for argument in Self.topLevelArguments(in: list) {
+                guard let colon = argument.firstIndex(of: ":") else { continue }
+                passed[String(argument[..<colon])] =
+                    argument[colon...].dropFirst().trimmingCharacters(in: .whitespacesAndNewlines)
+            }
+            lists.append(passed)
+        }
+        return lists
+    }
+
+    /// The four executing call sites, each named by the body it sits in, the
+    /// plan function it calls, and how many times that body calls it.
+    ///
+    /// `git grep -c 'MainWindowSizePlan\.' Sources/MacSCPAppKit/ContentView+Lifecycle.swift`
+    /// reports more, because the launch resolve above calls four more of the
+    /// plan's functions — none of which takes a `Bool`, which is what this
+    /// table is for.
+    ///
+    /// The counts are the positive beside the per-argument negatives:
+    /// without them the scan would pass a body it found no call in at all,
+    /// and it would pass a SECOND call that hard-codes everything. Counted
+    /// in the pass that wrote this list, with
+    /// `grep -c 'MainWindowSizePlan\.<function>(' ContentView+Lifecycle.swift`:
+    /// 1 each, for all four.
+    private static let planCallSites: [(anchor: String, function: String, calls: Int)] = [
+        ("func shrinkIfPristine() {", "shrink", 1),
+        ("func growToBrowserSize() {", "rememberedBrowserSize", 1),
+        ("func growToBrowserSize() {", "resumesFrameAutosave", 1),
+        ("func handleWindowDidEndLiveResize(_ notification: Notification) {", "persistsLiveResize", 1),
+    ]
+
+    /// Fix round 1: every window fact the plan is asked for at the four
+    /// executing call sites is read from the window, not written in. A
+    /// hard-coded `true` for the primary-window fact made a secondary
+    /// window's drag write the saved size with every value test still green.
+    ///
+    /// The labels are READ from `MainWindowSizePlan`'s own signatures
+    /// (`boolParameters(of:)`), not spelled here, so renaming a parameter
+    /// cannot leave this scan matching nothing, and a `Bool` parameter added
+    /// to any of the four is pinned the moment it is declared — the previous
+    /// form spelled `isPrimaryWindow:` and counted it, which is why
+    /// `isActiveTabConnected` went unpinned from the day it was added
+    /// (backlog: "Task 3's review deferred minors", re-review item 1).
+    ///
+    /// Each check reads the CALL's own argument list, not the enclosing
+    /// body: the previous form asked whether the body contained
+    /// `isFullScreen:` and, separately, whether it contained
+    /// `styleMask.contains(.fullScreen)` — two independent `.contains`
+    /// calls that a body passing `isFullScreen: false` while reading the
+    /// style mask for anything else at all would have satisfied.
+    ///
+    /// EVERY call in the body, and the number of them asserted against
+    /// `planCallSites` (fix round 1). Narrowing the span from the body to
+    /// the call is what this test is for, and round 0 narrowed it too far:
+    /// it read the first call and no other, where the guard it replaced had
+    /// counted the label over the whole body. A second, fully hard-coded
+    /// call planted beside the real one was green.
+    @Test func thePlanIsAskedAboutTheRealWindow() throws {
+        let property = try Self.primaryWindowProperty()
+        /// The fact each label names, as the window answers it. A label not
+        /// listed here is still held to "not a literal" below.
+        let readFromTheWindow = [
+            "isPrimaryWindow": property,
+            "isActiveTabConnected": "activeTab.isConnected",
+            "frameAutosaveSuspended": "frameAutosaveSuspended",
+        ]
+        let fullScreen = try CompiledPattern.regex(#"^\w+\.styleMask\.contains\(\.fullScreen\)$"#)
+        var declared: Set<String> = []
+        for (anchor, function, calls) in Self.planCallSites {
+            let labels = try Self.boolParameters(of: function)
+            declared.formUnion(labels)
+            #expect(!labels.isEmpty, """
+                MainWindowSizePlan.\(function) declares no Bool parameter — this guard is \
+                pointed at a signature that no longer asks the window anything.
+                """)
+            let body = try Self.body(of: anchor, in: Self.lifecycleFile)
+            let lists = try Self.argumentLists(to: function, in: body)
+            #expect(lists.count == calls, """
+                \(anchor) calls MainWindowSizePlan.\(function) \(lists.count) times, not \
+                \(calls). Fewer means this scan is checking nothing there; more means a call \
+                nobody counted — check what it passes and update planCallSites.
+                """)
+            for passed in lists {
+                for label in labels {
+                    let value = try #require(passed[label], """
+                        \(anchor) calls MainWindowSizePlan.\(function) without its \
+                        `\(label):` argument — the plan declares it, so this call does not \
+                        compile, or this scan is reading the wrong call.
+                        """)
+                    #expect(value != "true" && value != "false", """
+                        \(anchor) hard-codes `\(label): \(value)` — the plan must be asked \
+                        about the real window.
+                        """)
+                    if let expected = readFromTheWindow[label] {
+                        #expect(value == expected, """
+                            \(anchor) passes `\(label): \(value)` where the window answers \
+                            `\(expected)`.
+                            """)
+                    }
+                    if label == "isFullScreen" {
+                        #expect(
+                            fullScreen.firstMatch(
+                                in: value, range: NSRange(value.startIndex..., in: value)) != nil, """
+                                \(anchor) passes `isFullScreen: \(value)` — full screen is \
+                                read from the window's own style mask, in this argument, or a \
+                                size the screen chose is saved as one the user chose.
+                                """)
+                    }
+                }
+            }
+        }
+        // The positive beside the two spelled tables above: every label
+        // `readFromTheWindow` and the full-screen check name is a label the
+        // plan really declares. Without it, renaming a parameter would
+        // silently retire the value check for it — the table would simply
+        // stop matching — and leave only "not a literal" behind, which is
+        // exactly the way a negative check goes stale in silence.
+        for label in readFromTheWindow.keys.sorted() + ["isFullScreen"] {
+            #expect(declared.contains(label), """
+                no MainWindowSizePlan function this guard reads declares `\(label):` any \
+                more — the check keyed on it is now checking nothing. Declared: \
+                \(declared.sorted().joined(separator: ", ")).
+                """)
+        }
+    }
+
+    /// The launch-time restore in `ContentView`'s own wiring. Order is the
+    /// whole of it: the stored descriptor is read BEFORE the name is set,
+    /// because from that moment AppKit writes the applied frame over it, and
+    /// the put-back is decided by the plan and applied without animation
+    /// AFTER it. The negative — `ContentView+Detail.swift` no longer calls
+    /// the bare `applyFrameAutosave(` from its `WindowAccessor`, which is
+    /// the call that left the launch unguarded — has its positive beside it.
+    @Test func theLaunchResolveRestoresThroughThePlan() throws {
+        let resolve = try Self.body(
+            of: "func applyFrameAutosaveKeepingItsDisplay(to window: NSWindow?) {",
+            in: Self.lifecycleFile)
+        #expect(resolve.contains("MainWindowSizePlan.frameDefaultsKey("))
+        #expect(resolve.contains("animate: false"), "the launch-time put-back must not animate")
+        let read = try #require(Self.offset(of: "MainWindowSizePlan.storedFrame(", in: resolve))
+        let apply = try #require(Self.offset(of: "applyFrameAutosave(to: window)", in: resolve))
+        let gate = try #require(
+            Self.offset(of: "MainWindowSizePlan.restoresAtLaunch(", in: resolve), """
+                applyFrameAutosaveKeepingItsDisplay(to:) no longer asks the plan whether a \
+                stored frame was applied at all. Review round 1: with that decision inline, \
+                deleting it and dropping half of it each left this whole suite green.
+                """)
+        let decide = try #require(
+            Self.offset(of: "MainWindowSizePlan.launchFrameToRestore(", in: resolve))
+        let restore = try #require(Self.offset(of: "window.setFrame(", in: resolve))
+        #expect(read < apply, """
+            the stored frame must be read before the autosave name is set — after it, AppKit \
+            has written the frame it applied over the one being read.
+            """)
+        #expect(apply < gate && gate < decide && decide < restore,
+            "the gate is asked after the name is set and before the put-back is decided")
+        // Structural, not a further anchor (review round 2). The gate used
+        // to be asked about two `String`s this body read itself, and
+        // binding those reads to the wrong labels satisfied every anchor
+        // there was — two reads, the first before the call, the exact
+        // argument spelling, the whole ordering — while disabling the
+        // put-back, 94 of 94 green. The reads live where the change is
+        // caused now, so the negative here is ZERO of them, and its
+        // positive is that `applyFrameAutosave(to:)` does the reading and
+        // answers the pair.
+        let wrapperReads = resolve.components(separatedBy: ".frameAutosaveName").count - 1
+        #expect(wrapperReads == 0, """
+            applyFrameAutosaveKeepingItsDisplay(to:) reads frameAutosaveName \(wrapperReads) \
+            times of its own again — a second same-typed name here is one the gate can be \
+            asked about in either order.
+            """)
+        let autosave = try Self.body(of: Self.autosaveDeclaration, in: Self.lifecycleFile)
+        #expect(autosave.contains(".frameAutosaveName"), """
+            applyFrameAutosave(to:) no longer reads the window's autosave name, so nothing \
+            can answer what the call did — re-anchor this guard.
+            """)
+        #expect(autosave.contains("wasSetNow: "), """
+            applyFrameAutosave(to:) no longer answers whether IT set the name; a caller \
+            reconstructing that from two reads is what round 2 removed.
+            """)
+        let detail = try Self.code(of: Self.detailFile)
+        #expect(detail.contains("applyFrameAutosaveKeepingItsDisplay(to: $0)"), """
+            ContentView+Detail.swift's WindowAccessor no longer calls \
+            applyFrameAutosaveKeepingItsDisplay(to:) — re-anchor this guard.
+            """)
+        #expect(!detail.contains("applyFrameAutosave(to: $0)"), """
+            ContentView+Detail.swift's WindowAccessor calls applyFrameAutosave(to:) bare again — \
+            the stored frame is then applied relative to NSScreen.main and nothing puts it back.
+            """)
+    }
+
+    /// The span every count and every negative below rests on: the walk
+    /// descends. A silent return to a non-recursive listing would leave all
+    /// of them scanning a subset of the target while still reading like
+    /// checks that are satisfied.
+    ///
+    /// Both halves are DERIVED, not spelled: the flat listing is asked for
+    /// itself rather than compared against a counted number, so neither half
+    /// needs a recount when a file is added or a subdirectory appears.
+    @Test func theSizeWalkDescendsIntoSubdirectories() throws {
+        let files = try Self.appSwiftFiles()
+        let prefix = SourceCorpus.key(Self.sourceDir) + "/"
+        let nested = files.filter {
+            SourceCorpus.key($0).dropFirst(prefix.count).contains("/")
+        }
+        #expect(nested.isEmpty == false, "the App walk no longer reaches any subdirectory")
+        let flat = try SourceCorpus.children(of: Self.sourceDir)
+            .filter { $0.pathExtension == "swift" }
+            .count
+        #expect(files.count > flat, "the App walk no longer descends")
+    }
+
+    /// The negatives, each with its positive beside it: the persisted size
+    /// has exactly the two writers pinned above, the frame is saved by name
+    /// in one place, and no call site resizes the window to a size it
+    /// spelled itself instead of asking the plan.
+    ///
+    /// The counts were re-derived on 2026-09-27, after the walk was widened
+    /// to the whole target: every needle here occurs zero times in
+    /// `Presentation/`, so widening moved none of them.
+    @Test func nothingElseWritesTheSizeOrResizesTheWindow() throws {
+        #expect(try Self.occurrences(of: "mainWindowBrowserSize = ") == 2)
+        #expect(try Self.occurrences(of: "saveFrame(usingName:") == 1)
+        #expect(try Self.occurrences(of: "lastBrowserSize = ") == 1)
+        // Declaration plus connect growth, pristine shrink and the catalog launch floor.
+        #expect(try Self.occurrences(of: "resizeWindow(") == 4)
+        let literalResize = try CompiledPattern.regex(#"resizeWindow\(\s*toWidth:\s*[0-9]"#)
+        var literalCalls = 0
+        for file in try Self.appSwiftFiles() {
+            let code = try Self.code(of: file)
+            literalCalls += literalResize.numberOfMatches(
+                in: code, range: NSRange(code.startIndex..., in: code))
+        }
+        #expect(literalCalls == 0)
+        let chrome = try Self.code(of: Self.detailFile)
+        #expect(chrome.contains("MainWindowSizePlan.formSize.width"),
+            "the window's minimum size no longer reads the plan's form size")
+    }
+}

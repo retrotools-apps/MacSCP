@@ -1,0 +1,15 @@
+.DS_Store
+/.build
+/Packages
+/*.xcodeproj
+Package.pins
+*.pem
+/docs
+Package.resolved
+.podspecs
+DerivedData
+/.swiftpm
+
+# Keep the complete vendored source snapshot under version control.
+!**
+/.build/

@@ -1,0 +1,108 @@
+name: RetroTools MacSCP CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: macos-15
+    timeout-minutes: 20
+    env:
+      MAX_WARNINGS: 0
+    steps:
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+      - name: Report toolchain
+        run: |
+          xcodebuild -version
+          swift --version
+      - name: Verify public source boundary
+        run: |
+          python3 scripts/check-public-tree
+      - name: Verify local dependency sources
+        run: |
+          scripts/check-vendor
+          swift package resolve
+          swift package --disable-automatic-resolution show-dependencies --format json > "$RUNNER_TEMP/dependency-graph.json"
+          scripts/check-vendor --graph "$RUNNER_TEMP/dependency-graph.json"
+      - name: Build
+        run: |
+          set -o pipefail
+          swift build --disable-automatic-resolution --disable-dependency-cache 2>&1 | tee "$RUNNER_TEMP/build.log"
+      - name: Third-party notices are up to date
+        run: scripts/third-party-notices --check
+      - name: Build and publication script tests
+        run: python3 -m unittest discover -s scripts/tests
+      - name: Unit-Tests
+        id: unit-tests
+        timeout-minutes: 8
+        run: |
+          set -o pipefail
+          swift test --disable-automatic-resolution --disable-dependency-cache --event-stream-output-path "$RUNNER_TEMP/test-events.jsonl" \
+            2>&1 | tee "$RUNNER_TEMP/test.log"
+      - name: Test verdicts from the event stream
+        if: always() && steps.unit-tests.outcome != 'skipped'
+        run: |
+          set -euo pipefail
+          events="$RUNNER_TEMP/test-events.jsonl"
+          if [ ! -s "$events" ]; then
+            echo "::warning::no event stream was written at $events"
+            exit 0
+          fi
+          echo "events: $(wc -l < "$events" | tr -d ' ') lines"
+          jq -r 'select(.kind == "event" and .payload.kind == "issueRecorded")
+                 | "::error::issue in \(.payload.testID // "<no test>"): \((.payload.messages // []) | map(.text) | join(" | "))"' \
+            "$events" || true
+          failed=$(jq -r 'select(.kind == "event" and .payload.kind == "testEnded")
+                          | (.payload.messages // []) | map(.text) | join(" ")
+                          | select(test(" failed after "))' "$events" || true)
+          if [ -n "$failed" ]; then
+            echo "----- failed verdicts -----"
+            printf '%s\n' "$failed"
+            echo "---------------------------"
+          else
+            echo "no failed verdict in the event stream"
+          fi
+      - name: Upload the event stream
+        if: always() && steps.unit-tests.outcome != 'skipped'
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
+        with:
+          name: test-events
+          path: ${{ runner.temp }}/test-events.jsonl
+          if-no-files-found: warn
+          retention-days: 14
+      - name: Warning gate
+        run: |
+          set -euo pipefail
+          cat "$RUNNER_TEMP/build.log" "$RUNNER_TEMP/test.log" \
+            > "$RUNNER_TEMP/compile.log"
+          warnings=$(grep -E '^[^[:space:]]+:[0-9]+:[0-9]+: warning:' \
+            "$RUNNER_TEMP/compile.log" | sort -u || true)
+          vendor_warnings=$(printf '%s' "$warnings" | grep -E '/Vendor/|/checkouts/' || true)
+          if [ -n "$vendor_warnings" ]; then
+            echo "Upstream dependency compiler warnings:"
+            printf '%s\n' "$vendor_warnings"
+          fi
+          warnings=$(printf '%s' "$warnings" | grep -vE '/Vendor/|/checkouts/' || true)
+          locations=$(printf '%s' "$warnings" \
+            | grep -oE '^[^[:space:]]+:[0-9]+:[0-9]+:' \
+            | sort -u || true)
+          if [ -n "$locations" ]; then
+            count=$(printf '%s\n' "$locations" | wc -l | tr -d ' ')
+          else
+            count=0
+          fi
+          echo "Unique warning locations: $count (budget: $MAX_WARNINGS)"
+          if [ -n "$warnings" ]; then
+            echo "----- warnings -----"
+            printf '%s\n' "$warnings"
+            echo "--------------------"
+          fi
+          if [ "$count" -gt "$MAX_WARNINGS" ]; then
+            echo "::error::$count compiler warning locations exceed the budget of $MAX_WARNINGS. Fix the new warning, or raise MAX_WARNINGS in .github/workflows/ci.yml and say in the commit message which warning it now pays for."
+            exit 1
+          fi
+          if [ "$count" -lt "$MAX_WARNINGS" ]; then
+            echo "::notice::Only $count warning locations left, below the budget of $MAX_WARNINGS. Lower MAX_WARNINGS in .github/workflows/ci.yml to keep the gate tight."
+          fi

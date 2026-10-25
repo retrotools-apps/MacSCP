@@ -1,0 +1,310 @@
+#!/bin/bash
+# Generates Markdown and user-facing PDF notices from Vendor/Package.resolved
+# and licence files inside Vendor/ and official Apple checkouts under .build/.
+#
+# Usage:
+#   scripts/third-party-notices          # regenerate both notice documents
+#   scripts/third-party-notices --check  # compare both with their generated
+#                                       # contents; exit 1 on any difference
+#
+# Requires Vendor sources and resolved Apple checkouts; never downloads packages.
+set -euo pipefail
+cd "$(dirname "$0")/.."
+
+USAGE="usage: scripts/third-party-notices [--check]"
+
+MODE="generate"
+case "${1:-}" in
+    "") ;;
+    --check) MODE="check" ;;
+    *)
+        echo "third-party-notices: unknown argument '$1'" >&2
+        echo "$USAGE" >&2
+        exit 2
+        ;;
+esac
+
+OUT_FILE="THIRD_PARTY_NOTICES.md"
+PDF_FILE="output/pdf/THIRD_PARTY_NOTICES.pdf"
+PAYLOAD_FILE="$(mktemp -t macscp-notices-payload)"
+trap 'rm -f "$PAYLOAD_FILE"' EXIT
+mkdir -p .build/notices-module-cache
+
+generate() {
+    python3 - "$1" "$PAYLOAD_FILE" <<'PYEOF'
+import json
+import os
+import sys
+
+repo_root = os.getcwd()
+dest = sys.argv[1]
+payload_dest = sys.argv[2]
+
+resolved_path = os.path.join(repo_root, "Vendor", "Package.resolved")
+with open(resolved_path, "r", encoding="utf-8") as f:
+    resolved = json.load(f)
+
+pins = resolved.get("pins", [])
+with open(os.path.join(repo_root, "Vendor", "native-dependencies.json"), encoding="utf-8") as f:
+    native_pins = json.load(f)["pins"]
+native_identities = {pin["identity"] for pin in native_pins}
+pins += native_pins
+if not pins:
+    sys.exit("error: Vendor/Package.resolved has no pins")
+
+checkouts_root = os.path.join(repo_root, "Vendor")
+try:
+    available = os.listdir(checkouts_root)
+except FileNotFoundError:
+    sys.exit(
+        f"error: {checkouts_root} does not exist — restore Vendor sources and run swift package resolve"
+    )
+available_by_lower = {name.lower(): name for name in available}
+
+LICENCE_PREFIXES = ("LICENSE", "LICENCE", "COPYING", "NOTICE")
+PRUNE_DIRS = {".build", "Tests", "test", ".git"}
+
+def repo_name_from_location(location):
+    name = location.rstrip("/")
+    name = name.rsplit("/", 1)[-1]
+    if name.endswith(".git"):
+        name = name[: -len(".git")]
+    return name
+
+
+def find_checkout_dir(identity, location):
+    candidates = [identity, repo_name_from_location(location)]
+    for candidate in candidates:
+        match = available_by_lower.get(candidate.lower())
+        if match:
+            return match
+    return None
+
+
+def display_version(state):
+    version = state.get("version")
+    if version:
+        return version
+    revision = state.get("revision")
+    branch = state.get("branch")
+    if branch and revision:
+        return f"{branch} @ {revision[:7]}"
+    if revision:
+        return f"{revision[:7]} (revision, untagged)"
+    return "unknown"
+
+
+def find_licence_files(checkout_dir):
+    """Every LICENSE/LICENCE/COPYING/NOTICE file under checkout_dir, at any
+    depth, skipping .build/Tests/test(/.git) directories. Returns a sorted
+    list of (relative_path, content) pairs."""
+    found = []
+    for dirpath, dirnames, filenames in os.walk(checkout_dir):
+        dirnames[:] = [d for d in dirnames if d not in PRUNE_DIRS]
+        for filename in filenames:
+            if filename.startswith(LICENCE_PREFIXES):
+                full_path = os.path.join(dirpath, filename)
+                rel_path = os.path.relpath(full_path, checkout_dir)
+                with open(full_path, "r", encoding="utf-8", errors="replace") as f:
+                    content = f.read()
+                found.append((rel_path, content))
+    found.sort(key=lambda pair: pair[0])
+    return found
+
+
+def guess_licence_name(licence_files):
+    """First non-empty line of the most LICENSE-like file found, preferring
+    an exact 'LICENSE' file, then common suffixed variants, then whatever
+    sorts first."""
+    if not licence_files:
+        return "unknown (no LICENSE/LICENCE/COPYING/NOTICE file found)"
+
+    def priority(item):
+        rel_path, _ = item
+        basename = os.path.basename(rel_path)
+        order = [
+            "LICENSE",
+            "LICENSE.txt",
+            "LICENSE.md",
+        ]
+        if basename in order:
+            return (0, order.index(basename))
+        if basename.startswith("LICENSE"):
+            return (1, basename)
+        if basename.startswith("LICENCE"):
+            return (2, basename)
+        if basename.startswith("COPYING"):
+            return (3, basename)
+        return (4, basename)
+
+    best = sorted(licence_files, key=priority)[0]
+    for line in best[1].splitlines():
+        stripped = line.strip()
+        if stripped:
+            return stripped
+    return "unknown (LICENSE file is empty)"
+
+
+def fence_for(content):
+    longest_run = 0
+    run = 0
+    for ch in content:
+        if ch == "`":
+            run += 1
+            longest_run = max(longest_run, run)
+        else:
+            run = 0
+    return "`" * max(3, longest_run + 1)
+
+
+entries = []
+missing = []
+for pin in pins:
+    identity = pin["identity"]
+    location = pin.get("location", "")
+    state = pin.get("state", {})
+    # Native build inputs are vendored even when their upstream is Apple.
+    # Never substitute a different version from a developer's Swift cache.
+    if identity in native_identities:
+        checkouts_root = os.path.join(repo_root, "Vendor")
+    elif location.startswith("https://github.com/apple/"):
+        checkouts_root = os.path.join(repo_root, ".build", "checkouts")
+    else:
+        checkouts_root = os.path.join(repo_root, "Vendor")
+    available_by_lower = {name.lower(): name for name in os.listdir(checkouts_root)} if os.path.isdir(checkouts_root) else {}
+    checkout_name = find_checkout_dir(identity, location)
+    if checkout_name is None:
+        missing.append(identity)
+        continue
+    checkout_dir = os.path.join(checkouts_root, checkout_name)
+    licence_files = find_licence_files(checkout_dir)
+    entries.append(
+        {
+            "identity": identity,
+            "location": location,
+            "version": display_version(state),
+            "revision": state.get("revision"),
+            "licence_files": licence_files,
+            "licence_name": guess_licence_name(licence_files),
+        }
+    )
+
+if missing:
+    sys.exit(
+        "error: no dependency source found in Vendor or .build/checkouts for: "
+        + ", ".join(sorted(missing))
+        + " — restore Vendor sources and run swift package resolve"
+    )
+
+with open(os.path.join(repo_root, "licenses", "macSCP-upstream-MIT.txt"), encoding="utf-8") as inherited:
+    licence_files = [("licenses/macSCP-upstream-MIT.txt", inherited.read())]
+entries.append({
+    "identity": "macscp",
+    "location": "https://github.com/NoiXdev/macSCP",
+    "version": "17e1858 (revision, untagged)",
+    "revision": "17e185845c65c4bd60d5d410dffaa1b8c05d880a",
+    "licence_files": licence_files,
+    "licence_name": guess_licence_name(licence_files),
+})
+with open(os.path.join(repo_root, "Sources", "MacSCPAppKit", "Resources", "ApplicationLogos.json"), encoding="utf-8") as source:
+    icon_sources = json.load(source)
+icon_licences = []
+for name in ["simple-icons-CC0.txt"] + sorted(name for name in os.listdir(os.path.join(repo_root, "licenses"))
+                                              if name.startswith("application-icons-") and name.endswith(".txt")):
+    with open(os.path.join(repo_root, "licenses", name), encoding="utf-8") as licence:
+        icon_licences.append(("licenses/" + name, licence.read()))
+attribution = "Application identification logos from Simple Icons. Geometry is preserved; compact SVG arc parameters are separated for CoreSVG compatibility. Display colors may be customized. Trademarks belong to their respective owners; no affiliation is implied."
+icon_licences.insert(0, ("Application logo attribution", attribution))
+entries.append({
+    "identity": "simple-icons",
+    "location": icon_sources["repository"],
+    "version": icon_sources["revision"][:7] + " (revision)",
+    "revision": icon_sources["revision"],
+    "licence_files": icon_licences,
+    "licence_name": "CC0-1.0; source-logo terms included below",
+})
+entries.append({
+    "identity": "tabler-icons",
+    "location": icon_sources["additionalProviders"]["tabler-icons"]["repository"],
+    "version": icon_sources["additionalProviders"]["tabler-icons"]["version"],
+    "revision": icon_sources["additionalProviders"]["tabler-icons"]["version"],
+    "licence_files": [("licenses/tabler-icons-MIT.txt", open(
+        os.path.join(repo_root, "licenses", "tabler-icons-MIT.txt"), encoding="utf-8").read())],
+    "licence_name": "MIT",
+})
+entries.sort(key=lambda e: e["identity"])
+
+lines = []
+lines.append("# Third-Party Notices")
+lines.append("")
+lines.append("## Dependencies")
+lines.append("")
+lines.append("| Identity | Version | Licence | Source |")
+lines.append("|---|---|---|---|")
+for e in entries:
+    source = e["location"]
+    if source.endswith(".git"):
+        source = source[: -len(".git")]
+    licence_cell = e["licence_name"].replace("|", "\\|")
+    lines.append(
+        f"| {e['identity']} | {e['version']} | {licence_cell} | {source} |"
+    )
+lines.append("")
+
+for e in entries:
+    lines.append(f"## {e['identity']}")
+    lines.append("")
+    source = e["location"]
+    if source.endswith(".git"):
+        source = source[: -len(".git")]
+    lines.append(f"Source: <{source}>")
+    lines.append("")
+    if e.get("revision"):
+        lines.append(f"Source revision: `{e['revision']}`.")
+        lines.append("")
+    if not e["licence_files"]:
+        lines.append(
+            "No LICENSE/LICENCE/COPYING/NOTICE file was found in this "
+            "checkout."
+        )
+        lines.append("")
+    for rel_path, content in e["licence_files"]:
+        lines.append(f"### {rel_path}")
+        lines.append("")
+        fence = fence_for(content)
+        lines.append(fence)
+        lines.append(content.rstrip("\n"))
+        lines.append(fence)
+        lines.append("")
+
+output = "\n".join(lines).rstrip("\n") + "\n"
+with open(dest, "w", encoding="utf-8") as f:
+    f.write(output)
+
+with open(payload_dest, "w", encoding="utf-8") as f:
+    json.dump(entries, f, ensure_ascii=False, sort_keys=True)
+PYEOF
+    swift -module-cache-path .build/notices-module-cache scripts/render-notices-pdf.swift "$PAYLOAD_FILE" "$2"
+}
+
+if [ "$MODE" = "check" ]; then
+    TMP_FILE="$(mktemp -t third-party-notices)"
+    TMP_PDF="$(mktemp -t third-party-notices-pdf)"
+    trap 'rm -f "$TMP_FILE" "$TMP_PDF" "$PAYLOAD_FILE"' EXIT
+    generate "$TMP_FILE" "$TMP_PDF"
+    STATUS=0
+    diff -u "$OUT_FILE" "$TMP_FILE" || STATUS=1
+    # PDF timestamps and internal object IDs are not stable. Compare the
+    # source/renderer fingerprint, every page's text and its dimensions.
+    swift -module-cache-path .build/notices-module-cache scripts/render-notices-pdf.swift --compare "$PDF_FILE" "$TMP_PDF" || STATUS=1
+    if [ "$STATUS" = 0 ]; then
+        echo "$OUT_FILE and $PDF_FILE are up to date"
+        exit 0
+    else
+        echo "error: third-party notices are stale — run scripts/third-party-notices to regenerate" >&2
+        exit 1
+    fi
+else
+    generate "$OUT_FILE" "$PDF_FILE"
+    echo "wrote $OUT_FILE and $PDF_FILE"
+fi
