@@ -21,6 +21,8 @@
 
 # Public documentation and static website.
 /docs/*
+!/docs/index.html
+!/docs/.nojekyll
 !/docs/web/
 !/docs/DEPENDENCY_FORKS.md
 !/docs/WINSCP_FORMAT.md

@@ -33,6 +33,18 @@ class Document(HTMLParser):
 
 
 class WebsiteTests(unittest.TestCase):
+    def test_pages_entry_resolves_to_the_site_from_the_docs_root(self):
+        entry = ROOT / "docs/index.html"
+        document = Document(entry.read_text())
+        self.assertTrue(document.links)
+        for link in document.links:
+            target = (entry.parent / link).resolve()
+            if target.is_dir():
+                target /= "index.html"
+            self.assertEqual(target, SITE / "index.html")
+            self.assertTrue(target.is_file())
+        self.assertTrue((entry.parent / ".nojekyll").is_file())
+
     def test_generated_public_documents_are_current(self):
         result = subprocess.run(["python3", str(ROOT / "scripts/prepare-website"), "--check"],
                                 capture_output=True, text=True, timeout=10)

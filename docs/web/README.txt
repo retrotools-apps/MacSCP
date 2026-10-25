@@ -14,7 +14,8 @@ Preview on loopback:
 Export for deployment:
   python3 scripts/prepare-website --output /new/empty/directory
 
-GitHub Pages uses .github/workflows/pages.yml to export and deploy this site.
-In Settings > Pages, select GitHub Actions as the publishing source.
-The export excludes this readme, system metadata and unreviewed assets.
+GitHub Pages publishes main > /docs using Deploy from a branch.
+docs/index.html forwards the project URL to this site's web/ directory.
+docs/.nojekyll preserves static files without Jekyll processing.
+The optional export excludes this readme, system metadata and unreviewed assets.
 The local commands above do not publish anything.

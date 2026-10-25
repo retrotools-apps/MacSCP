@@ -47,6 +47,7 @@ class PublicTreeTests(unittest.TestCase):
                    "scripts/local/screenshots/capture.swift", "output/screenshots/release/demo.png",
                    "docs/images/private.png", "docs/web/.env", "docs/web/assets/.DS_Store"]
         public = ["docs/images/workspace-light.png", "docs/USER_GUIDE.md", "Sources/App.swift",
+                  "docs/index.html", "docs/.nojekyll",
                   "docs/web/index.html", "docs/web/assets/screenshots/workspace-light.png",
                   "scripts/prepare-website", "scripts/website_documents.py",
                   "scripts/tests/test_website.py", "scripts/tests/test_website_documents.py"]
