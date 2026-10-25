@@ -50,6 +50,15 @@ secret. The workflow passes it to the signing tool through standard input,
 not command-line arguments. This integration does not export the local key
 or configure a GitHub secret automatically.
 
+Before compiling, the release workflow checks the export format and its public
+key match. After building Sparkle, it signs a small probe and verifies that
+signature with CryptoKit. Store exclusion runs in parallel with the GitHub
+build; publication waits for both. Compilation outputs are cached by toolchain
+and source inputs, but private keys, signing diagnostics and final signed feeds
+are never cached. The DMG is retained as a short-lived workflow artifact before
+feed generation, so a signing failure does not discard the expensive build.
+No already published release or update-signing public key is replaced.
+
 The GitHub distribution is free: `bash scripts/release` creates a DMG with an
 ad-hoc signed application and no Apple notarization. This path does not require
 Developer ID credentials. The explicit `--ad-hoc` signing mode grants no

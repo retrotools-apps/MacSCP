@@ -18,11 +18,21 @@ WORK="$(mktemp -d .build/appcast.XXXXXX)"
 cp "$DMG" "$WORK/"
 ARGS=(--download-url-prefix "https://github.com/retrotools-apps/MacSCP/releases/download/v${VERSION}/"
     --maximum-deltas 0 --maximum-versions 1)
+KEY_INPUT="${MACSCP_SPARKLE_PRIVATE_KEY:-}"
+if [[ -n "$KEY_INPUT" ]]; then
+    swift scripts/verify-sparkle-key.swift
+    # Match the verifier's surrounding-whitespace normalization.
+    KEY_INPUT="${KEY_INPUT#"${KEY_INPUT%%[![:space:]]*}"}"
+    KEY_INPUT="${KEY_INPUT%"${KEY_INPUT##*[![:space:]]}"}"
+fi
 if [[ -n "${MACSCP_SPARKLE_PRIVATE_KEY:-}" ]]; then
     # Upstream error messages can echo a malformed key. Never forward its
     # diagnostics to CI logs, even when GitHub's secret masking is enabled.
-    if ! printf '%s\n' "$MACSCP_SPARKLE_PRIVATE_KEY" | "$TOOL" --ed-key-file - "${ARGS[@]}" "$WORK" >/dev/null 2>&1; then
-        echo "error: appcast generation failed; check the Sparkle key and release archive" >&2; exit 1
+    if printf '%s\n' "$KEY_INPUT" | "$TOOL" --ed-key-file - "${ARGS[@]}" "$WORK" >/dev/null 2>&1; then
+        :
+    else
+        status=$?
+        echo "error: Sparkle appcast tool failed (exit $status); key format and public-key match were validated" >&2; exit "$status"
     fi
 else
     if ! "$TOOL" --account retroTools.MacSCP.updates "${ARGS[@]}" "$WORK" >/dev/null 2>&1; then

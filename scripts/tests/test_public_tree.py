@@ -42,13 +42,14 @@ class PublicTreeTests(unittest.TestCase):
         self.assertNotEqual(code, 0)
         self.assertEqual(report["issues"][0]["path"], "AGENTS.md")
 
-    def test_website_stays_local_but_documentation_images_are_publishable(self):
+    def test_website_is_public_but_screenshot_production_stays_local(self):
         private = ["website/index.html", "website/assets/screenshots/workspace-light.png",
-                   "scripts/prepare-website", "scripts/website_documents.py",
-                   "scripts/tests/test_website.py", "scripts/tests/test_website_documents.py",
                    "scripts/local/screenshots/capture.swift", "output/screenshots/release/demo.png",
-                   "docs/images/private.png"]
-        public = ["docs/images/workspace-light.png", "docs/USER_GUIDE.md", "Sources/App.swift"]
+                   "docs/images/private.png", "docs/web/.env", "docs/web/assets/.DS_Store"]
+        public = ["docs/images/workspace-light.png", "docs/USER_GUIDE.md", "Sources/App.swift",
+                  "docs/web/index.html", "docs/web/assets/screenshots/workspace-light.png",
+                  "scripts/prepare-website", "scripts/website_documents.py",
+                  "scripts/tests/test_website.py", "scripts/tests/test_website_documents.py"]
         for name in private + public:
             path = self.root / name
             path.parent.mkdir(parents=True, exist_ok=True)

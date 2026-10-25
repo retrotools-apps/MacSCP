@@ -19,8 +19,9 @@
 !/.github/
 !/output/
 
-# Only build/review documentation belongs in the public source tree.
+# Public documentation and static website.
 /docs/*
+!/docs/web/
 !/docs/DEPENDENCY_FORKS.md
 !/docs/WINSCP_FORMAT.md
 !/docs/SPARKLE.md
@@ -54,6 +55,9 @@
 !/scripts/check-public-tree
 !/scripts/check-release-environment
 !/scripts/verify-appcast.swift
+!/scripts/verify-sparkle-key.swift
+!/scripts/prepare-website
+!/scripts/website_documents.py
 !/scripts/tests/
 
 .build/
@@ -98,7 +102,7 @@ __pycache__/
 /*.pfx
 /*.keychain
 /*.keychain-db
-# Maintainer-only instructions, presentation site and design work.
+# Maintainer-only instructions and design work.
 /AGENTS.md
 /CLAUDE.md
 /docs/design/
@@ -119,11 +123,7 @@ __pycache__/
 # Keep sources, regression tests, manifests/locks, build and signing tools,
 # dependency provenance and mandatory notices available for independent review.
 
-# Website sources and publishing tools are separate from the application repo.
-/website/
-/scripts/prepare-website
-/scripts/website_documents.py
-/scripts/tests/test_website*.py
+# Screenshot production and local maintainer tooling remain private.
 /scripts/local/
 /output/screenshots/
 

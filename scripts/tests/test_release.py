@@ -79,6 +79,7 @@ class GitHubReleaseTests(unittest.TestCase):
         tool = self.root / ".build/sparkle/Build/Products/Release/generate_appcast"
         tool.parent.mkdir(parents=True)
         self.tool(tool, 'printf "%s" "$MACSCP_SPARKLE_PRIVATE_KEY"\nprintf "%s" "$MACSCP_SPARKLE_PRIVATE_KEY" >&2\nexit 1')
+        self.tool(self.root / "tools/swift", "exit 0")
         value = "Disposable malformed fixture"
         self.env["MACSCP_SPARKLE_PRIVATE_KEY"] = value
         result = subprocess.run(["/bin/bash", "scripts/generate-appcast"], cwd=self.root,

@@ -1,0 +1,75 @@
+#!/usr/bin/env python3
+"""Prepare the static website's public documents without publishing anything."""
+import argparse
+from pathlib import Path
+import re
+import shutil
+from website_documents import generated_pages
+
+ROOT = Path(__file__).resolve().parents[1]
+SITE = ROOT / "docs/web"
+
+
+def main():
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--check", action="store_true", help="Fail if generated website documents are stale")
+    parser.add_argument("--output", type=Path, help="Export only reviewed public files to a new empty directory")
+    args = parser.parse_args()
+    if args.check and args.output:
+        parser.error("--check and --output cannot be combined")
+    documents = {"LICENCE.md": "LICENSE", "CHANGELOG.md": "CHANGELOG.md",
+                 "THIRD_PARTY_NOTICES.md": "THIRD_PARTY_NOTICES.md", "assets/macscp.svg": "Resources/Brand/AppIcon.svg", "assets/favicon.svg": "Resources/Brand/AppIcon.svg"}
+    stale = []
+    pages = generated_pages(ROOT)
+    for destination, content in pages.items():
+        path = SITE / destination
+        if not path.exists() or path.read_text() != content:
+            if args.check:
+                stale.append(destination)
+            else:
+                path.write_text(content)
+    for destination, source in documents.items():
+        content = (ROOT / source).read_bytes()
+        path = SITE / destination
+        if not path.exists() or path.read_bytes() != content:
+            if args.check:
+                stale.append(destination)
+            else:
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_bytes(content)
+    index = SITE / "index.html"
+    version = (ROOT / "VERSION").read_text().strip()
+    original = index.read_text()
+    updated, count = re.subn(r'(?P<prefix>\bdata-version>)[^<]+', lambda match: match["prefix"] + version, original)
+    if count == 0:
+        raise SystemExit("Missing website version anchors")
+    if updated != original:
+        if args.check:
+            stale.append("index.html version")
+        else:
+            index.write_text(updated)
+    if stale:
+        raise SystemExit("Stale website files: " + ", ".join(stale))
+    if args.output:
+        output = args.output.resolve()
+        site = SITE
+        if output == ROOT or output.is_relative_to(site) or output.exists() and any(output.iterdir()):
+            raise SystemExit("Website export requires a new empty directory outside the source website")
+        files = ["index.html", "guide.html", "style.css", "macscp.css", "script.js", *pages, *documents,
+                 "assets/screenshots/connections-light.png", "assets/screenshots/connections-dark.png",
+                 "assets/screenshots/workspace-light.png", "assets/screenshots/workspace-dark.png",
+                 "assets/screenshots/new-connection-light.png", "assets/screenshots/new-connection-dark.png",
+                 "assets/screenshots/tunnels-light.png", "assets/screenshots/tunnels-dark.png"]
+        for name in files:
+            source = site / name
+            if not source.resolve().is_relative_to(site) or not source.is_file():
+                raise SystemExit("Missing or external website input: " + name)
+            target = output / name
+            target.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copyfile(source, target)
+        print(f"Exported {len(files)} reviewed public website files")
+    print("Website documents are up to date" if args.check else "Prepared website documents (no publication)")
+
+
+if __name__ == "__main__":
+    main()

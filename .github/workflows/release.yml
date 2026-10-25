@@ -2,12 +2,11 @@ name: RetroTools MacSCP GitHub Release
 
 on:
   push:
-    tags:
-      - 'v*.*.*'
+    tags: ['v*.*.*']
   workflow_dispatch:
     inputs:
       tag:
-        description: 'Release tag (e.g. v1.0.0) — must match VERSION and already exist'
+        description: 'Existing release tag matching VERSION'
         required: true
 
 permissions:
@@ -18,108 +17,166 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  changelog:
-    name: Validate curated release notes
-    runs-on: ubuntu-latest
+  preflight:
+    name: Validate publication and signing key before building
+    runs-on: macos-15
     steps:
       - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
         with:
           ref: ${{ github.event.inputs.tag || github.ref_name }}
-
-      - name: Verify release credentials are configured
-        env:
-          MACSCP_SPARKLE_PRIVATE_KEY: ${{ secrets.MACSCP_SPARKLE_PRIVATE_KEY }}
-        shell: bash
-        run: bash scripts/check-release-environment
-
       - name: Verify publication inputs
-        run: |
-          python3 scripts/check-public-tree
-          python3 -m unittest discover -s scripts/tests -p 'test_public_tree.py'
-
-      - name: Extract version-matched release notes
-        env:
-          TAG: ${{ github.event.inputs.tag || github.ref_name }}
-        run: python3 scripts/release-notes "$TAG" > RELEASE_NOTES.md
-
-  build:
-    name: Build and attest free GitHub distribution
-    needs: changelog
-    runs-on: macos-latest
-    timeout-minutes: 60
-    permissions:
-      contents: write
-      id-token: write
-      attestations: write
-    env:
-      MACSCP_DISTRIBUTION: direct
-      MACSCP_BUILD: ${{ github.run_number }}
-    steps:
-      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
-        with:
-          # workflow_dispatch runs from a branch ref; build the TAGGED source
-          # either way so a re-dispatch can never ship a moved HEAD.
-          ref: ${{ github.event.inputs.tag || github.ref }}
-
-      - name: Verify public publication target and version
         env:
           TAG: ${{ github.event.inputs.tag || github.ref_name }}
           REPOSITORY_PRIVATE: ${{ github.event.repository.private }}
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
-          if [ "$REPOSITORY_PRIVATE" != false ]; then
-            echo '::error::This free attested-release workflow requires a public repository.'
-            exit 1
-          fi
+          test "$REPOSITORY_PRIVATE" = false
+          python3 scripts/check-public-tree
           python3 scripts/release-notes "$TAG" > "$RUNNER_TEMP/release-notes.md"
-          echo "MACSCP_VERSION=${TAG#v}" >> "$GITHUB_ENV"
-          # Never replace the assets of an already published version.
+          python3 -m unittest discover -s scripts/tests
           gh api --paginate "repos/$GITHUB_REPOSITORY/releases" \
             --jq '.[] | select(.draft == false) | .tag_name' > "$RUNNER_TEMP/published-tags"
           if grep -Fxq "$TAG" "$RUNNER_TEMP/published-tags"; then
             echo '::error::This version is already published. Create a new version instead.'
             exit 1
           fi
+      - name: Verify Sparkle key matches the application
+        env:
+          MACSCP_SPARKLE_PRIVATE_KEY: ${{ secrets.MACSCP_SPARKLE_PRIVATE_KEY }}
+        run: |
+          bash scripts/check-release-environment
+          swift scripts/verify-sparkle-key.swift
 
+  store:
+    name: Verify Store updater exclusion
+    needs: preflight
+    runs-on: macos-15
+    timeout-minutes: 25
+    env:
+      MACSCP_DISTRIBUTION: app-store
+    steps:
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+        with:
+          ref: ${{ github.event.inputs.tag || github.ref_name }}
+      - name: Verify dependencies
+        run: scripts/check-vendor
+      - name: Test and inspect Store executable
+        run: |
+          set -euo pipefail
+          swift test --disable-automatic-resolution --filter 'AppUpdatePolicyTests|SparkleDistributionTests'
+          swift build --product MacSCP --disable-automatic-resolution
+          BIN="$(swift build --product MacSCP --show-bin-path)"
+          test -x "$BIN/MacSCP"
+          if otool -L "$BIN/MacSCP" | grep -Fq Sparkle; then
+            echo '::error::Store executable links Sparkle'
+            exit 1
+          fi
+
+  build:
+    name: Build and sign free GitHub distribution
+    needs: preflight
+    runs-on: macos-latest
+    timeout-minutes: 60
+    env:
+      MACSCP_DISTRIBUTION: direct
+      MACSCP_BUILD: ${{ github.run_number }}
+    steps:
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+        with:
+          ref: ${{ github.event.inputs.tag || github.ref_name }}
+      - name: Toolchain cache identity
+        id: toolchain
+        run: echo "id=$(xcodebuild -version | shasum -a 256 | cut -d ' ' -f 1)" >> "$GITHUB_OUTPUT"
+      - name: Restore compilation outputs
+        id: cache
+        uses: actions/cache/restore@caa296126883cff596d87d8935842f9db880ef25 # v5
+        with:
+          path: |
+            .build/sparkle
+            .build/package
+          key: release-v1-${{ runner.os }}-${{ runner.arch }}-${{ steps.toolchain.outputs.id }}-${{ hashFiles('Vendor/checksums.json', 'Package.resolved', 'Package.swift', 'Sources/**', 'Resources/**', 'scripts/package-app', 'scripts/build-sparkle') }}
+          restore-keys: |
+            release-v1-${{ runner.os }}-${{ runner.arch }}-${{ steps.toolchain.outputs.id }}-
       - name: Verify local dependency sources
         run: |
           scripts/check-vendor
           swift package resolve
           swift package --disable-automatic-resolution show-dependencies --format json > "$RUNNER_TEMP/dependency-graph.json"
           scripts/check-vendor --graph "$RUNNER_TEMP/dependency-graph.json"
-
-      - name: Verify Store updater exclusion
-        env:
-          MACSCP_DISTRIBUTION: app-store
-        run: |
-          swift test --disable-automatic-resolution --filter 'AppUpdatePolicyTests|SparkleDistributionTests'
-          swift build --product MacSCP --disable-automatic-resolution
-          BIN="$(swift build --product MacSCP --show-bin-path)"
-          test -x "$BIN/MacSCP"
-          LINKS="$(otool -L "$BIN/MacSCP")"
-          if grep -Fq Sparkle <<< "$LINKS"; then
-            echo 'error: Store executable links Sparkle' >&2
-            exit 1
-          fi
-
       - name: Build Sparkle from verified sources
         run: bash scripts/build-sparkle --tools
-
+      - name: Exercise signing before the application build
+        env:
+          MACSCP_SPARKLE_PRIVATE_KEY: ${{ secrets.MACSCP_SPARKLE_PRIVATE_KEY }}
+        run: |
+          swift scripts/verify-sparkle-key.swift
+          printf 'MacSCP signing probe\n' > "$RUNNER_TEMP/signing-probe"
+          KEY_INPUT="$MACSCP_SPARKLE_PRIVATE_KEY"
+          KEY_INPUT="${KEY_INPUT#"${KEY_INPUT%%[![:space:]]*}"}"
+          KEY_INPUT="${KEY_INPUT%"${KEY_INPUT##*[![:space:]]}"}"
+          # Never print upstream diagnostics: malformed-key errors may echo input.
+          printf '%s\n' "$KEY_INPUT" | .build/sparkle/Build/Products/Release/sign_update \
+            --ed-key-file - -p "$RUNNER_TEMP/signing-probe" > "$RUNNER_TEMP/signing-probe.signature" 2>/dev/null
+          swift scripts/verify-sparkle-key.swift Resources/Sparkle-public-key.txt \
+            "$RUNNER_TEMP/signing-probe" "$RUNNER_TEMP/signing-probe.signature"
       - name: Run tests
-        # A tag can point at any commit — never sign and ship untested code.
         env:
           MACSCP_ENABLE_SPARKLE: '1'
         run: swift test --disable-automatic-resolution --disable-dependency-cache
-
       - name: Build ad-hoc signed GitHub DMG
         run: bash scripts/release
-
+      - name: Save compilation outputs before publication
+        if: steps.cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@caa296126883cff596d87d8935842f9db880ef25 # v5
+        with:
+          path: |
+            .build/sparkle
+            .build/package
+          key: ${{ steps.cache.outputs.cache-primary-key }}
+      - name: Preserve the DMG for recovery without rebuilding
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
+        with:
+          name: release-dmg
+          path: dist/MacSCP-*.dmg
+          if-no-files-found: error
+          retention-days: 7
       - name: Sign Sparkle appcast
         env:
           MACSCP_SPARKLE_PRIVATE_KEY: ${{ secrets.MACSCP_SPARKLE_PRIVATE_KEY }}
         run: bash scripts/generate-appcast
+      - name: Upload verified distribution
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
+        with:
+          name: signed-distribution
+          path: |
+            dist/MacSCP-*.dmg
+            dist/appcast.xml
+          if-no-files-found: error
+          retention-days: 7
 
+  publish:
+    name: Attest and publish after all checks pass
+    needs: [build, store]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      id-token: write
+      attestations: write
+    steps:
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+        with:
+          ref: ${{ github.event.inputs.tag || github.ref_name }}
+      - uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7
+        with:
+          name: signed-distribution
+          path: dist
+      - name: Release metadata
+        env:
+          TAG: ${{ github.event.inputs.tag || github.ref_name }}
+        run: |
+          python3 scripts/release-notes "$TAG" > "$RUNNER_TEMP/release-notes.md"
+          echo "MACSCP_VERSION=${TAG#v}" >> "$GITHUB_ENV"
       - name: Generate GitHub provenance attestations
         uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4
         with:
@@ -127,7 +184,6 @@ jobs:
           subject-path: |
             dist/MacSCP-${{ env.MACSCP_VERSION }}.dmg
             dist/appcast.xml
-
       - name: Upload verified assets to a draft release
         uses: softprops/action-gh-release@b4309332981a82ec1c5618f44dd2e27cc8bfbfda # v3
         with:
@@ -139,7 +195,6 @@ jobs:
             dist/appcast.xml
           draft: true
           prerelease: ${{ contains(github.event.inputs.tag || github.ref_name, '-') }}
-
       - name: Publish the complete release
         env:
           GH_TOKEN: ${{ github.token }}

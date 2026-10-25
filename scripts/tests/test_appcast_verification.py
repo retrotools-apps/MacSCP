@@ -15,7 +15,8 @@ class AppcastVerificationTests(unittest.TestCase):
         cls.addClassCleanup(cls.work.cleanup)
         cls.root = Path(cls.work.name)
         cls.verifier = cls.root / "verify"
-        subprocess.run(["swiftc", str(ROOT / "scripts/verify-appcast.swift"), "-o", str(cls.verifier)],
+        subprocess.run(["swiftc", "-module-cache-path", str(cls.root / "modules"),
+                        str(ROOT / "scripts/verify-appcast.swift"), "-o", str(cls.verifier)],
                        check=True, capture_output=True)
         cls.fixture = cls.root / "fixture.swift"
         cls.fixture.write_text('''import CryptoKit
@@ -41,7 +42,8 @@ for variant in ["valid", "wrong-build", "wrong-url", "missing-archive-signature"
     try xml.write(to: root.appendingPathComponent(variant + ".xml"))
 }
 ''')
-        subprocess.run(["swift", str(cls.fixture), str(cls.root)], check=True, capture_output=True)
+        subprocess.run(["swift", "-module-cache-path", str(cls.root / "modules"),
+                        str(cls.fixture), str(cls.root)], check=True, capture_output=True)
         cls.app = cls.root / "MacSCP.app"
         (cls.app / "Contents").mkdir(parents=True)
         with (cls.app / "Contents/Info.plist").open("wb") as stream:
