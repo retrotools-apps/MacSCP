@@ -8,6 +8,27 @@ ROOT = Path(__file__).resolve().parents[2]
 
 
 class SSHVendorOriginTests(unittest.TestCase):
+    def test_nested_locks_use_the_root_swift_nio_pin(self):
+        root_lock = json.loads((ROOT / "Package.resolved").read_text())
+        root_pin = next(pin for pin in root_lock["pins"]
+                        if pin["identity"] == "swift-nio")
+        lock_paths = [ROOT / "Package.resolved", ROOT / "Vendor/Package.resolved"]
+        lock_paths += sorted((ROOT / "Vendor").glob("*/Package.resolved"))
+        self.assertIn(ROOT / "Vendor/citadel/Package.resolved", lock_paths)
+
+        for path in lock_paths:
+            lock = json.loads(path.read_text())
+            pins = lock.get("pins", lock.get("object", {}).get("pins", []))
+            nio_pins = [pin for pin in pins
+                        if (pin.get("identity") or pin.get("package", "")).lower() == "swift-nio"]
+            self.assertTrue(nio_pins, f"{path.relative_to(ROOT)} has no swift-nio pin")
+            for pin in nio_pins:
+                self.assertEqual(
+                    pin["state"],
+                    root_pin["state"],
+                    f"{path.relative_to(ROOT)} has a stale swift-nio pin",
+                )
+
     def test_source_provenance_has_no_patch_dependencies(self):
         pins = {pin["identity"]: pin for pin in
                 json.loads((ROOT / "Vendor/Package.resolved").read_text())["pins"]}

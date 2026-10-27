@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.2.1] (2026-10-28)
+
+### Highlights
+
+* **icons:** Expanded the Tabler Outline catalogue and refined sidebar behavior.
+* **maintenance:** Hardened releases and aligned vendored SwiftNIO locks.
+
 ## [1.2.0] (2026-10-27)
 
 ### Highlights

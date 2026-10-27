@@ -597,7 +597,7 @@
   },
   "citadel/Package.resolved": {
     "executable": false,
-    "sha256": "4ee725a2ee698805372cc382b3a8d8b9e5e63e7a50200da171147db63359ab29"
+    "sha256": "c5668f009cef130d8a8d9003933b033f119f6083ec36b695f263c4eab06dffbc"
   },
   "citadel/Package.swift": {
     "executable": false,
