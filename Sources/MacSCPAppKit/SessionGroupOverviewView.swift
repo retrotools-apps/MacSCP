@@ -234,28 +234,49 @@ struct SessionCardView: View {
         .buttonStyle(SessionCardButtonStyle())
     }
 
-    var body: some View {
+    private var cardShape: RoundedRectangle {
+        RoundedRectangle(cornerRadius: 12, style: .continuous)
+    }
+
+    private var primaryInk: Color { groupInk ?? Color.primary }
+    private var secondaryInk: Color { groupInk?.opacity(0.85) ?? Color.secondary }
+    private var tertiaryInk: Color { groupInk?.opacity(0.75) ?? Color.secondary }
+
+    private var cardLayout: some View {
         VStack(alignment: .leading, spacing: 8) {
             cardHeader
             cardEndpoint
             cardFacts
             cardActions
         }
-        .foregroundStyle(groupInk ?? .primary, groupInk?.opacity(0.85) ?? .secondary,
-                         groupInk?.opacity(0.75) ?? .secondary)
+        .foregroundStyle(primaryInk, secondaryInk, tertiaryInk)
         .padding(14)
         .frame(width: SessionCardLayout.width, height: SessionCardLayout.height, alignment: .topLeading)
-        .background {
-            GroupContentTint(hue: card.groupHue, darkerNeutral: card.darkerNeutral, customColor: card.groupColor)
-                .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
-        }
-        .background(DesignTokens.sessionCardSurface, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
-        .overlay(RoundedRectangle(cornerRadius: 12, style: .continuous).strokeBorder(
-            hovered ? DesignTokens.remoteBlue.opacity(0.45) : Color.primary.opacity(0.09), lineWidth: 1))
-        .contentShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
-        .onTapGesture(count: 2) { connect(.doubleClick) }
-        .onHover { hovered = $0 }
-        .animation(reduceMotion ? nil : .easeOut(duration: 0.12), value: hovered)
+    }
+
+    private var cardTint: some View {
+        let tint = GroupContentTint(hue: card.groupHue, darkerNeutral: card.darkerNeutral, customColor: card.groupColor)
+        return tint.clipShape(cardShape)
+    }
+
+    private var cardSurface: some View {
+        cardLayout
+            .background(cardTint)
+            .background(DesignTokens.sessionCardSurface, in: cardShape)
+    }
+
+    private var cardBorder: some View {
+        let color: Color = hovered ? DesignTokens.remoteBlue.opacity(0.45) : Color.primary.opacity(0.09)
+        return cardShape.strokeBorder(color, lineWidth: 1)
+    }
+
+    var body: some View {
+        cardSurface
+            .overlay(cardBorder)
+            .contentShape(cardShape)
+            .onTapGesture(count: 2) { connect(.doubleClick) }
+            .onHover { hovered = $0 }
+            .animation(reduceMotion ? nil : .easeOut(duration: 0.12), value: hovered)
     }
 
     private func connect(_ input: SessionRowInput) {
