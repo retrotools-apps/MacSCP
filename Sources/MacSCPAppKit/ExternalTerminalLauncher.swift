@@ -126,8 +126,15 @@ enum ExternalTerminalLauncher {
             defer { pendingTerminalLaunch = nil }
             try await launch.value
         } else {
-            _ = try await NSWorkspace.shared.open([script], withApplicationAt: application,
-                configuration: launchConfiguration())
+            // Use the completion API: older SDKs do not mark OpenConfiguration
+            // as transferable across the async NSWorkspace boundary.
+            try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, any Error>) in
+                NSWorkspace.shared.open([script], withApplicationAt: application,
+                    configuration: launchConfiguration()) { _, error in
+                    if let error { continuation.resume(throwing: error) }
+                    else { continuation.resume() }
+                }
+            }
         }
     }
 
