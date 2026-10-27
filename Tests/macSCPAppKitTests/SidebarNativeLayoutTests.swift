@@ -21,7 +21,7 @@ import Testing
         let model = SessionListViewModel(store: store, secrets: NoSecretsStore(), auditStore: AuditLogStore(directory: directory), loginSetStore: LoginSetStore(directory: directory), keys: ManagedKeyStore(directory: directory))
         let rig = TunnelManagerTests.Rig()
         defer { rig.tearDown() }
-        for (index, session) in model.sessions.enumerated() {
+        for (index, session) in model.sessions.enumerated() where index.isMultiple(of: 2) {
             try rig.store.upsert(TunnelProfile(sessionID: session.id, name: "Preview tunnel",
                 kind: .local(bind: "127.0.0.1", localPort: 25000 + index, host: "example.invalid", remotePort: 80)))
         }
@@ -33,7 +33,8 @@ import Testing
             onShowAuditLog: { _ in }, onDiagnose: { _ in }, tunnels: rig.manager, onStartTunnel: .init { _ in },
             onStopTunnel: { _ in }, onStartAllTunnels: .init { _ in }, onStopAllTunnels: { _ in }, onManageTunnels: { _ in },
             onShowKnownHosts: {}, onShowLogins: {}, sidebarCompact: compact)
-        let host = NSHostingView(rootView: sidebar.environment(\.highContrast, true).environment(\.colorScheme, scheme))
+        let host = NSHostingView(rootView: sidebar.modifier(SidebarWorkspaceVisibility(isVisible: true))
+            .environment(\.highContrast, true).environment(\.colorScheme, scheme))
         let window = NSWindow(contentRect: NSRect(x: -3000, y: -3000, width: 330, height: 650), styleMask: [.borderless], backing: .buffered, defer: false)
         window.isReleasedWhenClosed = false
         window.contentView = host
@@ -73,6 +74,7 @@ import Testing
             kind: .local(bind: "127.0.0.1", localPort: 18680, host: "example.invalid", remotePort: 80), groupID: group.id))
         rig.manager.reload()
         let host = NSHostingView(rootView: TunnelWorkspaceSidebar(manager: rig.manager, sidebarCompact: compact, onSessions: {})
+            .modifier(SidebarWorkspaceVisibility(isVisible: true))
             .environment(\.highContrast, true).environment(\.colorScheme, .light))
         let window = NSWindow(contentRect: NSRect(x: -3000, y: -3000, width: 330, height: 280),
                               styleMask: [.borderless], backing: .buffered, defer: false)

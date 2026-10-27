@@ -1,8 +1,6 @@
 name: RetroTools MacSCP GitHub Release
 
 on:
-  push:
-    tags: ['v*.*.*']
   workflow_dispatch:
     inputs:
       tag:
@@ -17,16 +15,74 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  resolve:
+    name: Resolve the release tag to trusted immutable source
+    runs-on: ubuntu-latest
+    outputs:
+      tag: ${{ steps.release.outputs.tag }}
+      commit: ${{ steps.release.outputs.commit }}
+      tag_object: ${{ steps.release.outputs.tag_object }}
+    steps:
+      - name: Resolve and validate the exact release tag
+        id: release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REQUESTED_TAG: ${{ inputs.tag || github.ref_name }}
+          DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+          EVENT_NAME: ${{ github.event_name }}
+        run: |
+          set -euo pipefail
+          TAG="$REQUESTED_TAG"
+          if [[ ! "$TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+([+-][0-9A-Za-z][0-9A-Za-z.-]*)?$ ]]; then
+            echo '::error::Release input must be a bare semantic-version tag such as v1.2.3.'
+            exit 1
+          fi
+          if [[ "$EVENT_NAME" = workflow_dispatch && "$GITHUB_REF" != "refs/heads/$DEFAULT_BRANCH" ]]; then
+            echo '::error::Manual releases must be dispatched from the default branch.'
+            exit 1
+          fi
+
+          REF_JSON="$(gh api "repos/$GITHUB_REPOSITORY/git/ref/tags/$TAG")"
+          OBJECT_TYPE="$(jq -r '.object.type' <<< "$REF_JSON")"
+          OBJECT_SHA="$(jq -r '.object.sha' <<< "$REF_JSON")"
+          TAG_OBJECT="$OBJECT_SHA"
+          DEPTH=0
+          while [[ "$OBJECT_TYPE" = tag ]]; do
+            DEPTH=$((DEPTH + 1))
+            if (( DEPTH > 8 )); then
+              echo '::error::Release tag annotation nesting is unexpectedly deep.'
+              exit 1
+            fi
+            TAG_JSON="$(gh api "repos/$GITHUB_REPOSITORY/git/tags/$OBJECT_SHA")"
+            OBJECT_TYPE="$(jq -r '.object.type' <<< "$TAG_JSON")"
+            OBJECT_SHA="$(jq -r '.object.sha' <<< "$TAG_JSON")"
+          done
+          if [[ "$OBJECT_TYPE" != commit || ! "$OBJECT_SHA" =~ ^[0-9a-f]{40}$ ]]; then
+            echo '::error::Release tag does not resolve to a commit.'
+            exit 1
+          fi
+
+          STATUS="$(gh api "repos/$GITHUB_REPOSITORY/compare/$OBJECT_SHA...$DEFAULT_BRANCH" --jq '.status')"
+          if [[ "$STATUS" != ahead && "$STATUS" != identical ]]; then
+            echo '::error::Release tag commit is not part of the default-branch history.'
+            exit 1
+          fi
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+          echo "commit=$OBJECT_SHA" >> "$GITHUB_OUTPUT"
+          echo "tag_object=$TAG_OBJECT" >> "$GITHUB_OUTPUT"
+
   preflight:
     name: Validate publication and signing key before building
+    needs: resolve
     runs-on: macos-15
+    environment: release
     steps:
       - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
         with:
-          ref: ${{ github.event.inputs.tag || github.ref_name }}
+          ref: ${{ needs.resolve.outputs.commit }}
       - name: Verify publication inputs
         env:
-          TAG: ${{ github.event.inputs.tag || github.ref_name }}
+          TAG: ${{ needs.resolve.outputs.tag }}
           REPOSITORY_PRIVATE: ${{ github.event.repository.private }}
           GH_TOKEN: ${{ github.token }}
         run: |
@@ -50,7 +106,7 @@ jobs:
 
   store:
     name: Verify Store updater exclusion
-    needs: preflight
+    needs: [resolve, preflight]
     runs-on: macos-15
     timeout-minutes: 25
     env:
@@ -58,7 +114,7 @@ jobs:
     steps:
       - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
         with:
-          ref: ${{ github.event.inputs.tag || github.ref_name }}
+          ref: ${{ needs.resolve.outputs.commit }}
       - name: Verify dependencies
         run: scripts/check-vendor
       - name: Test and inspect Store executable
@@ -75,16 +131,17 @@ jobs:
 
   build:
     name: Build and sign free GitHub distribution
-    needs: preflight
+    needs: [resolve, preflight]
     runs-on: macos-latest
     timeout-minutes: 60
+    environment: release
     env:
       MACSCP_DISTRIBUTION: direct
       MACSCP_BUILD: ${{ github.run_number }}
     steps:
       - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
         with:
-          ref: ${{ github.event.inputs.tag || github.ref_name }}
+          ref: ${{ needs.resolve.outputs.commit }}
       - name: Toolchain cache identity
         id: toolchain
         run: echo "id=$(xcodebuild -version | shasum -a 256 | cut -d ' ' -f 1)" >> "$GITHUB_OUTPUT"
@@ -157,23 +214,36 @@ jobs:
 
   publish:
     name: Attest and publish after all checks pass
-    needs: [build, store]
+    needs: [resolve, build, store]
     runs-on: ubuntu-latest
+    environment: release
     permissions:
       contents: write
       id-token: write
       attestations: write
     steps:
+      - name: Verify the release tag has not moved
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ needs.resolve.outputs.tag }}
+          EXPECTED_TAG_OBJECT: ${{ needs.resolve.outputs.tag_object }}
+        run: |
+          set -euo pipefail
+          CURRENT_TAG_OBJECT="$(gh api "repos/$GITHUB_REPOSITORY/git/ref/tags/$TAG" --jq '.object.sha')"
+          if [[ "$CURRENT_TAG_OBJECT" != "$EXPECTED_TAG_OBJECT" ]]; then
+            echo '::error::Release tag changed after validation.'
+            exit 1
+          fi
       - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
         with:
-          ref: ${{ github.event.inputs.tag || github.ref_name }}
+          ref: ${{ needs.resolve.outputs.commit }}
       - uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7
         with:
           name: signed-distribution
           path: dist
       - name: Release metadata
         env:
-          TAG: ${{ github.event.inputs.tag || github.ref_name }}
+          TAG: ${{ needs.resolve.outputs.tag }}
         run: |
           python3 scripts/release-notes "$TAG" > "$RUNNER_TEMP/release-notes.md"
           echo "MACSCP_VERSION=${TAG#v}" >> "$GITHUB_ENV"
@@ -187,16 +257,16 @@ jobs:
       - name: Upload verified assets to a draft release
         uses: softprops/action-gh-release@b4309332981a82ec1c5618f44dd2e27cc8bfbfda # v3
         with:
-          tag_name: ${{ github.event.inputs.tag || github.ref_name }}
+          tag_name: ${{ needs.resolve.outputs.tag }}
           body_path: ${{ runner.temp }}/release-notes.md
           fail_on_unmatched_files: true
           files: |
             dist/MacSCP-${{ env.MACSCP_VERSION }}.dmg
             dist/appcast.xml
           draft: true
-          prerelease: ${{ contains(github.event.inputs.tag || github.ref_name, '-') }}
+          prerelease: ${{ contains(needs.resolve.outputs.tag, '-') }}
       - name: Publish the complete release
         env:
           GH_TOKEN: ${{ github.token }}
-          TAG: ${{ github.event.inputs.tag || github.ref_name }}
+          TAG: ${{ needs.resolve.outputs.tag }}
         run: gh release edit "$TAG" --repo "$GITHUB_REPOSITORY" --draft=false

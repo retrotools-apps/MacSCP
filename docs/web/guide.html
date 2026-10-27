@@ -1,16 +1,106 @@
 <!doctype html>
-<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#0d1117"><meta name="description" content="MacSCP 1.0 user guide: connections, remote-to-remote copies, files, SSH tunnels and diagnostics."><title>MacSCP — User guide · retroTools</title><link rel="icon" href="assets/favicon.svg" type="image/svg+xml"><link rel="stylesheet" href="style.css"><link rel="stylesheet" href="macscp.css"></head>
-<body><a class="skip" href="#main">Skip to content</a><header><div class="header-inner wrap"><a class="brand" href="index.html">retroTools / MacSCP</a><a class="text-link" href="index.html">← MacSCP overview</a></div></header>
-<main id="main" class="wrap guide-main"><p class="eyebrow">MACSCP 1.0 / USER GUIDE</p><h1>MacSCP user guide</h1><p>MacSCP requires macOS 15 or later and supports Apple Silicon and Intel Macs. The interface is available in seven languages.</p>
-<nav class="guide-nav" aria-label="Guide sections"><a href="#connections">Connections</a><a href="#files">Files</a><a href="#paired">Two remotes</a><a href="#tunnels">Tunnels</a><a href="#diagnostics">Diagnostics</a><a href="#limits">Limits</a><a href="#build">Build</a></nav>
-<section id="connections"><h2>Connections</h2><p>Choose <strong>New connection</strong>, select SSH/SFTP, S3 or WebDAV, and enter the endpoint and authentication details. Save it to reuse it from the sidebar or <strong>All connections</strong>. Each file tab owns its connection.</p><p>SSH supports passwords, private keys and your local SSH agent. Unknown host keys need confirmation; changed keys stop the connection. Saved passwords and passphrases belong in macOS Keychain, not session JSON.</p><p>Organize connections in groups and subgroups. Dissolving a group keeps its entries. Import supported OpenSSH configuration entries, Cyberduck SFTP/S3 bookmarks, WinSCP INI files or MacSCP exports from the Sessions menu.</p><figure class="product-shot wide-shot"><img src="assets/screenshots/new-connection-light.png" width="1250" height="712" loading="lazy" alt="Complete MacSCP new connection form with a fictional example.com endpoint"><figcaption>New connection · Demonstration endpoint, no saved credentials</figcaption></figure></section>
-<section id="files"><h2>Files and editors</h2><p>Browse local files on the left and remote files on the right. Drag files or folders between panes, use Space, or choose a transfer action from the context menu. Remote files can also be dragged to Finder.</p><p>Use the source tab's queue to follow transfers, handle overwrite/skip/rename conflicts and cancel work. Resume is protocol-dependent and is not available for every operation.</p><p>The built-in editor edits UTF-8 documents. Text and hex previews read bounded windows; SSH search looks for literal file names or contents. External-editor saves can upload changes back.</p><p>Select a file and choose <strong>File → View</strong> (F3) or <strong>File → Edit</strong> (F4). Hold Fn if your keyboard uses these keys for system controls. The viewer and editor have independent, movable and resizable windows that stay open when you switch session tabs. Use ⌘S to save, ⌘F to search in the viewer, ⌘G / ⇧⌘G for the next / previous match, and ⌘W to close. Closing a modified editor asks before discarding changes; save before disconnecting its session.</p><p>The <strong>SSH</strong> button or <strong>⌘T</strong> opens an external SSH terminal. <strong>Disconnect</strong> keeps the tab; <strong>⌘W</strong> closes it.</p></section>
-<section id="paired"><h2>Pair two remote sessions</h2><p>Open two SCP sessions and drag one tab onto the center of the other. The dragged session becomes the left remote pane. Drops near the edges still reorder tabs.</p><p>Different destinations transfer through the Mac using the existing connections, without staging a complete local file or delegating credentials. Identical SSH endpoints, accounts and jump/TLS routes can copy on the server with a POSIX shell and <code>cp</code>. Unsupported server-side operations fail without a silent client fallback.</p><p>A shared bastion alone does not enable server-side copying between different destinations. Host aliases and shared filesystems are not automatically recognized as one endpoint. Copying onto the source file or a folder into itself is refused.</p><p><strong>Local / remote view</strong> separates the panes without disconnecting or cancelling queued work. Closing a destination cancels incoming work before disconnecting it.</p></section>
-<section id="tunnels"><h2>Tunnels</h2><p>Switch to <strong>Tunnels</strong>, choose <strong>New tunnel</strong> and select local forwarding, remote forwarding or SOCKS5. Choose a saved SSH connection and destination. Keep local listeners on <code>127.0.0.1</code> unless wider exposure is deliberate.</p><p>Use groups to start or stop related mappings. Tunnels own their connections and remain independent of file tabs. Active local HTTP/HTTPS mappings can open in a browser.</p><p><strong>Settings → Startup</strong> separates opening the app at login, restoring disconnected windows and starting configured tunnels. Reconnection is a separate option. Saving a tunnel's changes stops it; start it again to apply them.</p></section>
-<section id="diagnostics"><h2>Diagnostics</h2><p>Disconnected checks cover DNS, ping and the configured TCP endpoint, with separate jump and destination checks where applicable. Route tracing runs when the protocol connection fails. A silent router alone does not prove an outage.</p><p>Connected SSH sessions can read OS/version, uptime, load, available/total memory and disk, user/account counts and IPv4/IPv6 addresses. Probes require no administrator access. Recognizable container interfaces are omitted; Linux container memory limits are respected. The Windows fallback still needs live Windows qualification.</p><p>Public-IP discovery is optional and off by default. It runs on the server and can contact ipify, OpenDNS or Google DNS without sending MacSCP credentials.</p><p><strong>Throughput test</strong> measures upload/download in Mbit/s by writing, reading back and removing a temporary server file. Transfer limits apply. It is not a Mac Internet speed test.</p></section>
-<section id="limits"><h2>Limits and safe sharing</h2><p>File transfers use SFTP over SSH, S3 and WebDAV, not the legacy SCP wire protocol. FTP, SMB and AFP are not supported. SSH supports one jump host, not arbitrary multi-hop chains. Route tracing is IPv4-only. RSA authentication uses SHA-512 signatures.</p><p>Review diagnostics and logs before sharing: hostnames and paths can be sensitive. Do not include credentials, private keys or infrastructure details in public issues. Follow the repository's <a href="https://github.com/retrotools-apps/MacSCP/security/policy">security policy</a> for suspected vulnerabilities.</p></section>
-<section id="build"><h2>Source and updates</h2><p>The application is <a href="license.html">GPLv3 or later</a>. Third-party components retain their own terms. Inspect the source and build instructions at <a href="https://github.com/retrotools-apps/MacSCP">retrotools-apps/MacSCP</a>.</p><pre><code>scripts/check-vendor
-swift package resolve
-scripts/dev build
-scripts/dev run</code></pre><p>Find official assets on <a href="https://github.com/retrotools-apps/MacSCP/releases">GitHub Releases</a>. Packaged direct-distribution builds use signed Sparkle updates with confirmation before installation. Source builds can be rebuilt locally.</p><p><a href="changelog.html">Release notes</a> · <a href="notices.html">Third-party notices</a></p></section>
-</main><footer><div class="wrap footer-bottom"><span>© 2026 retroTools</span><a href="index.html">MacSCP overview</a><span>macOS 15+</span></div></footer></body></html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="theme-color" content="#0d1117">
+<meta name="description" content="Learn how to connect to servers, transfer files, manage SSH tunnels and customize MacSCP.">
+<title>MacSCP — User guide · retroTools</title>
+<link rel="icon" href="assets/favicon.svg" type="image/svg+xml"><link rel="stylesheet" href="style.css"><link rel="stylesheet" href="macscp.css">
+</head>
+<body>
+<a class="skip" href="#main">Skip to content</a>
+<header><div class="header-inner wrap"><a class="brand" href="index.html">retroTools / MacSCP</a><a class="text-link" href="index.html">← MacSCP overview</a></div></header>
+<main id="main" class="wrap guide-main">
+<p class="eyebrow">MACSCP / USER GUIDE</p>
+<h1>MacSCP user guide</h1>
+<p>Use MacSCP to browse remote files, transfer documents and manage SSH tunnels. It requires macOS 15 or later and runs on Apple Silicon and Intel Macs. The interface is available in seven languages; this guide uses the English names of buttons and menus.</p>
+<nav class="guide-nav" aria-label="Guide sections"><a href="#connections">Connect</a><a href="#files">Transfer files</a><a href="#paired">Two remotes</a><a href="#terminal">SSH terminal</a><a href="#tunnels">Tunnels</a><a href="#appearance">Display</a><a href="#diagnostics">Troubleshooting</a><a href="#updates">Updates</a><a href="#limits">Help</a></nav>
+
+<section id="connections">
+<h2>Connect to a server</h2>
+<ol><li>Choose <strong>New connection</strong>.</li><li>Select <strong>SSH/SFTP</strong>, <strong>S3</strong> or <strong>WebDAV</strong>, then enter the server address and your authentication details.</li><li>Save the connection to find it again in the sidebar or <strong>All connections</strong>.</li><li>Double-click its card to connect.</li></ol>
+<p>For SSH, use a password, a private key or your local SSH agent. Passwords and key passphrases are saved in macOS Keychain.</p>
+<p>On your first SSH connection, check the host-key fingerprint with the server administrator before accepting it. If a saved key has changed, MacSCP stops the connection. Verify why it changed before updating the saved key.</p>
+<figure class="product-shot wide-shot"><img src="assets/screenshots/new-connection-light.png" width="1250" height="712" loading="lazy" alt="MacSCP new connection form with a fictional example.com endpoint"><figcaption>Enter your server address and account details, then save the connection.</figcaption></figure>
+<h3>Organize and import connections</h3>
+<p>Use groups and subgroups to keep related connections together. Click a group's chevron to expand or collapse it, and use its color dot to choose a color. Dissolving a group keeps its connections.</p>
+<p>To import connections, open the <strong>Sessions</strong> menu and choose the appropriate import action. Supported formats include OpenSSH configuration entries, Cyberduck SFTP/S3 bookmarks, WinSCP INI files and MacSCP exports. Review the imported settings before connecting; some options from other clients are not supported.</p>
+<p>Open several connections in separate tabs. <strong>Disconnect</strong> ends a file session while keeping its tab; <strong>⌘W</strong> closes the tab. Use <strong>⌘1–9</strong> to select a tab, or <strong>⌃Tab</strong> and <strong>⌃⇧Tab</strong> to move between tabs.</p>
+</section>
+
+<section id="files">
+<h2>Browse and transfer files</h2>
+<p>The file workspace shows your Mac on the left and the remote server on the right. Open folders or use the path bar to navigate. <strong>Home</strong>, <strong>Root</strong> and <strong>Up</strong> take you to common locations.</p>
+<p>To upload, drag files or folders from the local pane to the remote pane. To download, drag them in the opposite direction. You can also select items and press <strong>Space</strong>, or use the context menu. Drag remote files to a Finder folder to download directly into it.</p>
+<p>Follow progress in the source tab's transfer queue. If a file already exists, choose whether to overwrite it, skip it or use another name. You can cancel transfers and set bandwidth limits. Resume is available only for supported protocols and operations.</p>
+<h3>View or edit a file</h3>
+<p>Select a file and choose <strong>File → View</strong> (<strong>F3</strong>) or <strong>File → Edit</strong> (<strong>F4</strong>). Depending on your keyboard settings, you may need to hold <strong>Fn</strong>.</p>
+<p>The viewer displays text or hexadecimal data, including parts of large remote files. The editor is intended for UTF-8 text. Both open in separate windows that stay open when you switch tabs.</p>
+<ul><li>Press <strong>⌘S</strong> to save in the editor.</li><li>In the viewer, use <strong>⌘F</strong> to search and <strong>⌘G</strong> / <strong>⇧⌘G</strong> to move between matches.</li><li>Press <strong>⌘W</strong> to close the document window. MacSCP asks before discarding unsaved edits.</li></ul>
+<p>Save before disconnecting: disconnecting a session closes its viewer and editor windows. External-editor saves can upload changes back to the server.</p>
+<p>For SSH connections, directory search can find files by name or look for literal text in their contents. You can also request a checksum to compare files; check its displayed type before comparing values.</p>
+</section>
+
+<section id="paired">
+<h2>Copy between two remote servers</h2>
+<ol><li>Open two SCP sessions.</li><li>Drag one tab onto the <strong>center</strong> of the other. The dragged session appears in the left pane. Dropping near an edge reorders tabs instead.</li><li>Select files and transfer them using drag and drop, <strong>Space</strong>, the context menu or the pane's arrow.</li></ol>
+<p>The paired header shows the copy route. Between different servers, files pass through your Mac. When both panes use the same SSH server, account and connection route, MacSCP can copy directly on that server. Direct copies require a POSIX shell with <code>cp</code>; if the server cannot perform the operation, the copy fails.</p>
+<p>A shared jump host does not enable a direct copy between different servers. Different host aliases are not automatically treated as the same server. You cannot copy a file onto itself or a folder into itself.</p>
+<p>Choose <strong>Local / remote view</strong> to return to the usual layout. Both connections stay open and queued copies continue. Closing a destination tab cancels copies being sent to it.</p>
+</section>
+
+<section id="terminal">
+<h2>Open an SSH terminal</h2>
+<p>With an SSH connection selected, click <strong>SSH</strong> or press <strong>⌘T</strong>. MacSCP opens the terminal application configured in Settings, such as Terminal or iTerm. It has its own SSH session, separate from the file browser.</p>
+</section>
+
+<section id="tunnels">
+<h2>Create and manage tunnels</h2>
+<p>Switch to <strong>Tunnels</strong> and choose <strong>New tunnel</strong>. Select the forwarding type, choose a saved SSH connection and enter the required ports and destination. Save the tunnel, then choose <strong>Start</strong>.</p>
+<ul><li><strong>Local forwarding</strong> makes a service reachable through a port on your Mac.</li><li><strong>Remote forwarding</strong> opens a listening port on the SSH server.</li><li><strong>SOCKS5</strong> provides a local proxy for applications configured to use it.</li></ul>
+<p>For local and SOCKS tunnels, use <code>127.0.0.1</code> as the listening address to keep access limited to your Mac. Use another address only if other machines should reach the port.</p>
+<p>Tunnels run independently of file tabs. Disconnecting a file session does not stop them; use <strong>Stop</strong> when you no longer need a tunnel. Active local HTTP and HTTPS tunnels can be opened in your browser.</p>
+<h3>Find and change a tunnel</h3>
+<p>In <strong>All tunnels</strong>, enable <strong>Active only</strong> to show established tunnels, including degraded connections. Turn it off to see stopped, connecting and reconnecting tunnels too. <strong>Start all</strong> and <strong>Stop all</strong> apply to all tunnels even when the filter is enabled. Use groups to start or stop related tunnels together.</p>
+<p>Right-click a tunnel, or open its <strong>…</strong> menu, to rename, duplicate, edit, move or delete it. Renaming leaves it running. Saving an edit stops the tunnel; start it again to apply the changes. Deleting asks for confirmation and stops it.</p>
+<p>Duplicating opens a new tunnel to review before saving, with automatic start disabled. MacSCP suggests a free local port; for remote forwarding, choose another remote listening port yourself.</p>
+<h3>If a port is already in use</h3>
+<p>Choose another listening port in the tunnel editor, or, for a local or SOCKS tunnel, choose <strong>… → Free port and restart…</strong>. Review the application names and process IDs before confirming: this terminates those processes, forcibly if needed, and their unsaved work may be lost. macOS asks for administrator authorization when required.</p>
+<p>MacSCP restarts the tunnel only after freeing the port. This action cannot free a port on a remote server.</p>
+<h3>Start tunnels automatically</h3>
+<p>In <strong>Settings → Startup</strong>, choose whether to open MacSCP at login, restore windows or start configured tunnels. Restored file tabs remain disconnected until you connect them. Configure automatic reconnection separately for each tunnel. The menu bar icon also provides tunnel status and start/stop actions.</p>
+</section>
+
+<section id="appearance">
+<h2>Customize the display</h2>
+<p>Open <strong>Settings → View</strong> to adjust contrast and the sidebar.</p>
+<ul><li>Choose <strong>Low contrast</strong> for subtle group backgrounds or <strong>High contrast</strong> for stronger colors and more distinct text and icons.</li><li>Use <strong>Color group backgrounds</strong> to show or hide group colors. Your saved colors remain available.</li><li>Enable <strong>Compact sidebar</strong> to hide status dots, connection protocol labels, tunnel indicators and generated tunnel port suffixes. Group color dots are also hidden; your chosen identity icons remain visible.</li></ul>
+<p>Drag the divider to resize the sidebar. Hiding and showing it keeps the width you chose in that window.</p>
+<p>To personalize a connection or tunnel, open its editor and choose a color and icon. Use the circular palette or the color picker for a custom color. Search the icon grid by name or keyword, or choose a <strong>Family</strong> to narrow the selection. The grid combines system symbols, Tabler Outline icons and application logos.</p>
+</section>
+
+<section id="diagnostics">
+<h2>Diagnose a connection problem</h2>
+<p>Right-click a connection, choose <strong>Diagnose…</strong>, then <strong>Run check</strong>. Before connecting, checks help investigate name resolution and server reachability. If the connection fails, route tracing can help locate the problem. A router that does not reply does not necessarily indicate an outage.</p>
+<p>For connected SSH sessions, diagnostics can show the operating system, uptime, memory, disk space and network addresses. Available details depend on the server. Linux and macOS are supported; Windows results may be incomplete. These checks require no administrator privileges.</p>
+<p>Public-IP discovery is optional and disabled by default. If enabled in Settings, the server may contact ipify, OpenDNS or Google DNS to identify its public address.</p>
+<p><strong>Throughput test</strong> measures upload and download speeds between your Mac and the server. It creates a temporary file on the server, downloads it and removes it. You need write permission, and configured bandwidth limits apply. The result is not a measurement of your Mac's Internet speed.</p>
+<p>Use <strong>Copy report</strong> to share results with an administrator. Review reports and logs first: they can include server names and paths. Never share passwords or private keys. Diagnostic logging is disabled by default and can be enabled in Settings when troubleshooting.</p>
+</section>
+
+<section id="updates">
+<h2>Keep MacSCP up to date</h2>
+<p>For GitHub installations, open <strong>Settings → General → Updates</strong> or choose <strong>Check for Updates</strong> from the application menu. MacSCP asks before installing an update and relaunching. If automatic updates are unavailable, download a package from <a href="https://github.com/retrotools-apps/MacSCP/releases">GitHub Releases</a>. GitHub packages are not Apple-notarized.</p>
+<p>Mac App Store installations are updated through the Store. If you built MacSCP from source, rebuild it to update, or install a GitHub package. Build instructions are available in the <a href="https://github.com/retrotools-apps/MacSCP">project repository</a>.</p>
+</section>
+
+<section id="limits">
+<h2>Compatibility and help</h2>
+<p>MacSCP supports SFTP over SSH, S3-compatible storage and WebDAV. FTP, SMB and AFP are not supported. SSH connections can use one jump host and supported TLS-gateway settings; multi-hop jump chains are not supported. RSA authentication requires SHA-512 signature support. If SSH agent authentication is rejected after several attempts, reduce the identities offered by your agent. Route tracing supports IPv4 only.</p>
+<p>When exporting connections, follow the dialog's encryption options to protect credentials. WinSCP export requires a master password.</p>
+<p>Report ordinary bugs through <a href="https://github.com/retrotools-apps/MacSCP/issues">GitHub Issues</a>. Include the MacSCP version and steps to reproduce the problem, with sensitive information removed. For suspected vulnerabilities, follow the <a href="https://github.com/retrotools-apps/MacSCP/security/policy">security policy</a>.</p>
+<p><a href="changelog.html">Release notes</a> · <a href="license.html">License</a> · <a href="notices.html">Third-party notices</a></p>
+</section>
+</main>
+<footer><div class="wrap footer-bottom"><span>© 2026 retroTools</span><a href="index.html">MacSCP overview</a><span>macOS 15+</span></div></footer>
+</body>
+</html>

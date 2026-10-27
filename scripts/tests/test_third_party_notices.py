@@ -35,6 +35,9 @@ class ThirdPartyNoticesTests(unittest.TestCase):
         self.write("licenses/macSCP-upstream-MIT.txt", "Inherited license fixture\n")
         self.write("licenses/simple-icons-CC0.txt", "Icon license fixture\n")
         self.write("licenses/tabler-icons-MIT.txt", "Tabler license fixture\n")
+        self.write("Sources/MacSCPAppKit/Resources/TablerOutline.json", json.dumps({
+            "repository": "https://example.com/tabler", "version": "1.0.0", "revision": "fixture-revision",
+        }))
         self.write("Sources/MacSCPAppKit/Resources/ApplicationLogos.json", json.dumps({
             "repository": "https://example.com/icons", "revision": "fixture",
             "additionalProviders": {"tabler-icons": {

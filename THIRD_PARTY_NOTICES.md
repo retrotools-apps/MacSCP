@@ -3075,7 +3075,13 @@ Source revision: `b5544ba79a70a0cb3563e75bf26dc198d6b40ed3`.
 
 Source: <https://github.com/tabler/tabler-icons>
 
-Source revision: `3.49.0`.
+Source revision: `bbed884d15354b5cebf2493371f20dc2d5e83eaf`.
+
+### Tabler Outline attribution
+
+```
+Tabler Outline SVG icons are bundled locally from revision bbed884d15354b5cebf2493371f20dc2d5e83eaf. Original geometry and existing icon selections are preserved. The legacy architecture subset remains from version 3.49.0.
+```
 
 ### licenses/tabler-icons-MIT.txt
 

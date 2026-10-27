@@ -1266,21 +1266,23 @@ private struct SessionRow: View {
                     .fixedSize(horizontal: true, vertical: false)
 
                 // State, symbol and count all come from the shared glyph plan.
-                if let glyph = tunnelGlyph {
-                    HStack(spacing: 2) {
-                        if let text = glyph.text {
-                            Text(text).font(.system(size: 10, weight: .semibold))
+                SidebarTunnelColumn {
+                    if let glyph = tunnelGlyph {
+                        HStack(spacing: 2) {
+                            if let text = glyph.text {
+                                Text(text).font(.system(size: 10, weight: .semibold))
+                                    .lineLimit(1).minimumScaleFactor(0.7)
+                            }
+                            if glyph.symbol == TunnelSymbols.tunnel {
+                                TunnelIcon(size: 12)
+                            } else {
+                                Image(systemName: glyph.symbol)
+                                    .font(.system(size: 9, weight: .semibold))
+                            }
                         }
-                        if glyph.symbol == TunnelSymbols.tunnel {
-                            TunnelIcon(size: 12)
-                        } else {
-                            Image(systemName: glyph.symbol)
-                                .font(.system(size: 9, weight: .semibold))
-                        }
+                        .foregroundStyle(groupForeground ?? glyph.tint.color)
+                        .help(tunnelTooltip)
                     }
-                    .foregroundStyle(groupForeground ?? glyph.tint.color)
-                    .help(tunnelTooltip)
-                    .fixedSize(horizontal: true, vertical: false)
                 }
             }
         }

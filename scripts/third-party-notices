@@ -223,12 +223,18 @@ entries.append({
     "licence_files": icon_licences,
     "licence_name": "CC0-1.0; source-logo terms included below",
 })
+with open(os.path.join(repo_root, "Sources", "MacSCPAppKit", "Resources", "TablerOutline.json"), encoding="utf-8") as source:
+    tabler_source = json.load(source)
 entries.append({
     "identity": "tabler-icons",
-    "location": icon_sources["additionalProviders"]["tabler-icons"]["repository"],
-    "version": icon_sources["additionalProviders"]["tabler-icons"]["version"],
-    "revision": icon_sources["additionalProviders"]["tabler-icons"]["version"],
-    "licence_files": [("licenses/tabler-icons-MIT.txt", open(
+    "location": tabler_source["repository"],
+    "version": tabler_source["version"],
+    "revision": tabler_source["revision"],
+    "licence_files": [("Tabler Outline attribution", "Tabler Outline SVG icons are bundled locally from revision "
+        + tabler_source["revision"] + ". Original geometry and existing icon selections are preserved. "
+        "The legacy architecture subset remains from version "
+        + icon_sources["additionalProviders"]["tabler-icons"]["version"] + "."),
+        ("licenses/tabler-icons-MIT.txt", open(
         os.path.join(repo_root, "licenses", "tabler-icons-MIT.txt"), encoding="utf-8").read())],
     "licence_name": "MIT",
 })

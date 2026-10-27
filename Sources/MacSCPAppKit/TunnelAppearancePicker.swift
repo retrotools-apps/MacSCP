@@ -19,7 +19,7 @@ struct TunnelServiceIcon: View {
         .background {
             if groupForeground != nil { Circle().fill(value.customColor?.swiftUIColor ?? value.tint.color).padding(-3) }
         }
-        .help(value.applicationLogo.flatMap { ApplicationLogo.record(id: $0)?.title } ?? value.icon.title)
+        .help(value.applicationLogo.flatMap { ApplicationLogo.record(id: $0)?.displayTitle } ?? value.icon.title)
         .accessibilityHidden(true)
     }
 }

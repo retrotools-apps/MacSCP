@@ -30,18 +30,12 @@ extension ContentView {
             SettingsSidebarView(selection: $settingsSection,
                 onSessions: { showsSettingsWorkspace = false; showsTunnelWorkspace = false },
                 onTunnels: { showsSettingsWorkspace = false; showsTunnelWorkspace = true })
-                .opacity(showsSettingsWorkspace ? 1 : 0)
-                .allowsHitTesting(showsSettingsWorkspace)
-                .disabled(!showsSettingsWorkspace)
-                .accessibilityHidden(!showsSettingsWorkspace)
+                .modifier(SidebarWorkspaceVisibility(isVisible: showsSettingsWorkspace))
             TunnelWorkspaceSidebar(manager: TunnelManager.shared, sessions: sessionListViewModel.sessions, selection: $tunnelWorkspaceSelection,
                                    decider: tunnelHostKeyDecider, sidebarCompact: settingsStore.sidebarCompact, onSessions: { showsTunnelWorkspace = false },
                                    onSettings: { showsSettingsWorkspace = true },
                                    onNewTunnel: { requestsNewTunnel = true })
-                .opacity(showsTunnelWorkspace && !showsSettingsWorkspace ? 1 : 0)
-                .allowsHitTesting(showsTunnelWorkspace && !showsSettingsWorkspace)
-                .disabled(!showsTunnelWorkspace || showsSettingsWorkspace)
-                .accessibilityHidden(!showsTunnelWorkspace || showsSettingsWorkspace)
+                .modifier(SidebarWorkspaceVisibility(isVisible: showsTunnelWorkspace && !showsSettingsWorkspace))
         SessionSidebar(
             viewModel: sessionListViewModel,
             activeSessionID: activeTab.activeStoredSessionID,
@@ -160,10 +154,7 @@ extension ContentView {
             onShowTunnels: { showsTunnelWorkspace = true },
             onShowSettings: { showsSettingsWorkspace = true }
         )
-        .opacity(!showsTunnelWorkspace && !showsSettingsWorkspace ? 1 : 0)
-        .allowsHitTesting(!showsTunnelWorkspace && !showsSettingsWorkspace)
-        .disabled(showsTunnelWorkspace || showsSettingsWorkspace)
-        .accessibilityHidden(showsTunnelWorkspace || showsSettingsWorkspace)
+        .modifier(SidebarWorkspaceVisibility(isVisible: !showsTunnelWorkspace && !showsSettingsWorkspace))
         }
         // Opens at the width this window was last left at and can be
         // dragged anywhere inside `SettingsStore.sidebarWidthRange` — see

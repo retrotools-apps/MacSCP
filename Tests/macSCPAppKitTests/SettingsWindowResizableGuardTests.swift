@@ -79,9 +79,9 @@ struct SettingsWorkspaceTests {
             HSplitView {
                 ZStack {
                     SettingsSidebarView(selection: .constant(.general), onSessions: {}, onTunnels: {})
-                        .opacity(navigation.workspace == 2 ? 1 : 0)
-                    Color.clear.opacity(navigation.workspace == 1 ? 1 : 0)
-                    Color.clear.opacity(navigation.workspace == 0 ? 1 : 0)
+                        .modifier(SidebarWorkspaceVisibility(isVisible: navigation.workspace == 2))
+                    Color.clear.modifier(SidebarWorkspaceVisibility(isVisible: navigation.workspace == 1))
+                    Color.clear.modifier(SidebarWorkspaceVisibility(isVisible: navigation.workspace == 0))
                 }
                 .frame(minWidth: 170, idealWidth: 210, maxWidth: 400)
                 Color.clear.frame(minWidth: 500, maxWidth: .infinity)
@@ -138,7 +138,7 @@ struct SettingsWorkspaceTests {
         #expect(split.contains("HSplitView {"))
         #expect(split.contains("SettingsSidebarView(selection: $settingsSection"))
         #expect(split.contains("ZStack {"))
-        #expect(split.contains(".allowsHitTesting(showsSettingsWorkspace)"))
+        #expect(split.contains("SidebarWorkspaceVisibility(isVisible: showsSettingsWorkspace)"))
         #expect(split.contains("idealWidth: sidebarOpeningWidth"))
         #expect(split.contains("value: proxy.size.width"))
     }

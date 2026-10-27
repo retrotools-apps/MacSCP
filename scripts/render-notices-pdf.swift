@@ -22,10 +22,23 @@ if CommandLine.arguments.count == 3, CommandLine.arguments[1] == "--text" {
     exit(0)
 }
 
+func bookmarkDestinations(_ document: PDFDocument) -> [String]? {
+    guard let root = document.outlineRoot, root.numberOfChildren > 0 else { return nil }
+    var result: [String] = []
+    for index in 0..<root.numberOfChildren {
+        guard let item = root.child(at: index), let label = item.label,
+              let page = item.destination?.page else { return nil }
+        result.append(label + ":" + String(document.index(for: page)))
+    }
+    return result
+}
+
 if CommandLine.arguments.count == 4, CommandLine.arguments[1] == "--compare" {
     guard let lhs = PDFDocument(url: URL(fileURLWithPath: CommandLine.arguments[2])),
           let rhs = PDFDocument(url: URL(fileURLWithPath: CommandLine.arguments[3])),
           lhs.pageCount == rhs.pageCount,
+          let lhsBookmarks = bookmarkDestinations(lhs), let rhsBookmarks = bookmarkDestinations(rhs),
+          lhsBookmarks == rhsBookmarks,
           lhs.documentAttributes?[PDFDocumentAttribute.subjectAttribute] as? String == rhs.documentAttributes?[PDFDocumentAttribute.subjectAttribute] as? String else {
         exit(1)
     }
@@ -130,18 +143,16 @@ for (title, section) in sections {
         offset += visible.length
     }
 }
-context.closePDF()
-guard let document = PDFDocument(url: output) else { fatalError("Cannot read generated PDF") }
-let outline = PDFOutline()
-for (label, index) in bookmarks {
-    guard let page = document.page(at: index) else { fatalError("Missing PDF page") }
-    let item = PDFOutline()
-    item.label = label
-    item.destination = PDFDestination(page: page, at: CGPoint(x: 0, y: mediaBox.height))
-    outline.insertChild(item, at: outline.numberOfChildren)
+// Write outlines in the original Core Graphics context. PDFKit can omit
+// newly assigned outlines when reserializing a generated document on newer SDKs.
+let children: [CFDictionary] = bookmarks.map { label, index in
+    [kCGPDFOutlineTitle: label, kCGPDFOutlineDestination: index + 1] as CFDictionary
 }
-document.outlineRoot = outline
-guard document.write(to: output) else { fatalError("Cannot write PDF outline") }
+CGPDFContextSetOutline(context, [kCGPDFOutlineChildren: children] as CFDictionary)
+context.closePDF()
+guard let document = PDFDocument(url: output), document.outlineRoot?.numberOfChildren == bookmarks.count else {
+    fatalError("Saved PDF lost its dependency bookmarks")
+}
 
 // Verify all source license text survived pagination and Unicode extraction.
 let extracted = normalized((document.string ?? "").replacingOccurrences(

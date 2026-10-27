@@ -21,6 +21,7 @@ struct SessionSidebarCompactRowGuardTests {
         let details = try TransferQueueBarCancelGuardTests.declarationBody(of: "if !isCompact", in: row)
         #expect(details.contains("Text(kindBadgeLabel)"))
         #expect(details.contains("if let glyph = tunnelGlyph"))
+        #expect(details.contains("SidebarTunnelColumn {"))
         let withoutDetails = row.replacingOccurrences(of: details, with: "")
         #expect(row.contains("Text(session.name)"))
         #expect(!withoutDetails.contains("Text(kindBadgeLabel)"))

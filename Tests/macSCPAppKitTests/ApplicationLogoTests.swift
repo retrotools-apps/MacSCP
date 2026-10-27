@@ -41,7 +41,7 @@ struct ApplicationLogoTests {
         #expect(ApplicationLogo.image(id: "not-a-catalogue-logo") == nil)
     }
 
-    @Test func onlyReviewedNetworkDevelopmentAndOperatingSystemIconsAreBundled() throws {
+    @Test func simpleIconsKeepTheirReviewedScopeAlongsideTablerOutline() throws {
         let path = SourceCorpus.url(of: .sources).deletingLastPathComponent()
             .appendingPathComponent("scripts/application-icon-scope.json")
         let document = try #require(JSONSerialization.jsonObject(with: Data(contentsOf: path)) as? [String: Any])
@@ -60,7 +60,7 @@ struct ApplicationLogoTests {
         for irrelevant in ["aldinord", "aldisud", "laposte", "deutschepost", "bmw", "aeroflot", "nike", "mcdonalds", "netflix", "spotify"] {
             #expect(!bundled.contains(irrelevant))
             #expect(ApplicationLogo.svgData(id: irrelevant) == nil)
-            #expect(AppearanceCatalogue.entries(matching: irrelevant).isEmpty)
+            #expect(AppearanceCatalogue.entries(matching: irrelevant, source: .logos).isEmpty)
         }
     }
 
@@ -113,7 +113,7 @@ struct ApplicationLogoTests {
         #expect(AppearanceCatalogue.entries(matching: "fantôme").contains { $0.logo == "ghost-mascot" })
         #expect(!AppearanceCatalogue.entries(matching: "EC2").contains { $0.logo?.hasPrefix("aws-") == true })
         #expect(AppearanceCatalogue.entries(matching: "load balancer").contains {
-            $0.logo == "architecture-load-balancer"
+            $0.logo == "tabler-load-balancer"
         })
         #expect(AppearanceCatalogue.entries(matching: "no-such-logo-in-the-catalogue").isEmpty)
     }

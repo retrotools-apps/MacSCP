@@ -14,9 +14,20 @@ enum ApplicationLogo {
         let originalSize: Int
         let sha256: String
         let origin: String?
+        let sourceName: String?
+        let category: String?
+        let tags: [String]?
+
+        var isLegacyTabler: Bool { origin == "tabler-icons" && id.hasPrefix("architecture-") }
+        var canonicalID: String {
+            isLegacyTabler ? "tabler-" + id.dropFirst("architecture-".count) : id
+        }
 
         @MainActor var displayTitle: String {
-            switch id {
+            if let sourceName {
+                return String(format: L10n.string("appearance.icon.identifier %@", "Icon · %@"), sourceName)
+            }
+            return switch id {
             case "internetbox": SessionAppearance.Icon.internetBox.title
             case "ghost-mascot": SessionAppearance.Icon.ghost.title
             case "esxi": SessionAppearance.Icon.vmwareESXi.title
@@ -25,16 +36,25 @@ enum ApplicationLogo {
         }
     }
 
-    private struct Index: Decodable { let icons: [Record] }
-    static let catalogue: [Record] = {
-        guard let url = L10n.bundle.url(forResource: "ApplicationLogos", withExtension: "json"),
-              let data = try? Data(contentsOf: url),
-              let index = try? JSONDecoder().decode(Index.self, from: data) else { return [] }
-        return index.icons
-    }()
+    private struct Index: Decodable {
+        let icons: [Record]
+        let categories: [String]?
+    }
+    private static func index(_ name: String) -> Index? {
+        guard let url = L10n.bundle.url(forResource: name, withExtension: "json"),
+              let data = try? Data(contentsOf: url) else { return nil }
+        return try? JSONDecoder().decode(Index.self, from: data)
+    }
+    private static let outline = index("TablerOutline")
+    static let families: [String] = outline?.categories ?? []
+    static let catalogue: [Record] = (index("ApplicationLogos")?.icons ?? []) + (outline?.icons ?? [])
     private static let byID = Dictionary(uniqueKeysWithValues: catalogue.map { ($0.id, $0) })
     private static let archive: Data = {
         guard let url = L10n.bundle.url(forResource: "ApplicationLogos", withExtension: "bin") else { return Data() }
+        return (try? Data(contentsOf: url, options: .mappedIfSafe)) ?? Data()
+    }()
+    private static let outlineArchive: Data = {
+        guard let url = L10n.bundle.url(forResource: "TablerOutline", withExtension: "bin") else { return Data() }
         return (try? Data(contentsOf: url, options: .mappedIfSafe)) ?? Data()
     }()
     private static let cache: NSCache<NSString, NSImage> = {
@@ -59,10 +79,12 @@ enum ApplicationLogo {
     }
 
     static func svgData(id: String) -> Data? {
-        guard let record = byID[id], record.offset >= 0, record.compressedSize > 0,
+        guard let record = byID[id] else { return nil }
+        let payload = record.sourceName == nil ? archive : outlineArchive
+        guard record.offset >= 0, record.compressedSize > 0,
               record.originalSize > 0, record.originalSize <= 512 * 1024,
-              record.offset <= archive.count, record.compressedSize <= archive.count - record.offset else { return nil }
-        let source = archive.subdata(in: record.offset..<(record.offset + record.compressedSize))
+              record.offset <= payload.count, record.compressedSize <= payload.count - record.offset else { return nil }
+        let source = payload.subdata(in: record.offset..<(record.offset + record.compressedSize))
         var output = [UInt8](repeating: 0, count: record.originalSize)
         let count = source.withUnsafeBytes { packed in
             output.withUnsafeMutableBufferPointer { unpacked in
