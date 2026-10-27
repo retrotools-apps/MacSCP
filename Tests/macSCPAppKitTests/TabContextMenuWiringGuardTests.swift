@@ -2,139 +2,6 @@ import Foundation
 import MacSCPTestSupport
 import Testing
 
-/// Guards ONE property of the tab strip's context menu in
-/// `Sources/MacSCPAppKit/TabStripView.swift`: **the view does not decide
-/// which entries appear.** The list it draws is whatever it was handed —
-/// no more, no fewer, in that order — and every rule about when an entry
-/// is offered lives in Core, in
-/// `TabContextMenu.entries(atIndex:ofTabCount:supportsShell:isAdHoc:
-/// isConnected:filesToggle:terminalToggle:)`,
-/// where `TabContextMenuTests` can reach it.
-///
-/// The view no longer asks that function itself (drag task, fix round 3).
-/// Two of its facts are positional, and a position that reaches a
-/// view is a position that can be shifted inside it — so the question is
-/// asked where the model is, and the strip is handed the answer.
-///
-/// That moved two violation sites rather than removing them, which round 3
-/// recorded as a removal and round 4 put right: **V7 travelled with the
-/// call** into `ContentView.tabMenuEntries(for:)`, and **V2 gained a second
-/// home** at the closure that hands the answer over. Both are guarded
-/// where they now live, so this suite reads three files — the strip, the
-/// place the decision is asked, and the place its answer is handed on.
-///
-/// Why a guard at all: `TabContextMenuTests` proves what the decision
-/// FUNCTION answers, and it stays green whether or not anything calls it.
-/// This project has no SwiftUI rendering harness (the same boundary
-/// `PaneRenderConditionGuardTests` and `ConnectTimeoutAppWiringGuardTests`
-/// document), so a menu that quietly re-derives visibility in the view —
-/// the exact shape the design rejects — can only be caught by reading the
-/// source.
-///
-/// **Where the property could be violated FROM.** This suite's checks were
-/// derived from this list, not from the lines that happened to get written:
-///
-/// - **V1** A condition inside the menu closure wrapping an item (`if`,
-///   `guard`, `else`, a ternary), so an entry Core returned is not drawn.
-/// - **V2** A transformation of the returned list before it is iterated
-///   (`filter`, `prefix`, `dropFirst`, `contains`), so the value is
-///   consulted and then overruled. Writable in two places now: inside the
-///   menu closure, and in the closure that hands the answer to the strip.
-/// - **V3** `.disabled(…)`/`.hidden(…)` on a drawn item — a greyed-out
-///   entry is a visibility decision under another name, and the design
-///   rejects greyed-out entries outright ("no greyed entry, no error — the
-///   entry does not appear there").
-/// - **V4** An item drawn beside the loop rather than by it, so the menu
-///   carries something the value never named.
-/// - **V5** A SECOND menu attachment in the file, whose items nothing
-///   decided.
-/// - **V6** The iteration source swapped out — the loop walks a
-///   hand-written array while a `TabContextMenu.entries` call sits nearby
-///   looking like it is still in charge.
-/// - **V7** An extra rule folded into the ARGUMENTS of the decision —
-///   `isConnected: tab.isConnected && …` — or a fact asserted instead of
-///   read. Not possible in the view any more, which supplies no facts; it
-///   travelled with the call into `ContentView.tabMenuEntries(for:)` and is
-///   guarded there, on that function's whole body, because a positional
-///   fact can be rewritten in the `guard` that produces it as easily as in
-///   the call that uses it.
-///
-/// **Deliberately NOT guarded here**, so a green run is not read as more
-/// than it is:
-///
-/// - **A handler that does nothing.** That makes an entry inert, not
-///   invisible — a different property, and one this scanner cannot judge.
-///   The arm this actually costs something at is `.pane` in
-///   `ContentView+Lifecycle.swift`'s `handleTabMenuEntry`: replacing
-///   `togglePane(toggle, in: tab)` with `break` compiles, leaves this suite
-///   and every other one green, and gives the user two menu entries that
-///   silently do nothing. (An earlier version of this bullet illustrated
-///   the hole with `case .saveAsSession: break`, which has read
-///   `saveAsSession(from: tab)` since the commit that wrote the sentence.
-///   Naming an arm that is fine, while the one that can go inert is named
-///   nowhere, is worse than saying nothing.)
-///
-///   The edge of the hole was measured rather than guessed, and it is
-///   narrower than "an inert handler is uncatchable": deleting `togglePane`
-///   as well DOES go red, because `PaneVisibilityWiringGuardTests` counts
-///   the toggle sites in that file and finds three where it expects five.
-///   What nothing sees is the function surviving while its one caller stops
-///   calling it — Swift emits no warning for an uncalled method. That, and
-///   only that, is unguarded.
-/// - The title mapping answering an empty string. The item still exists and
-///   is still clickable; and `TabMenuEntryTitle.title(for:)` is a total
-///   `switch` over `TabMenuEntry` with no `default`, so the compiler already
-///   refuses to let a case be dropped.
-///
-/// **What this guard does NOT catch.** Corrected in fix round 1 after a
-/// reviewer got four mutations past it; the technique was kept and the
-/// claim narrowed, because chasing each hole with another anchor buys a
-/// longer blocklist and no property.
-///
-/// The list of violation sites says where the property can be violated
-/// FROM. What the checks actually recognize is narrower, in the two
-/// specific ways set out here, and a green run means only this much:
-///
-/// - **V2 and V3 are a name blocklist, not a rule.** `forbiddenTokens`
-///   names the spellings that were in front of us. A narrowing or
-///   suppressing call by any other name passes: `.map { _ in .close }`
-///   rewrites every entry into the same one, `.allowsHitTesting(false)`
-///   makes an item unclickable, `.opacity(0)` makes it invisible. None is
-///   on the list, and none can be, without the list becoming an
-///   ever-growing catalogue of SwiftUI's surface.
-/// - **It reads three files**, and reads them as text: the strip,
-///   `ContentView+Lifecycle.swift` where the decision is asked, and
-///   `ContentView+Detail.swift` where its answer is handed over. (Round 3
-///   claimed one file here and had already written a check against the
-///   second; the undercount is what argued the V7 checks away, so it is
-///   corrected rather than trimmed.) What it does not read is where the
-///   facts come FROM — `SessionTab.isConnected`, `activeStoredSessionID`,
-///   the capabilities `BackendDescriptor` answers. A fact that lies at its
-///   source is handed on faithfully by everything scanned here and changes
-///   which entries appear with nothing in this suite to notice.
-///
-/// So: this catches a condition, a filter, a `.disabled`, an extra item, a
-/// second menu, a swapped iteration source, an answer narrowed on its way
-/// to the strip, and a rule folded into the facts the decision is asked
-/// with — all under the names they are usually written with. It does not
-/// prove the menu shows what Core decided — only that the view draws what
-/// it was handed, that what it was handed is what Core answered, and that
-/// Core was asked with the facts as they stand.
-///
-/// Same boundary as the other wiring guards: a source-text scan aimed at
-/// the accidental regression (a "simplification" that reintroduces a
-/// condition, a reformat) rather than a hostile rewrite. Renaming
-/// `TabContextMenu.entries` wholesale, or moving the menu into a helper
-/// view in another file, would leave the anchor missing — which fails
-/// closed here, reported as "re-anchor this guard", rather than passing
-/// quietly.
-///
-/// Fail-closed throughout: an unreadable file, a missing anchor, unbalanced
-/// braces, and an unterminated string or comment all count as failures.
-/// Self-tested against synthetic source — a probe for every violation site
-/// named here, two each for V2 and V4, and three for V7, the site that can
-/// be written in the most shapes — so the scanner cannot pass merely
-/// because the real file moved or was reformatted past recognition.
 @Suite("Tab context menu wiring guard")
 struct TabContextMenuWiringGuardTests {
     /// `#filePath` here is
@@ -180,38 +47,10 @@ struct TabContextMenuWiringGuardTests {
     /// (whitespace stripped), matching `canonicalBody`'s own return shape.
     private static let sanctionedDuplicateTabArm = "case.duplicateTab:duplicateTab(tab)"
 
-    /// The one sanctioned shape of asking it: every fact read off the model
-    /// or off the tab in the same expression that hands it over, and
-    /// nothing folded into any of them. Compared as a whole body rather
-    /// than fact by fact, because a fact can also be substituted before the
-    /// call as easily as inside it.
-    ///
-    /// This shape sanctions no asserted value at all. It used to sanction
-    /// one: while nothing rendered a `.pane` entry, both pane facts were
-    /// the literal `PaneToggleState(isOn: false, isEnabled: false)`, and
-    /// that placeholder was allowed here on the condition that it went the
-    /// moment the entries went live. It has — both facts are now read from
-    /// `SessionTab.paneToggleState`, the method the toolbar's own
-    /// `.disabled` reads, so the menu and the window cannot disagree about
-    /// which halves are on screen. Re-introducing a constant for either of
-    /// them is V7 again, with nothing left to excuse it.
-    ///
-    /// `terminalIsVisible` is bound once and handed to both readings on
-    /// purpose: two readings of `tab.session?.terminal.isVisible` would be
-    /// two chances for the halves to be asked about different states.
-    /// `hasStoredSession` (Duplicate Tab, 2026-09-05) joined the argument
-    /// list in the same shape every other fact here has: read off the tab
-    /// in this expression, nothing asserted. It reuses the `active ??
-    /// restored` rule `WindowRestorationPlan.sessionID` already states for
-    /// window restoration — the same combined fact
-    /// `describeForRestoration` reads off this tab elsewhere in this file
-    /// — rather than inventing a second way to ask "does this tab have a
-    /// stored session".
     private static let sanctionedDecisionBody = """
         guard let index = tabsModel.tabs.firstIndex(where: { $0.id == tab.id }) else { return [] }
         let capabilities = BackendDescriptor
             .descriptor(for: tab.connectionViewModel.kind).capabilities
-        let terminalIsVisible = tab.session?.terminal.isVisible ?? false
         return TabContextMenu.entries(
             atIndex: index,
             ofTabCount: tabsModel.tabs.count,
@@ -219,13 +58,7 @@ struct TabContextMenuWiringGuardTests {
             isAdHoc: tab.activeStoredSessionID == nil,
             isConnected: tab.isConnected,
             hasStoredSession: WindowRestorationPlan.sessionID(
-                active: tab.activeStoredSessionID, restored: tab.restoredSessionID) != nil,
-            filesToggle: tab.paneToggleState(
-                for: .files, terminalIsVisible: terminalIsVisible,
-                hasShell: capabilities.supportsShell),
-            terminalToggle: tab.paneToggleState(
-                for: .terminal, terminalIsVisible: terminalIsVisible,
-                hasShell: capabilities.supportsShell))
+                active: tab.activeStoredSessionID, restored: tab.restoredSessionID) != nil)
         """
 
     /// The one sanctioned shape of the iteration: the loop's collection IS
@@ -718,19 +551,6 @@ struct TabContextMenuWiringGuardTests {
         #expect(substituted != sanctioned)
     }
 
-    /// The pane facts, the two that decide whether the window's halves can
-    /// be switched from this menu at all. Three ways they can go wrong, and
-    /// the guard has to see each: the reading replaced by a constant (the
-    /// placeholder this shape used to sanction, coming back), the reading
-    /// kept but pointed at the other half, and the visibility it is read
-    /// against asserted while both readings stay in place.
-    ///
-    /// Every substitution is checked to actually occur first. A probe whose
-    /// target has quietly stopped appearing in `sanctionedDecisionBody`
-    /// mutates nothing and passes while checking nothing — which is what
-    /// happened to `scannerFlagsARuleFoldedIntoAnArgument` when the
-    /// argument list gained two entries and its target lost its closing
-    /// parenthesis.
     @Test func scannerFlagsAChangedPaneFact() throws {
         let sanctioned = try Self.canonicalize(Self.sanctionedDecisionBody)
         func mutated(_ target: String, into replacement: String) throws -> String {
@@ -750,16 +570,12 @@ struct TabContextMenuWiringGuardTests {
                 describing: "a probe")
         }
         let asserted = try mutated(
-            "filesToggle: tab.paneToggleState(", into: "filesToggle: PaneToggleState(")
+            "supportsShell: capabilities.supportsShell", into: "supportsShell: true")
         #expect(asserted != sanctioned)
-        let otherHalf = try mutated(
-            "for: .files, terminalIsVisible: terminalIsVisible,",
-            into: "for: .terminal, terminalIsVisible: terminalIsVisible,")
-        #expect(otherHalf != sanctioned)
-        let assertedVisibility = try mutated(
-            "let terminalIsVisible = tab.session?.terminal.isVisible ?? false",
-            into: "let terminalIsVisible = false")
-        #expect(assertedVisibility != sanctioned)
+        let disconnected = try mutated(
+            "isConnected: tab.isConnected", into: "isConnected: true")
+        #expect(disconnected != sanctioned)
+
     }
 
     /// V5, at the file level: two attachments, so "the menu" is no longer a

@@ -447,7 +447,6 @@ private struct AppearanceSettingsSection: View {
                     .foregroundStyle(.secondary)
             }
 
-
             // Compact sidebar mode (sidebar-polish plan, Task 2): tighter
             // row padding, nothing else — `SessionSidebar`
             // reads this as a plain presentation preference
@@ -459,6 +458,11 @@ private struct AppearanceSettingsSection: View {
             }
 
             Section {
+                Picker(L10n.string("settings.appearance.contrast", "Contrast"), selection: $store.highContrast) {
+                    Text(L10n.string("settings.appearance.lowContrast", "Low contrast")).tag(false)
+                    Text(L10n.string("settings.appearance.highContrast", "High contrast")).tag(true)
+                }
+                .pickerStyle(.segmented)
                 Toggle(L10n.string("settings.appearance.groupColors", "Color group backgrounds"),
                        isOn: $store.groupColorsEnabled)
             } footer: {
@@ -839,11 +843,7 @@ private struct OpenWithSettingsTab: View {
     }
 }
 
-/// The "Terminal" section (M9d): font family/size and cursor style/blink,
-/// with a live preview. The external-terminal-target picker moved to the
-/// protocol-specific `SSHSettingsSection` in M18/T7. `@Bindable` (like
-/// `GeneralSettingsSection`) so the controls below can bind directly to
-/// `$store.*`.
+/// Chooses the application used for external SSH sessions.
 private struct TerminalSettingsTab: View {
     @Bindable var store: SettingsStore
     @State private var showCustomAppPicker = false

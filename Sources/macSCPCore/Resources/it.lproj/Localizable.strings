@@ -88,8 +88,6 @@
 "core.certificate.rejected" = "Connessione rifiutata: certificato non confermato.";
 "core.certificate.trustStoreUnreadable" = "Connessione rifiutata: impossibile leggere l'archivio dei certificati attendibili.";
 "core.s3.redirectRefused %@ %@" = "La connessione rifiutata — il punto finale S3 %1$@ ha reindirizzato questa richiesta a %2$@, un server diverso. Non e' stato mandato niente. Se ti fidi di quel server, inseriscilo come endpoint.";
-"core.terminal.shellEnded %@" = "Conchiglia finita: %@";
-"core.terminal.openFailed %@" = "Impossibile aprire la shell: %@";
 "core.session.loadFailed %@" = "Non caricate le sessioni: %@";
 "core.session.saveFailed %@" = "Non riuscito a salvare la sessione: %@";
 "core.session.deleteFailed %@" = "Non eliminato la sessione: %@";
@@ -107,9 +105,6 @@
 "core.overview.auth.agent" = "ssh-agent";
 "core.overview.value.yes" = "Sì";
 "core.overview.value.no" = "No";
-"core.overview.panes.files" = "File";
-"core.overview.panes.terminal" = "Terminale";
-"core.overview.panes.both" = "File e terminal";
 "core.overview.s3.bucketList" = "Elenco dei bucket";
 "core.fileType.bucket" = "Bucket";
 "core.fileType.folder" = "Cartella";

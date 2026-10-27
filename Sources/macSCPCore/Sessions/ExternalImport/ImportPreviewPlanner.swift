@@ -357,47 +357,6 @@ public enum ImportPreviewPlanner {
 
     // MARK: - The payload
 
-    /// The selected rows as a `SessionExportPayload`, for the existing
-    /// `SessionImportPlanner` → `applyImport` path.
-    ///
-    /// A `.new` row becomes a fresh `ExportedSession`. A `.knownChanged` row
-    /// becomes one carrying the stored record's id in `replaces`, which makes
-    /// `SessionImportPlanner` overwrite that record in place — same id, no
-    /// arbiter question about the connection, because the entry IS that
-    /// record.
-    ///
-    /// A ticked `.knownUnchanged` row becomes a provenance-only update — the
-    /// record unchanged but stamped, so a later run recognises it after its
-    /// connection moves (see `provenanceOnlyUpdate`). Such a row starts
-    /// unticked, so this only happens on purpose.
-    ///
-    /// An update overwrites everything the source knows, the session's NAME
-    /// included (design §0 item 3, the maintainer's decision): a bookmark
-    /// renamed in Cyberduck renames the session here. What the source does not
-    /// know is copied off the record instead — its group, its rank, its pane
-    /// visibility and every
-    /// backend field outside §3's table, such as an S3 region. Those four
-    /// session properties — group, rank and pane visibility — are the whole
-    /// list: `StoredSession` carries no notes and no colour, so there is
-    /// nothing else to copy.
-    ///
-    /// `groups` is the store's group catalogue, and it is needed rather than
-    /// convenient: `SessionImportPlanner` resolves `ExportedSession.groupID`
-    /// against the payload's OWN `groups` and drops a reference the payload
-    /// does not carry. So every group the rows reference — the one the picker
-    /// chose, the one an update copied off its record — is emitted here, under
-    /// its own id and name; the planner matches it to the existing group of
-    /// that name. A group the catalogue does not know is not emitted, and the
-    /// session then names no group at all rather than one that resolves to
-    /// nothing.
-    ///
-    /// Unsupported and unreadable rows are refused here as well as at preview
-    /// time. That is not belt and braces: `PreviewRow.selected` is mutable,
-    /// so a caller can tick any row it holds, and the status a row was built
-    /// with is the only thing that says whether it may be imported.
-    ///
-    /// `importedAt` is ONE timestamp for the whole call, so a run of forty
-    /// bookmarks is one import rather than forty.
     public static func payload(
         for rows: [PreviewRow], sessions: [StoredSession], groups: [StoredGroup],
         switches: ImportSwitches
@@ -511,7 +470,7 @@ public enum ImportPreviewPlanner {
             kind: kind.connectionKind,
             fields: fields.raw,
             groupID: stored.groupID,
-            paneVisibility: stored.paneVisibility,
+
             position: stored.position,
             importSource: bookmark.source,
             importID: bookmark.id,
@@ -539,7 +498,7 @@ public enum ImportPreviewPlanner {
             kind: kind.connectionKind,
             fields: fields.raw,
             groupID: stored.groupID,
-            paneVisibility: stored.paneVisibility,
+
             position: stored.position,
             importSource: bookmark.source,
             importID: bookmark.id,

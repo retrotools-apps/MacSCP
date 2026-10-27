@@ -15,14 +15,6 @@ public enum TabMoveStep: Equatable, Sendable {
     case right
 }
 
-/// Which way a pane entry points: the action the user can take right now.
-/// One entry per pane with a changing label, never two entries of which one
-/// is dead — this menu omits what does not apply instead of greying it.
-public enum PaneAction: Equatable, Sendable {
-    case show
-    case hide
-}
-
 /// Context-menu entries for a tab, in display order. The app layer maps
 /// these to localized menu items; the decision lives here so it can be
 /// tested without rendering anything — the same split
@@ -42,20 +34,6 @@ public enum TabMenuEntry: Equatable, Sendable {
     /// (open a window, park the tab, close the emptied one) is the app
     /// layer's business, and nothing about a window is known here.
     case moveToNewWindow
-    /// Show or hide one of the window's two halves. Requires both a live
-    /// connection and the pane's own `PaneToggleState` reporting
-    /// `isEnabled`: there are no halves to switch on a tab still showing a
-    /// connection form, and `isEnabled` is false for the last visible half,
-    /// so no entry here can empty the window.
-    /// Always the built-in terminal; `SettingsStore.terminalTarget` has no
-    /// say, for the same reason the Terminal menu's entries ignore it.
-    case pane(PaneToggle, PaneAction)
-    /// Open this session's shell in an external terminal. Always external,
-    /// never the built-in pane. Needs a shell and a live connection.
-    ///
-    /// The capability half is `ProtocolCapabilities.supportsShell` (`true`
-    /// for SSH, `false` for S3 and WebDAV); the state half is a connected
-    /// tab — there is no shell to attach to otherwise.
     case openExternalTerminal
     /// Requires both an ad-hoc-dialed tab and a live connection: persisting
     /// a connection that was dialed ad hoc, and only once it is actually
@@ -75,30 +53,9 @@ public enum TabMenuEntry: Equatable, Sendable {
 }
 
 public enum TabContextMenu {
-    /// Which entries a tab offers.
-    ///
-    /// `index` and `count` decide the movement, the bulk close and the move
-    /// into a new window; the five remaining facts decide the rest (see each
-    /// `TabMenuEntry` case for its precondition). Nothing here reaches for a
-    /// `ConnectionKind`: what an entry depends on is a capability or a
-    /// state, never which protocol it happens to be.
-    ///
-    /// The two toggle states are read, not recomputed: `PaneVisibility.
-    /// toggleState(for:hasShell:)` has already folded in both the shell's
-    /// absence and the lock on the last visible half, so `isEnabled` is the
-    /// whole question of whether a pane entry can be offered at all.
-    ///
-    /// `hasStoredSession` decides `.duplicateTab` alone: whether the tab is
-    /// connected to a stored session right now, or merely pointed at one
-    /// (an unconnected tab showing that session's overview) — the same
-    /// `active ?? restored` rule `WindowRestorationPlan.sessionID` states
-    /// for restoration, asked here for the identical reason: a tab that
-    /// has never touched a stored record has nothing for "Duplicate Tab"
-    /// to copy.
     public static func entries(
         atIndex index: Int, ofTabCount count: Int,
-        supportsShell: Bool, isAdHoc: Bool, isConnected: Bool, hasStoredSession: Bool,
-        filesToggle: PaneToggleState, terminalToggle: PaneToggleState
+        supportsShell: Bool, isAdHoc: Bool, isConnected: Bool, hasStoredSession: Bool
     ) -> [TabMenuEntry] {
         var entries: [TabMenuEntry] = [.close]
         if count > 1 { entries.append(.closeOthers) }

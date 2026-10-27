@@ -66,40 +66,12 @@
 
 /* Settings — Tab „Terminal" (M9d) */
 "settings.tab.terminal" = "Terminal";
-"settings.terminal.font" = "Schrift";
-"settings.terminal.systemFont" = "System (SF Mono)";
-"settings.terminal.size %lld" = "Größe: %lld pt";
-"settings.terminal.cursor" = "Cursor";
-"settings.terminal.cursor.block" = "Block";
-"settings.terminal.cursor.bar" = "Balken";
-"settings.terminal.cursor.underline" = "Unterstrich";
-"settings.terminal.cursorBlink" = "Blinken";
-"settings.terminal.copyOnSelect" = "Text beim Auswählen kopieren";
-"settings.terminal.pasteOnRightClick" = "Mit Rechtsklick einfügen";
-"settings.terminal.type" = "Terminaltyp";
-"settings.terminal.type.footer" = "Der Name, den der Server erfährt (TERM); er entscheidet, welche Funktionen Programme auf dem Server nutzen. Das Terminal selbst ändert sich nicht. Gilt für die nächste Shell, die sich öffnet; eine Sitzung kann in ihrem Editor einen eigenen wählen.";
-"terminal.type.xterm-256color" = "xterm-256color (256 Farben)";
-"terminal.type.xterm" = "xterm (8 Farben)";
-"terminal.type.vt100" = "vt100 (keine Farben)";
-"settings.terminal.theme.header" = "Farben";
-"settings.terminal.theme" = "Farbschema";
-"settings.terminal.theme.import" = "iTerm2-Farben importieren…";
-"settings.terminal.theme.forget" = "Import entfernen";
-"settings.terminal.theme.footer" = "Ein Farbschema legt den Hintergrund, die Schrift, den Cursor und die sechzehn Farben fest, die Programme auf dem Server über ihre Nummer anfordern. Du kannst eine von iTerm2 exportierte Farbdatei importieren (eine Datei mit der Endung .itermcolors); MacSCP behält die Farben, nicht die Datei. Es wird immer nur ein Import aufbewahrt.";
-"settings.terminal.theme.refused.title" = "Import fehlgeschlagen";
-"settings.terminal.theme.refused" = "Diese Datei ließ sich nicht als iTerm2-Farbdatei lesen. Exportiere das Farbschema in iTerm2 erneut und wähle die .itermcolors-Datei, die dabei entsteht.";
-"terminal.theme.macSCP" = "MacSCP (dunkel)";
-"terminal.theme.midnight" = "Mitternacht (dunkel)";
-"terminal.theme.paper" = "Papier (hell)";
-"terminal.theme.imported" = "Importiertes Farbschema";
 "settings.terminal.target.header" = "Externes Terminal";
 "settings.terminal.target" = "Sitzungen öffnen in";
-"settings.terminal.target.builtIn" = "Eingebautes Terminal";
 "settings.terminal.target.terminalApp" = "Terminal";
 "settings.terminal.target.iTerm" = "iTerm";
 "settings.terminal.target.custom" = "Eigene App…";
 "settings.terminal.target.footer" = "Beide Wege, eine Sitzung zu öffnen, bleiben unabhängig von dieser Einstellung über das Menü „Terminal“ erreichbar.";
-"settings.terminal.target.builtInFallback.footer" = "Ist „Eingebautes Terminal“ gewählt, öffnet dieser Menüpunkt deine eigene App, falls eine festgelegt ist, sonst Terminal.";
 "settings.terminal.target.noneChosen" = "Keine App gewählt";
 
 /* Settings — SSH tab, connection behaviour (Task 9) */
@@ -235,8 +207,6 @@
 "browser.filesToggle" = "Dateien";
 "browser.filesToggleHelp" = "Dateien ein-/ausblenden";
 "browser.ssh" = "SSH";
-"browser.terminalToggle" = "Terminal";
-"browser.terminalToggleHelp" = "Terminal ein-/ausblenden (⌘T)";
 "browser.terminalOpenExternalHelp" = "Im externen Terminal öffnen (⌘T)";
 "browser.transfersToggle" = "Übertragungen";
 "browser.transfersToggleHelp" = "Übertragungen ein-/ausblenden (⌘⇧Y)";
@@ -263,8 +233,6 @@
 "browser.pathBar.candidateCount %lld" = "%lld Treffer";
 
 /* Terminal-Panel */
-"terminal.ended" = "Shell beendet.";
-"terminal.reopen" = "Neu öffnen";
 
 /* Remote-Dateitabelle: Spalten */
 "filetable.column.name" = "Name";
@@ -362,9 +330,6 @@
 "connection.field.password.unchanged" = "unverändert";
 "connection.field.group" = "Gruppe";
 "connection.field.group.new.help" = "Legt eine Gruppe in der gewählten an, oder auf oberster Ebene, wenn keine Gruppe gewählt ist";
-"connection.field.terminalType" = "Terminaltyp";
-"connection.field.terminalType.useGlobal %@" = "Globale Einstellung verwenden (%@)";
-"connection.field.terminalType.help" = "Der Name, den der Server für das Terminal dieser Sitzung erfährt (TERM). Das Terminal selbst ändert sich nicht.";
 "connection.saveAndConnect" = "Speichern & verbinden";
 
 /* Menü-Befehle (M7a/T4) */
@@ -499,8 +464,6 @@
 "tab.duplicate" = "Tab duplizieren";
 "tabs.menu.showFiles" = "Dateien einblenden";
 "tabs.menu.hideFiles" = "Dateien ausblenden";
-"tabs.menu.showTerminal" = "Terminal einblenden";
-"tabs.menu.hideTerminal" = "Terminal ausblenden";
 "tabs.menu.openExternalTerminal" = "In externem Terminal öffnen";
 "tabs.menu.saveAsSession" = "Als Sitzung speichern…";
 
@@ -652,7 +615,6 @@
 "menu.importSessions" = "Sitzungen importieren…";
 "menu.importLogins" = "Logins importieren…";
 "menu.terminal" = "Terminal";
-"menu.terminal.toggle" = "Terminal ein-/ausblenden";
 "menu.terminal.openExternal" = "Im externen Terminal öffnen";
 
 /* Bekannte-Hosts-Sheet (M10a/T2) */
@@ -1257,7 +1219,6 @@
 "overview.fact.baseURL" = "Server-URL";
 "overview.fact.nextcloudPath" = "Nextcloud-Pfad";
 "overview.fact.group" = "Gruppe";
-"overview.fact.panes" = "Öffnet mit";
 "overview.hostKey" = "Host-Key";
 "overview.hostKey.unknown" = "Noch nicht bekannt — wird beim nächsten Verbinden gefragt";
 "overview.secret" = "Passwort";
@@ -1714,3 +1675,26 @@
 "remotePair.serverRoute" = "Kopien auf dem Server";
 "remotePair.serverCopyUnavailable" = "Serverseitiges Kopieren ist für diese Verbindung nicht verfügbar.";
 "whatsNew.1.0.diagnostics" = "Prüfe den konfigurierten Verbindungsweg, verfolge fehlgeschlagene Verbindungen und lies Serverinformationen und Übertragungsraten in Mbit/s.";
+
+/* Appearance contrast and tunnel management */
+"settings.appearance.contrast" = "Kontrast";
+"settings.appearance.lowContrast" = "Niedriger Kontrast";
+"settings.appearance.highContrast" = "Hoher Kontrast";
+"tunnels.activeOnly" = "Nur aktive";
+"tunnels.noActive" = "Keine aktiven Tunnel";
+"tunnel.action.rename" = "Umbenennen…";
+"tunnel.action.duplicate" = "Duplizieren…";
+"tunnels.copy %@" = "%@ Kopie";
+"tunnel.field.name" = "Name";
+"tunnel.action.edit" = "Bearbeiten";
+
+/* Explicit recovery of occupied local tunnel ports. */
+"tunnel.release.action" = "Port freigeben und neu starten…";
+"tunnel.release.title" = "Diesen Port freigeben und den Tunnel neu starten?";
+"tunnel.release.confirm" = "Beenden und neu starten";
+"tunnel.release.warning" = "Die folgenden Prozesse werden beendet, nötigenfalls erzwungen. Verbindungen und ungesicherte Arbeit können verloren gehen. macOS fordert bei Bedarf Administratorrechte an.";
+"tunnel.release.error" = "Port konnte nicht freigegeben werden";
+"tunnel.release.unavailable" = "Der Prozess, der diesen Port verwendet, konnte nicht ermittelt werden.";
+"tunnel.release.changed" = "Der Port wird nun von einem anderen Prozess verwendet. Prüfe den aktuellen Prozess erneut.";
+"tunnel.release.protected" = "Dieser Port gehört MacSCP oder einem Systemprozess. Beende den Listener in der zugehörigen Anwendung.";
+"tunnel.release.failed" = "Der Port konnte nicht freigegeben werden. Der Tunnel wurde nicht neu gestartet.";

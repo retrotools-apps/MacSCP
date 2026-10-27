@@ -3,11 +3,12 @@ import SwiftUI
 
 /// Shared folder typography for the Sessions and Tunnels navigation trees.
 struct SidebarGroupTitle: View {
+    @Environment(\.groupForeground) private var groupForeground
     let name: String
     var body: some View {
         Text(name).textCase(.uppercase)
             .font(.system(size: 10.5, weight: .semibold)).tracking(1.0)
-            .foregroundStyle(DesignTokens.inkTertiary)
+            .foregroundStyle(groupForeground ?? DesignTokens.inkTertiary)
             .lineLimit(1).truncationMode(.tail)
     }
 }

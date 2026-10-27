@@ -68,40 +68,12 @@
 
 /* Ustawienia — zakładka Terminal (M9d) */
 "settings.tab.terminal" = "Terminal";
-"settings.terminal.font" = "Czcionka";
-"settings.terminal.systemFont" = "Systemowa (SF Mono)";
-"settings.terminal.size %lld" = "Rozmiar: %lld pt";
-"settings.terminal.cursor" = "Kursor";
-"settings.terminal.cursor.block" = "Blok";
-"settings.terminal.cursor.bar" = "Kreska";
-"settings.terminal.cursor.underline" = "Podkreślenie";
-"settings.terminal.cursorBlink" = "Miganie";
-"settings.terminal.copyOnSelect" = "Kopiuj tekst po zaznaczeniu";
-"settings.terminal.pasteOnRightClick" = "Wklejaj prawym przyciskiem myszy";
-"settings.terminal.type" = "Typ terminala";
-"settings.terminal.type.footer" = "Nazwa przekazywana serwerowi (TERM); od niej zależy, z jakich funkcji korzystają programy na serwerze. Sam terminal się nie zmienia. Obowiązuje od następnej otwartej powłoki; sesja może wybrać własny typ w swoim edytorze.";
-"terminal.type.xterm-256color" = "xterm-256color (256 kolorów)";
-"terminal.type.xterm" = "xterm (8 kolorów)";
-"terminal.type.vt100" = "vt100 (bez kolorów)";
-"settings.terminal.theme.header" = "Kolory";
-"settings.terminal.theme" = "Motyw";
-"settings.terminal.theme.import" = "Importuj kolory iTerm2…";
-"settings.terminal.theme.forget" = "Usuń import";
-"settings.terminal.theme.footer" = "Motyw ustala tło, tekst, kursor oraz szesnaście kolorów, o które programy na serwerze proszą po numerze. Możesz zaimportować plik kolorów wyeksportowany z iTerm2 (plik z rozszerzeniem .itermcolors); MacSCP zachowuje kolory, a nie plik. Przechowywany jest tylko jeden import naraz.";
-"settings.terminal.theme.refused.title" = "Import nie powiódł się";
-"settings.terminal.theme.refused" = "Nie udało się odczytać tego pliku jako pliku kolorów iTerm2. Wyeksportuj motyw z iTerm2 ponownie i wybierz zapisany plik .itermcolors.";
-"terminal.theme.macSCP" = "MacSCP (ciemny)";
-"terminal.theme.midnight" = "Północ (ciemny)";
-"terminal.theme.paper" = "Papier (jasny)";
-"terminal.theme.imported" = "Zaimportowany motyw";
 "settings.terminal.target.header" = "Terminal zewnętrzny";
 "settings.terminal.target" = "Otwieraj sesje w";
-"settings.terminal.target.builtIn" = "Wbudowany terminal";
 "settings.terminal.target.terminalApp" = "Terminal";
 "settings.terminal.target.iTerm" = "iTerm";
 "settings.terminal.target.custom" = "Własna aplikacja…";
 "settings.terminal.target.footer" = "Oba sposoby otwierania sesji pozostają dostępne w menu Terminal, niezależnie od tego ustawienia.";
-"settings.terminal.target.builtInFallback.footer" = "Gdy wybrano „Wbudowany”, ta pozycja menu otwiera Twoją własną aplikację, jeśli jest ustawiona, w przeciwnym razie Terminal.";
 "settings.terminal.target.noneChosen" = "Nie wybrano aplikacji";
 
 /* Settings — SSH tab, connection behaviour (Task 9) */
@@ -237,8 +209,6 @@
 "browser.filesToggle" = "Pliki";
 "browser.filesToggleHelp" = "Pokaż/ukryj pliki";
 "browser.ssh" = "SSH";
-"browser.terminalToggle" = "Terminal";
-"browser.terminalToggleHelp" = "Pokaż/ukryj terminal (⌘T)";
 "browser.terminalOpenExternalHelp" = "Otwórz w zewnętrznym terminalu (⌘T)";
 "browser.transfersToggle" = "Transfery";
 "browser.transfersToggleHelp" = "Pokaż/ukryj transfery (⌘⇧Y)";
@@ -265,8 +235,6 @@
 "browser.pathBar.candidateCount %lld" = "%lld dopasowań";
 
 /* Panel terminala */
-"terminal.ended" = "Powłoka zakończona.";
-"terminal.reopen" = "Otwórz ponownie";
 
 /* Kolumny tabeli plików zdalnych */
 "filetable.column.name" = "Nazwa";
@@ -364,9 +332,6 @@
 "connection.field.password.unchanged" = "bez zmian";
 "connection.field.group" = "Grupa";
 "connection.field.group.new.help" = "Tworzy grupę wewnątrz wybranej lub na najwyższym poziomie, gdy żadna grupa nie jest wybrana";
-"connection.field.terminalType" = "Typ terminala";
-"connection.field.terminalType.useGlobal %@" = "Użyj ustawienia globalnego (%@)";
-"connection.field.terminalType.help" = "Nazwa przekazywana serwerowi dla terminala tej sesji (TERM). Sam terminal się nie zmienia.";
 "connection.saveAndConnect" = "Zapisz i połącz";
 
 /* Polecenia menu (M7a/T4) */
@@ -501,8 +466,6 @@
 "tab.duplicate" = "Duplikuj kartę";
 "tabs.menu.showFiles" = "Pokaż pliki";
 "tabs.menu.hideFiles" = "Ukryj pliki";
-"tabs.menu.showTerminal" = "Pokaż terminal";
-"tabs.menu.hideTerminal" = "Ukryj terminal";
 "tabs.menu.openExternalTerminal" = "Otwórz w zewnętrznym terminalu";
 "tabs.menu.saveAsSession" = "Zapisz jako sesję…";
 
@@ -654,7 +617,6 @@
 "menu.importSessions" = "Importuj sesje…";
 "menu.importLogins" = "Importuj zestawy logowania…";
 "menu.terminal" = "Terminal";
-"menu.terminal.toggle" = "Pokaż/ukryj terminal";
 "menu.terminal.openExternal" = "Otwórz w zewnętrznym terminalu";
 
 /* Arkusz znanych hostów (M10a/T2) */
@@ -1259,7 +1221,6 @@
 "overview.fact.baseURL" = "Adres URL serwera";
 "overview.fact.nextcloudPath" = "Ścieżka Nextcloud";
 "overview.fact.group" = "Grupa";
-"overview.fact.panes" = "Otwiera się na";
 "overview.hostKey" = "Klucz hosta";
 "overview.hostKey.unknown" = "Jeszcze nieznany — zapyta przy następnym połączeniu";
 "overview.secret" = "Hasło";
@@ -1716,3 +1677,26 @@
 "remotePair.serverRoute" = "Kopiowanie na serwerze";
 "remotePair.serverCopyUnavailable" = "Kopiowanie na serwerze jest niedostępne dla tego połączenia.";
 "whatsNew.1.0.diagnostics" = "Sprawdzaj skonfigurowaną trasę, śledź nieudane połączenia, odczytuj informacje o serwerze i mierz wysyłanie i pobieranie w Mbit/s.";
+
+/* Appearance contrast and tunnel management */
+"settings.appearance.contrast" = "Kontrast";
+"settings.appearance.lowContrast" = "Niski kontrast";
+"settings.appearance.highContrast" = "Wysoki kontrast";
+"tunnels.activeOnly" = "Tylko aktywne";
+"tunnels.noActive" = "Brak aktywnych tuneli";
+"tunnel.action.rename" = "Zmień nazwę…";
+"tunnel.action.duplicate" = "Powiel…";
+"tunnels.copy %@" = "Kopia %@";
+"tunnel.field.name" = "Nazwa";
+"tunnel.action.edit" = "Edytuj";
+
+/* Explicit recovery of occupied local tunnel ports. */
+"tunnel.release.action" = "Zwolnij port i uruchom ponownie…";
+"tunnel.release.title" = "Zwolnić ten port i ponownie uruchomić tunel?";
+"tunnel.release.confirm" = "Zakończ i uruchom ponownie";
+"tunnel.release.warning" = "Następujące procesy zostaną zakończone, w razie potrzeby wymuszenie. Połączenia i niezapisana praca mogą zostać utracone. W razie potrzeby macOS poprosi o uprawnienia administratora.";
+"tunnel.release.error" = "Nie udało się zwolnić portu";
+"tunnel.release.unavailable" = "Nie udało się zidentyfikować procesu używającego tego portu.";
+"tunnel.release.changed" = "Właściciel portu się zmienił. Spróbuj ponownie, aby sprawdzić bieżący proces.";
+"tunnel.release.protected" = "Ten port należy do MacSCP lub procesu systemowego. Zatrzymaj nasłuchiwanie w odpowiedniej aplikacji.";
+"tunnel.release.failed" = "Nie udało się zwolnić portu. Tunel nie został ponownie uruchomiony.";

@@ -166,16 +166,6 @@ public struct SessionOverviewModel: Sendable, Equatable {
         CoreL10n.string(value ? "core.overview.value.yes" : "core.overview.value.no")
     }
 
-    private static func paneText(_ panes: PaneVisibility) -> String {
-        // `PaneVisibility` forbids "neither half visible", so three states
-        // are all there are — the `else` below is the files-only one.
-        if panes.showsFiles && panes.showsTerminal {
-            return CoreL10n.string("core.overview.panes.both")
-        }
-        return CoreL10n.string(
-            panes.showsTerminal ? "core.overview.panes.terminal" : "core.overview.panes.files")
-    }
-
     private static func facts(
         for session: StoredSession, descriptor: BackendDescriptor,
         groupName: String?, loginSetName: String?
@@ -186,8 +176,6 @@ public struct SessionOverviewModel: Sendable, Equatable {
         if let groupName, !groupName.isEmpty {
             facts.append(Fact(id: "group", labelKey: label("group"), text: groupName))
         }
-        facts.append(
-            Fact(id: "panes", labelKey: label("panes"), text: paneText(.filesOnly)))
         return facts
     }
 

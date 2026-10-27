@@ -45,7 +45,7 @@ struct WindowSeedTests {
     @Test func aRestorationSeedDescribesTabsAndNamesNoLiveOnes() {
         let sessionID = UUID()
         let seed = WindowSeed(
-            tabs: [TabSeed(sessionID: sessionID, paneVisibility: .bothVisible)],
+            tabs: [TabSeed(sessionID: sessionID)],
             keepOnTop: true, isPrimary: true)
         #expect(seed.tabIDs.isEmpty, """
             a seed built for RESTORATION must name no live tab ids — those \
@@ -54,7 +54,6 @@ struct WindowSeedTests {
             """)
         #expect(seed.tabs.count == 1)
         #expect(seed.tabs[0].sessionID == sessionID)
-        #expect(seed.tabs[0].paneVisibility == PaneVisibility.bothVisible)
         #expect(seed.keepOnTop)
         #expect(seed.isPrimary)
     }
@@ -64,8 +63,8 @@ struct WindowSeedTests {
     @Test func aRestorationSeedRoundTripsThroughJSON() throws {
         let seed = WindowSeed(
             tabs: [
-                TabSeed(sessionID: UUID(), paneVisibility: .terminalOnly),
-                TabSeed(sessionID: nil, paneVisibility: .filesOnly),
+                TabSeed(sessionID: UUID()),
+                TabSeed(sessionID: nil),
             ],
             keepOnTop: true, isPrimary: true)
         #expect(try Self.roundTrip(seed) == seed)
@@ -98,18 +97,13 @@ struct WindowSeedTests {
         #expect(decoded.isPrimary == false)
     }
 
-    /// The other half of the same compatibility question: a `TabSeed`
-    /// written without a pane visibility (a field a later version could
-    /// add beside it) resolves to the same default a session with no
-    /// recorded preference gets.
-    @Test func aTabSeedWithoutAPaneVisibilityDecodesToFilesOnly() throws {
+    @Test func aTabSeedDecodesItsSessionIdentifier() throws {
         let sessionID = UUID()
         let json = """
             {"sessionID":"\(sessionID.uuidString)"}
             """
         let decoded = try JSONDecoder().decode(TabSeed.self, from: Data(json.utf8))
         #expect(decoded.sessionID == sessionID)
-        #expect(decoded.paneVisibility == PaneVisibility.filesOnly)
     }
 
     // MARK: - Equality still defeats window reuse
@@ -119,7 +113,7 @@ struct WindowSeedTests {
     /// Restoration opens several windows in one pass, so this matters more
     /// here than it did for a single move.
     @Test func twoSeedsDescribingTheSameTabsAreNotEqual() {
-        let described = [TabSeed(sessionID: UUID(), paneVisibility: .filesOnly)]
+        let described = [TabSeed(sessionID: UUID())]
         let first = WindowSeed(tabs: described, keepOnTop: false, isPrimary: false)
         let second = WindowSeed(tabs: described, keepOnTop: false, isPrimary: false)
         #expect(first != second)

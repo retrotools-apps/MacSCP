@@ -34,7 +34,8 @@ struct ChangelogParserTests {
         let bullets = Self.realChangelog.split(separator: "\n").filter { $0.hasPrefix("* ") }
         let entries = release.sections.flatMap(\.entries)
         #expect(!entries.isEmpty)
-        #expect(entries.count == bullets.count)
+        let allEntries = releases.flatMap(\.sections).flatMap(\.entries)
+        #expect(allEntries.count == bullets.count)
         #expect(entries.allSatisfy { $0.scope != nil && !$0.text.isEmpty })
     }
 

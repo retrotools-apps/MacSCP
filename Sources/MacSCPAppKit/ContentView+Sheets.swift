@@ -112,7 +112,7 @@ extension ContentView {
                 if let request = alreadyOpenRequest {
                     alreadyOpenRequest = nil
                     startWithoutAsking(
-                        request.stored, paneVisibility: request.paneVisibility)
+                        request.stored)
                 }
             }
             Button(L10n.string("common.cancel", "Cancel"), role: .cancel) {

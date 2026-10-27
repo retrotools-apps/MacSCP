@@ -32,14 +32,6 @@ public struct ExportedGroup: Codable, Equatable, Sendable {
     /// `nil` on any payload written before this field existed — and, in a
     /// file that has it, on every top-level folder.
     public var parentID: UUID?
-    /// Rank among the siblings under the same parent (`StoredGroup.position`,
-    /// D2). A value, not a reference: no remapping, the same way
-    /// `ExportedSession.paneVisibility` needs none.
-    ///
-    /// Optional for the same reason `kind` is: `nil` means a payload written
-    /// before this field existed, and the import side applies
-    /// `StoredGroup.position`'s own default (`0`) — mapped at import rather
-    /// than at decode, so every reader sees what the file actually said.
     public var position: Int?
     public var colorHue: Double?
     public var color: GroupColor?
@@ -62,14 +54,6 @@ public struct ExportedSession: Codable, Equatable, Sendable {
     /// The protocol this session speaks (M12). `nil` on legacy payloads
     /// written before M12, which the import side maps to `.ssh`.
     public var kind: ConnectionKind?
-    /// Which window halves were last shown for this session (P2
-    /// terminal-chrome milestone, Task 4) — carried through export exactly
-    /// like `groupID` above: a fact about the session, not a connection
-    /// field, so it is NOT part of `fields`. `nil` on any payload written
-    /// before this field existed; the import side applies the same
-    /// "both visible" default `StoredSession.init(from:)` does, the same
-    /// way `kind == nil` is mapped to `.ssh` at import rather than at decode.
-    public var paneVisibility: PaneVisibility?
     public var appearance: SessionAppearance?
     /// Rank among the siblings under the same parent
     /// (`StoredSession.position`, D2). Carried as a value and not the
@@ -79,19 +63,6 @@ public struct ExportedSession: Codable, Equatable, Sendable {
     /// `StoredSession.position`'s own default (`0`), the same way `kind ==
     /// nil` maps to `.ssh` at import rather than at decode.
     public var position: Int?
-    /// The session's own terminal type (`StoredSSHConfig.terminalType`,
-    /// plan of 2026-09-19, Task 4). Carried as a value, not
-    /// a reference, so no remapping on import. Added without a version bump,
-    /// like `position`: an older importer ignores the key.
-    ///
-    /// `nil` means the FILE SAYS NOTHING, which is not the same as "use the
-    /// global setting": a file written before this key existed, a Cyberduck
-    /// entry, or a session without an override all read this way. So the
-    /// import side never lets a `nil` here erase an override — a new session
-    /// gets none, a replaced one keeps its own (`SessionImportPlanner
-    /// .makePlanned`). Decoded leniently: a name this build does not offer
-    /// reads as `nil` instead of failing the file.
-    public var terminalType: TerminalType?
 
     /// Every backend field this session carries, keyed exactly as
     /// `FieldValues` keys them (`"<namespace>.<fieldID>"`).
@@ -221,10 +192,10 @@ public struct ExportedSession: Codable, Equatable, Sendable {
         kind: ConnectionKind? = nil,
         fields: [String: String] = [:],
         groupID: UUID? = nil,
-        paneVisibility: PaneVisibility? = nil,
+
         appearance: SessionAppearance? = nil,
         position: Int? = nil,
-        terminalType: TerminalType? = nil,
+
         password: String? = nil,
         jumpHost: String? = nil, jumpPort: Int? = nil, jumpUsername: String? = nil,
         jumpAuthKind: StoredSession.AuthKind? = nil, jumpKeyPath: String? = nil,
@@ -240,10 +211,8 @@ public struct ExportedSession: Codable, Equatable, Sendable {
         self.kind = kind
         self.fields = fields
         self.groupID = groupID
-        self.paneVisibility = paneVisibility
         self.appearance = appearance
         self.position = position
-        self.terminalType = terminalType
         self.password = password
         self.jumpHost = jumpHost
         self.jumpPort = jumpPort
@@ -262,8 +231,7 @@ public struct ExportedSession: Codable, Equatable, Sendable {
     /// The `legacy*` cases keep v1's original key names, so a v1 file decodes
     /// unchanged while the property names say what they are.
     private enum CodingKeys: String, CodingKey {
-        case id, name, groupID, kind, fields, paneVisibility, appearance, position, password
-        case terminalType
+        case id, name, groupID, kind, fields, appearance, position, password
         case jumpHost, jumpPort, jumpUsername, jumpAuthKind, jumpKeyPath, jumpPassword
         case jumpTLSTunnel
         case s3SecretAccessKey
@@ -292,11 +260,9 @@ public struct ExportedSession: Codable, Equatable, Sendable {
         name = try c.decode(String.self, forKey: .name)
         groupID = try c.decodeIfPresent(UUID.self, forKey: .groupID)
         kind = try c.decodeIfPresent(ConnectionKind.self, forKey: .kind)
-        paneVisibility = try c.decodeIfPresent(PaneVisibility.self, forKey: .paneVisibility)
         appearance = try c.decodeIfPresent(SessionAppearance.self, forKey: .appearance)
         position = try c.decodeIfPresent(Int.self, forKey: .position)
-        terminalType = (try? c.decodeIfPresent(String.self, forKey: .terminalType))
-            .flatMap(TerminalType.init(rawValue:))
+
         fields = try c.decodeIfPresent([String: String].self, forKey: .fields) ?? [:]
         password = try c.decodeIfPresent(String.self, forKey: .password)
         jumpHost = try c.decodeIfPresent(String.self, forKey: .jumpHost)
@@ -347,10 +313,8 @@ public struct ExportedSession: Codable, Equatable, Sendable {
         try c.encode(name, forKey: .name)
         try c.encodeIfPresent(groupID, forKey: .groupID)
         try c.encodeIfPresent(kind, forKey: .kind)
-        try c.encodeIfPresent(paneVisibility, forKey: .paneVisibility)
         try c.encodeIfPresent(appearance, forKey: .appearance)
         try c.encodeIfPresent(position, forKey: .position)
-        try c.encodeIfPresent(terminalType, forKey: .terminalType)
         try c.encode(fields, forKey: .fields)
         try c.encodeIfPresent(password, forKey: .password)
         try c.encodeIfPresent(jumpHost, forKey: .jumpHost)

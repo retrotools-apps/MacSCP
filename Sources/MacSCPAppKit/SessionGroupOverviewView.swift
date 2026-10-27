@@ -22,7 +22,7 @@ struct SessionCardPresentation: Identifiable, Sendable {
     var facts: [SessionOverviewModel.Fact] {
         let hasLogin = overview.facts.contains { $0.id == "loginSet" }
         return overview.facts.filter {
-            !["panes", "group", "endpoint", "baseURL"].contains($0.id) && !(hasLogin && $0.id == "username")
+            !["group", "endpoint", "baseURL"].contains($0.id) && !(hasLogin && $0.id == "username")
         }.map { fact in
             guard fact.id == "username" else { return fact }
             return .init(id: fact.id, labelKey: "card.login", text: fact.text, isMonospaced: true)
@@ -142,20 +142,29 @@ struct SessionCardView: View {
     let onConnect: SessionRowConnectEffect<StoredSession>
     let onEdit: (StoredSession) -> Void
     let onDiagnose: (StoredSession) -> Void
+    @Environment(\.highContrast) private var highContrast
+    @Environment(\.groupColorsEnabled) private var colorsEnabled
+    @Environment(\.colorScheme) private var scheme
     @State private var hovered = false
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     private var descriptor: BackendDescriptor { .descriptor(for: card.session.kind) }
     private var appearance: SessionAppearance { card.session.appearance ?? SessionAppearance() }
+    private var groupInk: Color? {
+        guard highContrast, card.groupHue != nil || card.groupColor != nil else { return nil }
+        return GroupSurfaceStyle.foreground(hue: card.groupHue ?? 0.62, customColor: card.groupColor,
+            darkerNeutral: card.darkerNeutral, dark: scheme == .dark, colorsEnabled: colorsEnabled)
+    }
+
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             HStack(spacing: 9) {
                 AppearanceIcon(icon: appearance.icon, applicationLogo: appearance.applicationLogo, kind: card.session.kind, size: 19)
                     .font(.system(size: 19, weight: .medium))
-                    .foregroundStyle(appearance.tint.color)
+                    .foregroundStyle(highContrast ? .white : appearance.displayColor)
                     .frame(width: 28, height: 28)
-                    .background(appearance.tint.color.opacity(0.09), in: RoundedRectangle(cornerRadius: 7))
+                    .background(appearance.displayColor.opacity(highContrast ? 1 : 0.09), in: RoundedRectangle(cornerRadius: highContrast ? 14 : 7))
                     .help(L10n.string(descriptor.badgeLabelKey, descriptor.badgeLabelDefault))
                     .accessibilityHidden(true)
                 Text(card.overview.name).font(.system(size: 14, weight: .semibold)).lineLimit(1)
@@ -216,6 +225,8 @@ struct SessionCardView: View {
             .controlSize(.small)
             .buttonStyle(SessionCardButtonStyle())
         }
+        .foregroundStyle(groupInk ?? .primary, groupInk?.opacity(0.85) ?? .secondary,
+                         groupInk?.opacity(0.75) ?? .secondary)
         .padding(14)
         .frame(width: SessionCardLayout.width, height: SessionCardLayout.height, alignment: .topLeading)
         .background {

@@ -203,33 +203,6 @@ struct PollingGuardTests {
         #expect(offenders.isEmpty, "\(offenders)")
     }
 
-    /// Negative: no test races a sleeping sibling against real work inside
-    /// a task group — `ConnectMainActorLivenessTests` and
-    /// `CitadelShellIntegrationTests` both carried this shape before the
-    /// "ceilings under other spellings" plan: a `group.addTask` whose
-    /// first statement is `Task.sleep(for:`, standing in for the harness
-    /// `.timeLimit` that already ends a hung test. Scanned over
-    /// comment-and-string-blanked source, per CLAUDE.md "Source-scanning
-    /// guards read comments too" — a doc comment that writes out the
-    /// banned shape to explain it (as this file's own history did, for
-    /// the `elapsed <` ceiling) is otherwise indistinguishable from the
-    /// shape itself.
-    ///
-    /// The regex also matches the sleep wrapped one level inside a
-    /// `do {}` — fix round 2026-09-04, docs/BACKLOG.md's "third limit" on
-    /// this guard: `AsyncSignal.race(timeout:_:)`
-    /// (`AsyncSignal.swift`) is exactly the sleeping-child shape
-    /// this check exists to catch, but the sleep sat behind a `do {}`
-    /// error handler, so the token right after `addTask`'s own brace was
-    /// that wrapper rather than `Task.sleep`, and the plain regex passed
-    /// over it without matching. Widening the pattern turned that miss
-    /// into a real match, which is now a NAMED exemption rather than an
-    /// unexamined blind spot: `AsyncSignal.swift` is excluded only
-    /// when it still carries `raceExemptionSentence` beside the sleep, the
-    /// same shape `noLatchIsWaitedOnWithATimeout` uses for the
-    /// saturation-site exemption above — matched by sentence, not by file
-    /// name, so a rewording without also removing the shape turns this
-    /// check red instead of quietly staying green.
     @Test func noSleepingChildRacesWorkInAGroup() throws {
         let pattern = try CompiledPattern.regex(Self.sleepingChildPattern)
         let raceExemptionSentence = "the timeout IS the API under test here"
@@ -389,44 +362,6 @@ struct PollingGuardTests {
         #expect(withoutLimit.isEmpty, "\(withoutLimit)")
     }
 
-    /// Negative: no `while` loop in `Tests/` waits by sleeping with its
-    /// sleep's cancellation swallowed.
-    ///
-    /// `while <condition> { try? await Task.sleep(...) }` is a poll whose
-    /// only suspension point stops suspending the moment the task is
-    /// cancelled: `Task.sleep` then throws at once, `try?` discards the
-    /// throw, and the loop becomes a tight spin on a cooperative-pool
-    /// thread that nothing can end (CLAUDE.md, "Tests never block the
-    /// cooperative pool"). `TunnelRunnerFakes.TunnelLatch.wait()` was
-    /// exactly that shape, and it is entered from an already-cancelled
-    /// task by design, so the spin was on the ONLY path it ever took.
-    ///
-    /// A condition that reads `Task.isCancelled` is not this shape: the
-    /// loop's own test ends it on the first turn after cancellation, which
-    /// is why three of the five `while` blocks this check finds are allowed
-    /// by their condition alone (counted 2026-09-07 by this check's own
-    /// scan; `everyCancellationObservingLoopIsSeen` below records the
-    /// totals).
-    ///
-    /// Two more are allowed by a sentence instead, searched for in the 12
-    /// lines above the `while` plus the block's own body — never by path,
-    /// so that moving or renaming a file cannot widen the exemption, and
-    /// so that removing the sentence without removing the loop turns this
-    /// check red:
-    ///
-    /// - `TerminalPanelViewModelTests`' output stub, whose whole purpose
-    ///   is a stream that does not answer cancellation ("does not observe
-    ///   task cancellation").
-    /// - `CitadelFileSystemIntegrationTests.waitForServerToCloseDescriptors`,
-    ///   whose loop carries its own iteration bound ("bounded at roughly
-    ///   two seconds") and so cannot spin without end.
-    ///
-    /// Scanned over comment-and-string-blanked source for the SHAPE, per
-    /// CLAUDE.md "Source-scanning guards read comments too" — a doc
-    /// comment quoting the forbidden loop, or a fixture holding one in a
-    /// string, would otherwise BE one — and over the ORIGINAL lines for
-    /// the exemption sentences, which live in comments the blanking has
-    /// erased.
     @Test func noWhileLoopSwallowsItsSleepsCancellation() throws {
         let blocks = try Self.sleepingWhileBlocks()
         let offenders = blocks.filter { !$0.observesCancellation && $0.exemption == nil }
@@ -464,7 +399,6 @@ struct PollingGuardTests {
 
     /// The two sentences that allow a swallowed sleep inside a `while`.
     private static let sleepExemptionSentences = [
-        "does not observe task cancellation",
         "bounded at roughly two seconds",
     ]
 
@@ -571,46 +505,6 @@ struct PollingGuardTests {
             .joined(separator: " ")
     }
 
-    /// Negative: no `EventLoopFuture` is awaited with `.get()` — the shape
-    /// `awaitCancellably` (`Tests/MacSCPTestSupport/AwaitCancellably.swift`)
-    /// exists to replace, per its own doc comment and
-    /// `docs/BACKLOG.md` ("Wall-clock ceilings still in the tree"):
-    /// `EventLoopFuture.get()` ignores task cancellation, so a future that
-    /// never completes ends nothing — the calling suite's `.timeLimit`
-    /// records a red and the run then parks, the same 0 % CPU shape
-    /// `docs/superpowers/specs/2026-08-08-testsuite-hang-investigation.md`
-    /// describes, reached from the other side.
-    ///
-    /// The regex matches a `.get()` preceded, across any run of
-    /// whitespace including a line break, by an identifier ending
-    /// `future`, `Future` or `futureResult` — `promise.futureResult` and a
-    /// bare `future` local are both real shapes this tree carried; a `.`
-    /// breaks `\w*`, so the match is always the LAST identifier segment
-    /// before the call, never a longer qualified path. The whitespace run
-    /// matters on its own: a fix-round review found `promise.futureResult`
-    /// wrapped onto its own line above a lone `.get()` compiles identically
-    /// to the one-line form and escaped an earlier version of this regex
-    /// that required the two adjacent — `FutureGetRegexFixture`'s second
-    /// demonstration is exactly that wrapped shape. `Result<Value,
-    /// Error>.get()` — a same-named, unrelated stdlib API this tree also
-    /// calls (`BandwidthBucketTests`, `SSHAgentClientTests`,
-    /// `HostKeyValidationTests`,
-    /// `EmbeddedKeyPorterTests`, `SSHTerminalViewSizingTests`) — is not this
-    /// shape and does not match: its receiver identifiers (`result`, `$0`,
-    /// a `#require(...)` call result, a bare `outcome`) never end in
-    /// `future`/`Future`/`futureResult`.
-    ///
-    /// Scanned over comment-and-string-blanked source, same as
-    /// `noSleepingChildRacesWorkInAGroup` and
-    /// `noTestAssertsAnElapsedSinceCeiling`, per CLAUDE.md "Source-scanning
-    /// guards read comments too": `EventLoopFuture` itself ends in
-    /// `Future`, so a doc comment that writes out
-    /// `` `EventLoopFuture.get()` `` to explain the shape — as this
-    /// check's own comment above does, and as `AwaitCancellably.swift`'s
-    /// does at length — is otherwise indistinguishable from the shape
-    /// itself. No exemption list is needed beyond that: every remaining
-    /// `.get()` in `Tests/` that would otherwise match this regex, at the
-    /// point this check was written, sits in such a comment.
     @Test func noEventLoopFutureIsAwaitedWithGet() throws {
         let pattern = try CompiledPattern.regex(Self.futureGetPattern)
         // Every match of the pattern ends in the literal `.get()`, so a file
@@ -692,52 +586,6 @@ struct PollingGuardTests {
         }
     }
 
-    /// Negative: no test target file outside `Tests/MacSCPTestSupport/`
-    /// calls `withCheckedContinuation(`/`withCheckedThrowingContinuation(`/
-    /// `withUnsafeContinuation(`/`withUnsafeThrowingContinuation(` directly,
-    /// unless the sentence "the continuation IS the API under test here"
-    /// appears within `continuationExemptionWindow` lines directly ABOVE
-    /// that specific use — the same PROXIMITY shape
-    /// `IconTooltipLintTests.hintWindow` uses (12 lines, read there for the
-    /// reasoning), not a file-level exemption. A file-level version of this
-    /// check shipped first (fix round 1 review, Important finding) and was
-    /// too coarse: one sentence anywhere in a file exempted EVERY bare
-    /// continuation in it, so a second, unrelated bare continuation added
-    /// to an already-exempted file would have passed silently. Matched by
-    /// sentence rather than by file name, same as
-    /// `noLatchIsWaitedOnWithATimeout` and `noSleepingChildRacesWorkInAGroup`,
-    /// so a rewording without also removing the shape turns this check red
-    /// instead of quietly staying green.
-    ///
-    /// `docs/BACKLOG.md`, "A test parked on a bare continuation outlives its
-    /// time limit": a bare continuation does not observe `Task`
-    /// cancellation, so Swift Testing's `.timeLimit` cancels the enclosing
-    /// test's task but never unparks the continuation underneath it — the
-    /// "exceeded" report is not the process actually stopping, and on CI the
-    /// job runs on to its own outer timeout instead of failing at the
-    /// suite's stated limit. Every ordinary wait instead goes through
-    /// `awaitResumption`/`awaitResumptionThrowing`
-    /// (`Tests/MacSCPTestSupport/AwaitResumption.swift`), which resumes with
-    /// `CancellationError` the moment the awaiting task is cancelled. The 14
-    /// call sites exempted here, across 13 files (counted 2026-09-06, one
-    /// file — `SSHTerminalViewSizingTests` — carries two, each with its own
-    /// nearby sentence), each sit beside a comment explaining why THAT
-    /// bare continuation is not this bug: a mock that deliberately never
-    /// resumes to model a frozen peer or an uncancellable probe, a
-    /// hand-built race that is already bounded by construction, or a body
-    /// that cannot be `@Sendable` (`NSItemProvider`). The newest of them,
-    /// `RemoteForwardTests`, is the first kind: a transport that ignores its
-    /// own cancellation, which is what `RemoteForward.stop()`'s bound
-    /// exists for.
-    ///
-    /// Matching is done PER LINE, on comment-and-string-blanked source (per
-    /// CLAUDE.md "Source-scanning guards read comments too": several
-    /// exemption doc comments quote `withCheckedContinuation` verbatim,
-    /// which would otherwise look like the call itself to this regex) —
-    /// blanking preserves line breaks, so a match's line number in the
-    /// blanked text is the same line number in the ORIGINAL text, which is
-    /// where the sentence itself lives (inside a `///`/`//` comment the
-    /// blanking would otherwise erase).
     @Test func noBareContinuationEscapesAwaitResumption() throws {
         // `\s*[({]`, not a literal `\(`: every real call site in this tree
         // uses trailing-closure syntax (`withCheckedContinuation { ... }`),

@@ -8,14 +8,19 @@ struct TunnelWorkspaceView: View {
     var selection: Binding<TunnelWorkspaceSelection> = .constant(.all)
     var requestsNewTunnel: Binding<Bool> = .constant(false)
     @Environment(\.openURL) private var openURL
+    @Environment(\.highContrast) private var highContrast
     @Environment(\.colorScheme) private var colorScheme
+    @State private var activeOnly = false
     @State private var editor: TunnelEditorItem?
     @State private var deletion: TunnelProfile?
     @State private var errorMessage: String?
 
     private var carriers: [StoredSession] { sessions.filter { $0.kind == .ssh } }
-    private var visibleProfiles: [TunnelProfile] {
+    private var scopedProfiles: [TunnelProfile] {
         TunnelCatalog.profiles(selection: selection.wrappedValue, profiles: manager.allProfiles, groups: manager.allGroups)
+    }
+    private var visibleProfiles: [TunnelProfile] {
+        scopedProfiles.filter { !activeOnly || selection.wrappedValue != .all || TunnelPresentationState.isActive(manager.state(of: $0.id)) }
     }
     private var selectedGroupID: UUID? {
         switch selection.wrappedValue {
@@ -53,10 +58,10 @@ struct TunnelWorkspaceView: View {
             Divider()
             if visibleProfiles.isEmpty {
                 ContentUnavailableView {
-                    Label { Text(L10n.string("tunnels.empty", "No tunnels yet")) } icon: { TunnelIcon(size: 40) }
+                    Label { Text(activeOnly && !scopedProfiles.isEmpty ? L10n.string("tunnels.noActive", "No active tunnels") : L10n.string("tunnels.empty", "No tunnels yet")) } icon: { TunnelIcon(size: 40) }
                         .help(L10n.string("tunnels.empty", "No tunnels yet"))
                 } description: {
-                    Text(L10n.string("tunnels.empty.detail", "Create a mapping and choose the saved SSH connection that carries it."))
+                    if !activeOnly || scopedProfiles.isEmpty { Text(L10n.string("tunnels.empty.detail", "Create a mapping and choose the saved SSH connection that carries it.")) }
                 }
                 if carriers.isEmpty {
                     Text(L10n.string("tunnels.noCarriers", "Create an SCP session first to use its SSH connection."))
@@ -71,7 +76,7 @@ struct TunnelWorkspaceView: View {
                                 .background {
                                     ZStack {
                                         if colorScheme == .light { DesignTokens.card }
-                                        Color.primary.opacity(GroupTintStyle.tunnelRowOpacity(
+                                        Color.primary.opacity(highContrast ? (index.isMultiple(of: 2) ? 0.04 : 0.10) : GroupTintStyle.tunnelRowOpacity(
                                             alternate: index.isMultiple(of: 2) == false,
                                             dark: colorScheme == .dark))
                                     }
@@ -130,6 +135,11 @@ struct TunnelWorkspaceView: View {
                 Text(title).font(.title2.weight(.semibold))
                 Text(L10n.string("tunnels.subtitle", "Local, remote and SOCKS forwarding across your SSH connections."))
                     .font(.callout).foregroundStyle(.secondary)
+                if selection.wrappedValue == .all {
+                    Toggle(L10n.string("tunnels.activeOnly", "Active only"), isOn: $activeOnly)
+                        .toggleStyle(.switch).controlSize(.mini).font(.caption)
+                        .fixedSize().padding(.top, 6)
+                }
             }
             Spacer(minLength: 4)
             Button {
@@ -137,7 +147,7 @@ struct TunnelWorkspaceView: View {
                     if case .group(let id) = selection.wrappedValue {
                         await manager.startGroup(id, decider: decider)
                     } else {
-                        for profile in visibleProfiles where !isRunning(manager.state(of: profile.id)) {
+                        for profile in scopedProfiles where !isRunning(manager.state(of: profile.id)) {
                             await manager.start(profile, decider: decider)
                         }
                     }
@@ -146,19 +156,19 @@ struct TunnelWorkspaceView: View {
                 Label(startTitle, systemImage: "play.fill")
             }
             .help(startTitle)
-            .disabled(visibleProfiles.isEmpty)
+            .disabled(scopedProfiles.isEmpty)
             Button {
                 Task {
                     if case .group(let id) = selection.wrappedValue { await manager.stopGroup(id) }
                     else if selection.wrappedValue == .all { await manager.stopAll() }
-                    else { for profile in visibleProfiles { await manager.stop(profile) } }
+                    else { for profile in scopedProfiles { await manager.stop(profile) } }
                 }
             } label: {
                 Label(stopTitle, systemImage: "stop.fill")
             }
             .help(stopTitle)
             .disabled(!TunnelPresentationState.canStopAll(
-                visibleProfiles.map { manager.state(of: $0.id) }))
+                scopedProfiles.map { manager.state(of: $0.id) }))
         }
         .controlSize(.small)
         .padding(.horizontal, 20).padding(.vertical, 16)
@@ -236,6 +246,7 @@ struct TunnelWorkspaceView: View {
                     }
                     .help(L10n.string("tunnel.action.edit", "Edit"))
                     Menu {
+                        TunnelPortReleaseButton(profile: profile, manager: manager, decider: decider)
                         Button(L10n.string("tunnel.action.delete", "Delete"), role: .destructive) { deletion = profile }
                     } label: {
                         Label(L10n.string("tunnels.more", "More actions"), systemImage: "ellipsis")
@@ -251,6 +262,7 @@ struct TunnelWorkspaceView: View {
         .padding(.horizontal, 20).padding(.vertical, 10)
         .contentShape(Rectangle())
         .onTapGesture(count: 2) { toggleTunnel(profile) }
+        .modifier(TunnelProfileActions(profile: profile, sessions: sessions, manager: manager, decider: decider))
     }
 
     private func toggleTunnel(_ profile: TunnelProfile) {
@@ -362,6 +374,7 @@ struct TunnelWorkspaceEditor: View {
     let sessions: [StoredSession]
     let manager: TunnelManager
     let onClose: () -> Void
+    var isDuplicate = false
     var initialGroupID: UUID? = nil
     @State private var draft = TunnelProfileDraft()
     @State private var carrierID: UUID?
@@ -414,14 +427,21 @@ struct TunnelWorkspaceEditor: View {
                     .keyboardShortcut(.defaultAction).disabled(saving || carrierID == nil)
             }
         }
-        .padding(24).frame(width: 900, height: 660)
+        .padding(24).frame(width: 900, height: 780)
         .background(Color(nsColor: .windowBackgroundColor))
         .onAppear {
-            if let profile { draft = TunnelProfileDraft(profile: profile); carrierID = profile.sessionID }
+            if let profile {
+                draft = TunnelProfileDraft(profile: profile); carrierID = profile.sessionID
+                if isDuplicate {
+                    draft.name = String(format: L10n.string("tunnels.copy %@", "%@ copy"), profile.name)
+                    draft.autoStart = .off
+                    if draft.kindTag != .remote { draft.listenPort = "" }
+                }
+            }
             else { carrierID = nil; draft.groupID = initialGroupID }
         }
         .task(id: "\(draft.kindTag.rawValue)|\(draft.bind)") {
-            guard profile == nil, draft.kindTag != .remote,
+            guard profile == nil || isDuplicate, draft.kindTag != .remote,
                   draft.listenPort.isEmpty || draft.listenPort == suggestedPort else { return }
             let original = draft.listenPort
             let port = await TunnelPortSuggestion.suggest(bind: draft.bind, profiles: manager.allProfiles)
@@ -433,7 +453,7 @@ struct TunnelWorkspaceEditor: View {
 
     private func save() {
         guard let carrierID else { return }
-        switch draft.profile(id: profile?.id ?? UUID(), sessionID: carrierID) {
+        switch draft.profile(id: isDuplicate ? UUID() : (profile?.id ?? UUID()), sessionID: carrierID) {
         case .failure(let invalid): errorMessage = TunnelProfilesSheet.message(for: invalid)
         case .success(var value):
             if draft.kindTag != .local { value.service = nil }

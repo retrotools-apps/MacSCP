@@ -7,13 +7,6 @@ import Combine
 import SwiftUI
 import macSCPCore
 
-/// Detail-pane builders split out of `ContentView.swift`: the two-pane
-/// split layout, the window-chrome modifier group, the composed
-/// `mainContent`, the tab-identity proxy that drives its `.onChange`, the
-/// connected/prompt/form detail view, and the terminal panel it embeds.
-///
-/// Extraction only (no behavior change) -- see `ContentView.swift` for the
-/// surrounding state and the rest of the window's modifier groups.
 extension ContentView {
     /// The window's two-pane layout: session sidebar on the left, tab strip
     /// plus detail on the right.
@@ -41,8 +34,8 @@ extension ContentView {
                 .allowsHitTesting(showsSettingsWorkspace)
                 .disabled(!showsSettingsWorkspace)
                 .accessibilityHidden(!showsSettingsWorkspace)
-            TunnelWorkspaceSidebar(manager: TunnelManager.shared, selection: $tunnelWorkspaceSelection,
-                                   decider: tunnelHostKeyDecider, onSessions: { showsTunnelWorkspace = false },
+            TunnelWorkspaceSidebar(manager: TunnelManager.shared, sessions: sessionListViewModel.sessions, selection: $tunnelWorkspaceSelection,
+                                   decider: tunnelHostKeyDecider, sidebarCompact: settingsStore.sidebarCompact, onSessions: { showsTunnelWorkspace = false },
                                    onSettings: { showsSettingsWorkspace = true },
                                    onNewTunnel: { requestsNewTunnel = true })
                 .opacity(showsTunnelWorkspace && !showsSettingsWorkspace ? 1 : 0)
@@ -189,6 +182,7 @@ extension ContentView {
                 Color.clear.preference(key: SidebarMeasuredWidthKey.self, value: proxy.size.width)
             }
         }
+        .background { SidebarDividerRestorer(width: sidebarOpeningWidth) }
 
         }
         VStack(spacing: 0) {
@@ -259,6 +253,8 @@ extension ContentView {
                 onAttempt: { reconnect($0) })
         }
     }
+    .modifier(SidebarWidthMemory(visible: isSidebarVisible || showsSettingsWorkspace,
+                                 openingWidth: $sidebarOpeningWidth))
     .backgroundPreferenceValue(SidebarMeasuredWidthKey.self) { measuredSidebarWidth in
         GeometryReader { proxy in
             if isSidebarVisible {
@@ -460,222 +456,201 @@ extension ContentView {
                         transferToSession(selection, from: .remote, target: target, in: owner, session: session)
                     })
             } else if let session = tab.session {
-                // The ONE decision both render conditions below read (P2
-                // terminal-chrome milestone, Task 3 review round 1) —
-                // `SessionTab.effectivePaneVisibility`, the SAME method the
-                // toolbar's `paneToggleState` reads. Neither branch below
-                // reads `tab.showsFiles`/`session.terminal.isVisible`
-                // directly any more: those two raw booleans can disagree
-                // (hide Files, disconnect, reconnect — `showsFiles` stays
-                // `false` while a fresh `TerminalPanelViewModel` also
-                // starts at `isVisible == false`), and reading them
-                // straight into two independent `if`s rendered NEITHER
-                // half while the toolbar's Files button, which DID go
-                // through `PaneVisibility`'s repair, showed itself as
-                // on-and-locked. Computing `visibility` once here and
-                // reading `.showsFiles`/`.showsTerminal` off it closes that
-                // gap — see `effectivePaneVisibility`'s own doc comment.
-                let visibility = PaneVisibility.filesOnly
                 VStack(spacing: 0) {
-                    VSplitView {
-                        if visibility.showsFiles {
-                            HSplitView {
-                                BrowserPane(
-                                    fileWindows: tab.fileWindows,
-                                    title: L10n.string("browser.paneLocal", "Local"),
-                                    tint: DesignTokens.localAmber,
-                                    softTint: DesignTokens.localSoft,
-                                    viewModel: session.local,
-                                    side: .local,
-                                    transferGroupID: session.id,
-                                    isActivePane: tab.commanderActiveSide == .local,
-                                    onActivatePane: { tab.commanderActiveSide = .local },
-                                    fileSystem: session.localFS,
-                                    pasteboardWriter: { item in
-                                        item.kind == .file
-                                            ? NSURL(fileURLWithPath: item.path)
-                                            : nil
-                                    },
-                                    onMenuAction: { entry, selection in
-                                        switch entry {
-                                        case .transferToOtherPane:
-                                            transferSelection(
-                                                selection, from: .local, in: tab, session: session)
-                                        case .transferToSession(let target):
-                                            transferToSession(
-                                                selection, from: .local, target: target,
-                                                in: tab, session: session)
-                                        case .copyPath:
-                                            copyPaths(of: selection)
-                                        case .openInEditor:
-                                            break   // never emitted for the local pane (menu model)
-                                        case .rename, .infoAndPermissions, .newFolder, .newFile,
-                                            .delete, .computeChecksum:
-                                            break   // handled inside BrowserPane, never forwarded
-                                        case .backendFileAction:
-                                            break   // never contributed on the LOCAL pane (fileActions is nil here)
-                                        }
-                                    },
-                                    crossSessionTargets: { CrossSessionTargets.targets(excluding: tab.id, in: tabsModel.tabs) },
-                                    // Where this pane's "Transfer ▸ To the
-                                    // other pane" would send (review C-1): the
-                                    // REMOTE pane, which cannot receive while
-                                    // it sits at a bucket list. A closure, so
-                                    // the remote pane's current directory is
-                                    // read at menu-build time rather than
-                                    // baked into this view's identity.
-                                    destinationScope: {
-                                        BrowserScope(
-                                            rootIsContainerList: session.remoteFS.rootIsContainerList,
-                                            currentPath: session.remote.currentPath)
-                                    },
-                                    visibleColumns: settingsStore.visibleColumns,
-                                    checksumAlgorithm: settingsStore.checksumAlgorithm,
-                                    // The ledger belongs to the SESSION, not
-                                    // to the pane (checksum-column review,
-                                    // I2): this subtree is remounted per tab
-                                    // (`.id(tab.id)` below) and again
-                                    // whenever the Files half is hidden and
-                                    // shown, and a digest the user paid a
-                                    // server-side hash for must survive all
-                                    // of that. The binding names THIS
-                                    // session and refuses to write once it
-                                    // is gone, so a hash still in flight
-                                    // across a reconnect cannot land in the
-                                    // next connection's ledger — see
-                                    // `checksumLedgerBinding(for:in:)`.
-                                    checksumLedger: tab.checksumLedgerBinding(
-                                        for: .local, in: session),
-                                    // "local" is not a `ConnectionKind`, so
-                                    // there is no descriptor and no capability
-                                    // flag to read here — the local file
-                                    // system is asked instead, which for it is
-                                    // the same question. See
-                                    // `ChecksumAvailability`.
-                                    supportsChecksum: ChecksumAvailability.isOffered(
-                                        byLocalFileSystem: session.localFS),
-                                    // Likewise off the local file system's own
-                                    // declaration, since there is no descriptor.
-                                    supportsPermissions: PermissionsAvailability.isOfferedByTheLocalFileSystem
-                                )
-                                .frame(minWidth: 280)
+                    HSplitView {
+                        BrowserPane(
+                            fileWindows: tab.fileWindows,
+                            title: L10n.string("browser.paneLocal", "Local"),
+                            tint: DesignTokens.localAmber,
+                            softTint: DesignTokens.localSoft,
+                            viewModel: session.local,
+                            side: .local,
+                            transferGroupID: session.id,
+                            isActivePane: tab.commanderActiveSide == .local,
+                            onActivatePane: { tab.commanderActiveSide = .local },
+                            fileSystem: session.localFS,
+                            pasteboardWriter: { item in
+                                item.kind == .file
+                                    ? NSURL(fileURLWithPath: item.path)
+                                    : nil
+                            },
+                            onMenuAction: { entry, selection in
+                                switch entry {
+                                case .transferToOtherPane:
+                                    transferSelection(
+                                        selection, from: .local, in: tab, session: session)
+                                case .transferToSession(let target):
+                                    transferToSession(
+                                        selection, from: .local, target: target,
+                                        in: tab, session: session)
+                                case .copyPath:
+                                    copyPaths(of: selection)
+                                case .openInEditor:
+                                    break   // never emitted for the local pane (menu model)
+                                case .rename, .infoAndPermissions, .newFolder, .newFile,
+                                    .delete, .computeChecksum:
+                                    break   // handled inside BrowserPane, never forwarded
+                                case .backendFileAction:
+                                    break   // never contributed on the LOCAL pane (fileActions is nil here)
+                                }
+                            },
+                            crossSessionTargets: { CrossSessionTargets.targets(excluding: tab.id, in: tabsModel.tabs) },
+                            // Where this pane's "Transfer ▸ To the
+                            // other pane" would send (review C-1): the
+                            // REMOTE pane, which cannot receive while
+                            // it sits at a bucket list. A closure, so
+                            // the remote pane's current directory is
+                            // read at menu-build time rather than
+                            // baked into this view's identity.
+                            destinationScope: {
+                                BrowserScope(
+                                    rootIsContainerList: session.remoteFS.rootIsContainerList,
+                                    currentPath: session.remote.currentPath)
+                            },
+                            visibleColumns: settingsStore.visibleColumns,
+                            checksumAlgorithm: settingsStore.checksumAlgorithm,
+                            // The ledger belongs to the SESSION, not
+                            // to the pane (checksum-column review,
+                            // I2): this subtree is remounted per tab
+                            // (`.id(tab.id)` below) and again
+                            // whenever the Files half is hidden and
+                            // shown, and a digest the user paid a
+                            // server-side hash for must survive all
+                            // of that. The binding names THIS
+                            // session and refuses to write once it
+                            // is gone, so a hash still in flight
+                            // across a reconnect cannot land in the
+                            // next connection's ledger — see
+                            // `checksumLedgerBinding(for:in:)`.
+                            checksumLedger: tab.checksumLedgerBinding(
+                                for: .local, in: session),
+                            // "local" is not a `ConnectionKind`, so
+                            // there is no descriptor and no capability
+                            // flag to read here — the local file
+                            // system is asked instead, which for it is
+                            // the same question. See
+                            // `ChecksumAvailability`.
+                            supportsChecksum: ChecksumAvailability.isOffered(
+                                byLocalFileSystem: session.localFS),
+                            // Likewise off the local file system's own
+                            // declaration, since there is no descriptor.
+                            supportsPermissions: PermissionsAvailability.isOfferedByTheLocalFileSystem
+                        )
+                        .frame(minWidth: 280)
 
-                                BrowserPane(
-                                    fileWindows: tab.fileWindows,
-                                    title: L10n.string("browser.paneRemote", "Remote"),
-                                    tint: DesignTokens.remoteBlue,
-                                    softTint: DesignTokens.remoteSoft,
-                                    viewModel: session.remote,
-                                    side: .remote,
-                                    transferGroupID: session.id,
-                                    isActivePane: tab.commanderActiveSide == .remote,
-                                    onActivatePane: { tab.commanderActiveSide = .remote },
-                                    onDropURLs: { urls in
-                                        uploadDropped(urls, in: tab, session: session)
-                                    },
-                                    onOpenFile: { item in
-                                        guard EditorResolver.applicationURL(
-                                            forFileName: item.name, settings: settingsStore) != nil
-                                        else { return false }
+                        BrowserPane(
+                            fileWindows: tab.fileWindows,
+                            title: L10n.string("browser.paneRemote", "Remote"),
+                            tint: DesignTokens.remoteBlue,
+                            softTint: DesignTokens.remoteSoft,
+                            viewModel: session.remote,
+                            side: .remote,
+                            transferGroupID: session.id,
+                            isActivePane: tab.commanderActiveSide == .remote,
+                            onActivatePane: { tab.commanderActiveSide = .remote },
+                            onDropURLs: { urls in
+                                uploadDropped(urls, in: tab, session: session)
+                            },
+                            onOpenFile: { item in
+                                guard EditorResolver.applicationURL(
+                                    forFileName: item.name, settings: settingsStore) != nil
+                                else { return false }
+                                openInEditor(item, in: tab, session: session)
+                                return true
+                            },
+                            fileSystem: session.remoteFS,
+                            pasteboardWriter: { item in
+                                item.kind == .file
+                                    ? remotePromiseProvider(for: item, in: tab, session: session)
+                                    : nil
+                            },
+                            onMenuAction: { entry, selection in
+                                switch entry {
+                                case .transferToOtherPane:
+                                    transferSelection(
+                                        selection, from: .remote, in: tab, session: session)
+                                case .transferToSession(let target):
+                                    transferToSession(
+                                        selection, from: .remote, target: target,
+                                        in: tab, session: session)
+                                case .openInEditor:
+                                    if let item = selection.first {
                                         openInEditor(item, in: tab, session: session)
-                                        return true
-                                    },
-                                    fileSystem: session.remoteFS,
-                                    pasteboardWriter: { item in
-                                        item.kind == .file
-                                            ? remotePromiseProvider(for: item, in: tab, session: session)
-                                            : nil
-                                    },
-                                    onMenuAction: { entry, selection in
-                                        switch entry {
-                                        case .transferToOtherPane:
-                                            transferSelection(
-                                                selection, from: .remote, in: tab, session: session)
-                                        case .transferToSession(let target):
-                                            transferToSession(
-                                                selection, from: .remote, target: target,
-                                                in: tab, session: session)
-                                        case .openInEditor:
-                                            if let item = selection.first {
-                                                openInEditor(item, in: tab, session: session)
-                                            }
-                                        case .copyPath:
-                                            copyPaths(of: selection)
-                                        case .rename, .infoAndPermissions, .newFolder, .newFile,
-                                            .delete, .computeChecksum:
-                                            break   // handled inside BrowserPane, never forwarded
-                                        case .backendFileAction(let action):
-                                            // Currently the only backend-contributed action is
-                                            // S3's presigned URL (M14/T5) — keyed off `action.id`
-                                            // so a future second contribution doesn't need a new
-                                            // `BrowserMenuEntry` case, just another `if` here.
-                                            // `selection.count == 1` mirrors the menu-model gate
-                                            // (`BrowserContextMenu.entries`) that only ever offers
-                                            // `backendFileAction` for a single selected file.
-                                            if action.id == "s3.presignedURL",
-                                                selection.count == 1, let file = selection.first,
-                                                let provider = session.remoteFS as? PresignedURLProvider
-                                            {
-                                                // Same "no leading slash" convention
-                                                // `S3FileSystem.objectKey(forPath:)` uses
-                                                // internally: normalize first (collapses any
-                                                // repeated slashes), then drop the single
-                                                // leading one.
-                                                let normalizedPath = RemotePath.normalizedAbsolute(file.path)
-                                                let key = normalizedPath == "/" ? "" : String(normalizedPath.dropFirst())
-                                                presignedSheetItem = PresignedSheetItem(
-                                                    itemKey: key, provider: provider)
-                                            }
-                                        }
-                                    },
-                                    crossSessionTargets: { CrossSessionTargets.targets(excluding: tab.id, in: tabsModel.tabs) },
-                                    fileActions: {
-                                        BackendDescriptor.descriptor(for: tab.connectionViewModel.kind)
-                                            .fileActions
-                                    },
-                                    // The mirror of the local pane's line
-                                    // above. `LocalFileSystem` takes the
-                                    // protocol default (`rootIsContainerList
-                                    // == false`), so this always answers
-                                    // "yes" today — asked through the same
-                                    // function anyway, rather than assumed,
-                                    // so a local pane that ever grows a
-                                    // container root is covered by
-                                    // construction.
-                                    destinationScope: {
-                                        BrowserScope(
-                                            rootIsContainerList: session.localFS.rootIsContainerList,
-                                            currentPath: session.local.currentPath)
-                                    },
-                                    visibleColumns: settingsStore.visibleColumns,
-                                    checksumAlgorithm: settingsStore.checksumAlgorithm,
-                                    // The remote side's own ledger — see the
-                                    // local pane's above for why it lives on
-                                    // the session. Two, because two panes are
-                                    // two file systems and a path means
-                                    // nothing across them.
-                                    checksumLedger: tab.checksumLedgerBinding(
-                                        for: .remote, in: session),
-                                    // The capability, not the kind. Every
-                                    // backend conforms to the checksum
-                                    // protocol — WebDAV does so in order to
-                                    // SAY it has none — so only the flag can
-                                    // tell an offer from an empty one.
-                                    supportsChecksum: ChecksumAvailability.isOffered(
-                                        for: tab.connectionViewModel.kind),
-                                    // Same shape: the descriptor's permission
-                                    // model, read through the one function
-                                    // that turns it into an offer.
-                                    supportsPermissions: PermissionsAvailability.isOffered(
-                                        for: tab.connectionViewModel.kind)
-                                )
-                                .frame(minWidth: 280)
-                            }
-                            .frame(minHeight: 200)
-                            .layoutPriority(1)
-                        }
-
+                                    }
+                                case .copyPath:
+                                    copyPaths(of: selection)
+                                case .rename, .infoAndPermissions, .newFolder, .newFile,
+                                    .delete, .computeChecksum:
+                                    break   // handled inside BrowserPane, never forwarded
+                                case .backendFileAction(let action):
+                                    // Currently the only backend-contributed action is
+                                    // S3's presigned URL (M14/T5) — keyed off `action.id`
+                                    // so a future second contribution doesn't need a new
+                                    // `BrowserMenuEntry` case, just another `if` here.
+                                    // `selection.count == 1` mirrors the menu-model gate
+                                    // (`BrowserContextMenu.entries`) that only ever offers
+                                    // `backendFileAction` for a single selected file.
+                                    if action.id == "s3.presignedURL",
+                                        selection.count == 1, let file = selection.first,
+                                        let provider = session.remoteFS as? PresignedURLProvider
+                                    {
+                                        // Same "no leading slash" convention
+                                        // `S3FileSystem.objectKey(forPath:)` uses
+                                        // internally: normalize first (collapses any
+                                        // repeated slashes), then drop the single
+                                        // leading one.
+                                        let normalizedPath = RemotePath.normalizedAbsolute(file.path)
+                                        let key = normalizedPath == "/" ? "" : String(normalizedPath.dropFirst())
+                                        presignedSheetItem = PresignedSheetItem(
+                                            itemKey: key, provider: provider)
+                                    }
+                                }
+                            },
+                            crossSessionTargets: { CrossSessionTargets.targets(excluding: tab.id, in: tabsModel.tabs) },
+                            fileActions: {
+                                BackendDescriptor.descriptor(for: tab.connectionViewModel.kind)
+                                    .fileActions
+                            },
+                            // The mirror of the local pane's line
+                            // above. `LocalFileSystem` takes the
+                            // protocol default (`rootIsContainerList
+                            // == false`), so this always answers
+                            // "yes" today — asked through the same
+                            // function anyway, rather than assumed,
+                            // so a local pane that ever grows a
+                            // container root is covered by
+                            // construction.
+                            destinationScope: {
+                                BrowserScope(
+                                    rootIsContainerList: session.localFS.rootIsContainerList,
+                                    currentPath: session.local.currentPath)
+                            },
+                            visibleColumns: settingsStore.visibleColumns,
+                            checksumAlgorithm: settingsStore.checksumAlgorithm,
+                            // The remote side's own ledger — see the
+                            // local pane's above for why it lives on
+                            // the session. Two, because two panes are
+                            // two file systems and a path means
+                            // nothing across them.
+                            checksumLedger: tab.checksumLedgerBinding(
+                                for: .remote, in: session),
+                            // The capability, not the kind. Every
+                            // backend conforms to the checksum
+                            // protocol — WebDAV does so in order to
+                            // SAY it has none — so only the flag can
+                            // tell an offer from an empty one.
+                            supportsChecksum: ChecksumAvailability.isOffered(
+                                for: tab.connectionViewModel.kind),
+                            // Same shape: the descriptor's permission
+                            // model, read through the one function
+                            // that turns it into an offer.
+                            supportsPermissions: PermissionsAvailability.isOffered(
+                                for: tab.connectionViewModel.kind)
+                        )
+                        .frame(minWidth: 280)
                     }
+                    .frame(minHeight: 200)
+                    .layoutPriority(1)
 
                     // Resume banner: displayed when the ACTIVE tab has interrupted
                     // transfers (M5d/T4). Clicking "Resume" re-enqueues them with
@@ -977,7 +952,6 @@ extension ContentView {
                         ConnectionFormView(
                             viewModel: tab.connectionViewModel,
                             sessionList: sessionListViewModel,
-                            globalTerminalType: settingsStore.terminalType,
                             managedKeyStore: managedKeyStore,
                             secretStore: secretStore,
                             resolveLoginSetForSubmit: {
@@ -1106,18 +1080,8 @@ extension ContentView {
                 }
             }
         }
-        // Load-bearing identity (M8a/T3 review): forces this whole per-tab
-        // subtree — the connected browser layout AND the form branch — to
-        // remount on every tab switch. Without it, two connected tabs would
-        // share the same SwiftUI view identities: `SSHTerminalView` binds
-        // `onOutput` and replays its buffer only in `makeNSView` --
-        // `updateNSView` touches font and cursor style and nothing else --
-        // so a tab switch would keep rendering/typing into the OLD tab's
-        // shell instead of rebinding to the new one. `BrowserPane`/
-        // `ConnectionFormView` `@State` would leak across tabs the same way.
         .id(tab.id)
     }
-
 
 }
 
@@ -2235,7 +2199,7 @@ struct ReconnectRunner: View {
 /// reader, can be read a pass apart — and a container width from before a
 /// window resize next to a sidebar width from after it is exactly the pair
 /// that looks like a drag.
-private struct SidebarMeasuredWidthKey: PreferenceKey {
+struct SidebarMeasuredWidthKey: PreferenceKey {
     static let defaultValue: CGFloat = 0
 
     /// The sidebar publishes exactly one value; this exists because the
@@ -2555,5 +2519,26 @@ private struct ConnectingAttemptView: View {
         .padding(24)
         .frame(minWidth: 420, maxWidth: 460)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
+    }
+}
+
+/// Retains each window's actual divider position across removal of the sidebar.
+/// The ideal width changes only while hidden, avoiding feedback during drags.
+struct SidebarWidthMemory: ViewModifier {
+    let visible: Bool
+    @Binding var openingWidth: CGFloat
+    // Geometry recording must not itself invalidate the split layout: doing
+    // so can cause SwiftUI to redistribute pane widths during a divider drag.
+    private final class Measurement { var width: CGFloat = 0 }
+    @State private var measurement = Measurement()
+
+    func body(content: Content) -> some View {
+        content
+            .onPreferenceChange(SidebarMeasuredWidthKey.self) { width in
+                if width > 0 { measurement.width = width }
+            }
+            .onChange(of: visible) { _, visible in
+                if !visible, measurement.width > 0 { openingWidth = measurement.width }
+            }
     }
 }

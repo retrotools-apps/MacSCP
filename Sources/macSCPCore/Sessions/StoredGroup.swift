@@ -39,24 +39,6 @@ public struct StoredGroup: Codable, Equatable, Identifiable, Sendable {
         case id, name, parentID, position, colorHue, color
     }
 
-    /// Explicit decoding preserves legacy position defaults and validates
-    /// the optional user-selected hue.
-    ///
-    /// Synthesized `Codable` does NOT fall back to a property's default value
-    /// for a MISSING key — it throws `keyNotFound`. Every `sessions-v2.json`
-    /// on disk today predates this field, so a synthesized decoder plus
-    /// `var position: Int = 0` would make the store unreadable for every
-    /// existing installation. `decodeIfPresent ?? 0` is what makes this
-    /// migration additive, and it is why the format needs no new file name.
-    ///
-    /// The alternative — an optional stored property behind a non-optional
-    /// computed accessor — was not taken: it would move the `?? 0` from one
-    /// place in the decoder to the type's surface, and `StoredSession` next
-    /// door already spells this same default for `kind` and `paneVisibility`
-    /// in exactly this way.
-    ///
-    /// `parentID` needs no such care: an Optional decodes as `nil` when its
-    /// key is absent, and `decodeIfPresent` here only says so out loud.
     public init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         id = try c.decode(UUID.self, forKey: .id)

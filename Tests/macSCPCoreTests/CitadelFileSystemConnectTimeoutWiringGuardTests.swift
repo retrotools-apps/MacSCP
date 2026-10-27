@@ -2,51 +2,8 @@ import Foundation
 import MacSCPTestSupport
 import Testing
 
-/// Guards that every `SSHClient.connect(` call inside `CitadelFileSystem.swift`
-/// actually FORWARDS the caller's `connectTimeout` — not merely that the
-/// label `connectTimeout:` appears.
-///
-/// A first version of this guard checked only for the label
-/// (`body.contains("connectTimeout:")`), which a fix-round review broke by
-/// re-spelling the original bug: hardcoding `connectTimeout: .seconds(30)`
-/// at both call sites satisfied that check exactly as well as threading the
-/// real parameter through, while silently reintroducing Citadel's old
-/// 30-second default — the literal is precisely the defect this task exists
-/// to remove. So the check here is on VALUE, not label: the argument passed
-/// for `connectTimeout:` must be the identifier `connectTimeout` (the
-/// function's own parameter, passed straight through), not a literal, not a
-/// differently-named local.
-///
-/// Both hops now dial through one funnel,
-/// `connectWithRegisteredAlgorithms` (added so that registering the custom
-/// host-key algorithms cannot come apart from the dial — see
-/// `CitadelFileSystemHostKeyAlgorithmWiringGuardTests`). So the timeout has
-/// two legs to travel, and this guard checks both: the funnel's own
-/// `SSHClient.connect(` must forward the funnel's `connectTimeout`, and each
-/// of the two hops must forward its own. One leg alone would leave a
-/// jump-through chain with its jump hop still stuck on Citadel's old
-/// 30-second wait.
-///
-/// Same boundary as the project's other wiring guards (see
-/// `PaneVisibilityWiringGuardTests`'s doc comment): a SOURCE-TEXT scan, not
-/// a behavioral test — there is no tool here that drives an actual TCP
-/// handshake against an unresponsive host. Fail-closed: an unreadable file,
-/// or a call-site count that does not match what this guard expects to
-/// find, is itself a failure rather than a silent pass.
-///
-/// The App-layer leg of the same wiring — that `ContentView+Lifecycle.swift`
-/// forwards a LIVE `settingsStore.connectTimeoutSeconds`, not a literal, to
-/// `BackendDescriptor.connect(...)` — is guarded separately, in
-/// `Tests/macSCPAppKitTests/ConnectTimeoutAppWiringGuardTests.swift`: it
-/// scans a different file with a different (positional, unlabeled) call
-/// shape, so it is not a natural extension of the scanner below.
 @Suite("CitadelFileSystem connect-timeout wiring guard")
 struct CitadelFileSystemConnectTimeoutWiringGuardTests {
-    /// `#filePath` here is
-    /// `<repoRoot>/Tests/macSCPCoreTests/CitadelFileSystemConnectTimeoutWiringGuardTests.swift`;
-    /// three `deletingLastPathComponent()` calls recover the repo root
-    /// regardless of `swift test`'s working directory (same trick as
-    /// `PaneVisibilityWiringGuardTests`).
     private static let repoRoot: URL = URL(fileURLWithPath: #filePath)
         .deletingLastPathComponent().deletingLastPathComponent()
         .deletingLastPathComponent()
@@ -236,11 +193,6 @@ struct CitadelFileSystemConnectTimeoutWiringGuardTests {
         #expect(Self.callStartLines(in: lines).count == 2)
         #expect(Self.callsNotForwardingConnectTimeout(in: lines).count == 1)
     }
-
-    // MARK: - Scanner
-    //
-    // Deliberately line/paren-based, like the project's other wiring guards
-    // (see `PaneVisibilityWiringGuardTests`'s `endLineOfCall`).
 
     /// 1-based line numbers where a call to `needle` starts. A line
     /// declaring the funnel is not a call of it, so `func ` lines are

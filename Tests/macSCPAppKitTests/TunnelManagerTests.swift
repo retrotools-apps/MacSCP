@@ -185,6 +185,22 @@ struct TunnelManagerTests {
 
     // MARK: - Start and stop, one profile
 
+    @Test func renamingAnActiveTunnelPersistsMetadataWithoutStoppingItsRunner() async throws {
+        let rig = Rig()
+        defer { rig.tearDown() }
+        let profile = Self.profile(session: UUID(), name: "Before")
+        try await rig.manager.save(profile)
+        await rig.manager.start(profile, decider: .refusing)
+        let runner = try rig.runner(profile)
+        try await pollUntil("active tunnel") { TunnelPresentationState.isActive(rig.manager.state(of: profile.id)) }
+        try rig.manager.rename(profile, to: " After ")
+        #expect(rig.manager.allProfiles.first?.name == "After")
+        #expect(rig.store.allProfiles().first?.name == "After")
+        #expect(runner.stopCount == 0)
+        #expect(TunnelPresentationState.isActive(rig.manager.state(of: profile.id)))
+        await rig.manager.stopAll()
+    }
+
     @Test func listedTunnelsStayAlphabeticalAfterCreationAndRename() async throws {
         let rig = Rig()
         defer { rig.tearDown() }

@@ -546,7 +546,6 @@ struct ReconnectWiringGuardTests {
             """)
     }
 
-
     /// The parser, on every form the grammar allows — including the one
     /// whose misreading would have talked a developer into opening the
     /// door this list exists to hold shut.
@@ -892,7 +891,7 @@ struct ReconnectWiringGuardTests {
             retryConnect(tab)
             func connect(
             connect(in: tab, stored: stored)
-            connect(in: target, stored: stored, paneVisibility: .terminalOnly)
+            connect(in: target, stored: stored)
             func mount() async {
             cancellable = publisher.connect()
             """)

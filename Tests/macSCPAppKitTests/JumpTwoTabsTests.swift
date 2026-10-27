@@ -262,7 +262,7 @@ struct JumpTwoTabsTests {
         // "Open Anyway" — the dialog's button calls exactly this with the
         // request's own values (`ContentView+Sheets.swift`).
         view.startWithoutAsking(
-            request.stored, paneVisibility: request.paneVisibility)
+            request.stored)
         try await pollUntil("the second tab connects") { second.isConnected }
 
         #expect(view.activeTab === second)

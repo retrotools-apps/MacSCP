@@ -268,8 +268,8 @@ struct TunnelPresenceWiringGuardTests {
         let glyph = try TransferQueueBarCancelGuardTests.declarationBody(
             of: "if let glyph = tunnelGlyph", in: sidebar)
         #expect(
-            glyph.contains("glyph.tint.color"),
-            "the glyph is drawn without the tint the plan chose")
+            glyph.contains(".foregroundStyle(groupForeground ?? glyph.tint.color)"),
+            "the glyph must use readable group ink or the ordinary status tint")
         #expect(glyph.contains("glyph.text"), "the glyph draws a colour with no text beside it")
         // The SYMBOL is the plan's too since fix round 1 (2026-09-20): it
         // is what tells a forwarding that keeps failing from one that is
@@ -292,19 +292,14 @@ struct TunnelPresenceWiringGuardTests {
         }
     }
 
-    /// The glyph is drawn in BOTH densities, which here means: it is not
-    /// wrapped in a compact-mode branch. `SessionSidebarCompactRowGuardTests`
-    /// forbids `if !isCompact` anywhere in the row; this states the property
-    /// for the glyph specifically, and pairs it with the positive that the
-    /// glyph is in the row at all.
-    @Test func theGlyphIsDrawnInBothDensities() throws {
+    /// The normal sidebar retains the complete forwarding indicator.
+    @Test func theGlyphIsDrawnInNormalMode() throws {
         let sidebar = try Self.strict(Self.sidebarFile)
-        #expect(sidebar.contains("if let glyph = tunnelGlyph"), "the row draws no glyph any more")
-        let glyph = try TransferQueueBarCancelGuardTests.declarationBody(
-            of: "if let glyph = tunnelGlyph", in: sidebar)
-        #expect(
-            !glyph.contains("isCompact"),
-            "the forwarding glyph is gated on the sidebar's density")
+        let row = try TransferQueueBarCancelGuardTests.declarationBody(
+            of: "private struct SessionRow: View", in: sidebar)
+        let normal = try TransferQueueBarCancelGuardTests.declarationBody(
+            of: "if !isCompact", in: row)
+        #expect(normal.contains("if let glyph = tunnelGlyph"))
     }
 
     /// The tooltip shows the state's own tooltip text — for a failure, its

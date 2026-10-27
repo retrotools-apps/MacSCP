@@ -1,52 +1,6 @@
 import Foundation
 import macSCPCore
 
-/// What a window opens with — ONE type with TWO uses (Detachable Tabs
-/// plan, Tasks 2 and 5).
-///
-/// SwiftUI's `WindowGroup(for:)` keys each window instance on a value, and
-/// `openWindow(value:)` is what opens a second one. This is that value,
-/// and the two things a window can be opened FOR are described by two
-/// different halves of it:
-///
-/// **A move (Task 2) fills `tabIDs`.** Those ids name LIVE `SessionTab`
-/// objects, parked in `TabRegistry` by the window they are leaving and
-/// claimed by the window that appears for this seed
-/// (`ContentView.claimSeededTabs()`). The tab keeps its connection, its
-/// queue and its terminal across the move because the OBJECT moves; the
-/// seed only says which. Those ids mean nothing outside the process that
-/// made them.
-///
-/// **A restoration (Task 5) fills `tabs`.** A `TabSeed` DESCRIBES a tab —
-/// the stored session it was showing and the pane visibility it was
-/// showing it with — so a later launch can build a NEW, disconnected tab
-/// from the description (`ContentView.restoreDescribedWindow()`). Nothing
-/// live is referenced, which is exactly why this half survives a quit and
-/// the other half cannot.
-///
-/// The two halves are never both filled, and the code reads that rather
-/// than a flag: a claim over an empty `tabIDs` comes back empty, and the
-/// restoration step is skipped for an empty `tabs`. A seed carries
-/// identifiers and booleans and nothing else — it is written to disk
-/// (`WindowRestorationStore`) and persisted by SwiftUI, and a persisted
-/// `SessionTab` would be a connection written to a file.
-///
-/// **`id` exists to defeat window reuse.** A value-keyed `WindowGroup`
-/// raises the window it already opened for an EQUAL value instead of
-/// opening a new one. A seed is consumed the moment its window appears, so
-/// two seeds must never be equal — the second would raise the first window
-/// and its tabs would go nowhere. A fresh `id` per seed makes equality
-/// per-seed, and it is what the registry parks under
-/// (`TabRegistry.park(_:for:from:onClaimed:)` / `claim(seedID:into:)`), so
-/// a claim can only ever pick up what THIS move parked. Restoration opens
-/// several windows in one pass, where the same rule does the same work.
-///
-/// The struct body holds stored properties and nothing else — every
-/// initializer is in the extension below. That is deliberate:
-/// `WindowRestorationWiringGuardTests` reads this body and checks every
-/// stored property's TYPE against the identifier-and-boolean set a seed
-/// may hold, and a body with function bodies in it could not be read that
-/// strictly.
 struct WindowSeed: Codable, Hashable, Sendable {
     /// Unique per seed — see the type's doc comment for why equality must
     /// be per-seed rather than per-content.
@@ -133,25 +87,4 @@ struct TabSeed: Codable, Hashable, Sendable {
     /// a file is how a host and username nobody chose to save would end up
     /// on disk.
     var sessionID: UUID?
-    /// Which halves the tab was showing. A restored tab is disconnected
-    /// and therefore has no panes yet, so this cannot be applied when the
-    /// tab is built; it rides along on the tab
-    /// (`SessionTab.restoredPaneVisibility`) until the tab connects, which
-    /// is the first moment there is anything to apply it to.
-    var paneVisibility: PaneVisibility = .filesOnly
-}
-
-extension TabSeed {
-    /// Same compatibility rule as `WindowSeed.init(from:)`: a description
-    /// missing a field decodes to the default rather than failing the
-    /// whole launch. `.filesOnly` is what a session with no recorded
-    /// preference already resolves to (`PaneVisibility.filesOnly`), so a
-    /// description written before this field existed restores what such a
-    /// session would have opened with anyway.
-    init(from decoder: any Decoder) throws {
-        let container = try decoder.container(keyedBy: CodingKeys.self)
-        sessionID = try container.decodeIfPresent(UUID.self, forKey: .sessionID)
-        paneVisibility = try container.decodeIfPresent(
-            PaneVisibility.self, forKey: .paneVisibility) ?? .filesOnly
-    }
 }

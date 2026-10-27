@@ -185,9 +185,7 @@ struct LivenessProbeCancellationTests {
             remoteFS: remoteFS,
             local: RemoteBrowserViewModel(fs: LocalFileSystem(), startPath: NSTemporaryDirectory()),
             remote: RemoteBrowserViewModel(fs: remoteFS, startPath: "/"),
-            terminal: TerminalPanelViewModel(openShell: { _, _, _ in
-                throw CancellationError()
-            }),
+
             editManager: EditSessionManager(sessionID: sessionID, queue: tab.transferQueue),
             homePath: "/")
         return remoteFS

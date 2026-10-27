@@ -564,7 +564,6 @@ struct ImportPreviewPlannerTests {
             port: 22, username: "deploy", groupID: group.id,
             importID: "known-1")
         stored.position = 7
-        stored.paneVisibility = .bothVisible
         let bookmark = sftpBookmark(
             id: "known-1", nickname: "Cyberduck's own name", host: "web-01.example.net",
             port: 2222, username: "deploy", labels: ["staging"])
@@ -587,7 +586,6 @@ struct ImportPreviewPlannerTests {
         // What the source does not know is copied off the record.
         #expect(exported.groupID == group.id)
         #expect(exported.position == 7)
-        #expect(exported.paneVisibility == .bothVisible)
     }
 
     @Test func anUpdateKeepsWhatCyberduckDoesNotKnow() throws {

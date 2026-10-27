@@ -39,22 +39,6 @@ enum SessionRowInput: Equatable, CaseIterable {
     }
 }
 
-/// The effect that moves the sidebar's selection onto a row.
-///
-/// A type of its own, holding the same closure shape its siblings hold, for
-/// one reason: `SessionRowActivation.apply` takes all of them at once, and
-/// parameters of the same function type are interchangeable by a one-token
-/// edit. Review round 2 planted exactly that — `onSelect: onConnect` — and
-/// the whole suite stayed green while every single click dialled a host.
-/// With distinct types that edit does not compile, which is a class of
-/// mistake removed rather than a mistake watched for. The same argument is
-/// why the host-reaching effects are a type each and not one repeated:
-/// swapping two of THOSE would send a double click to the terminal-only
-/// layout, or the terminal entry to a plain connect. Counted 2026-09-06,
-/// when the port-forwarding plan's Task 6 added the fourth and fifth: five
-/// effect types in this file reach the user's host — `SessionRowConnectEffect`,
-/// `SessionRowTerminalEffect`, `SessionRowExternalTerminalEffect`,
-/// `SessionRowStartTunnelEffect` and `SessionRowStartAllTunnelsEffect`.
 struct SessionRowSelectEffect<Value> {
     fileprivate let run: (Value) -> Void
 

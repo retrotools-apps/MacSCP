@@ -652,18 +652,13 @@ struct QuitSequenceTests {
         #expect(
             owner.contains("TeardownStage.stopEditWatchers.runBounded"),
             "TabTeardown.swift no longer runs the edit-watcher stage")
-        #expect(
-            owner.contains("TeardownStage.shutDownTerminal.runBounded"),
-            "TabTeardown.swift no longer runs the terminal stage")
-
         let declaration = try Self.strictSource(of: Self.stageFile)
         #expect(declaration.contains("case stopEditWatchers"))
-        #expect(declaration.contains("case shutDownTerminal"))
 
         var naming: [String] = []
         for file in try Self.swiftFiles(under: Self.sourcesRoot) {
             let source = try Self.strictSource(of: file)
-            guard source.contains(".stopEditWatchers") || source.contains(".shutDownTerminal")
+            guard source.contains(".stopEditWatchers")
             else { continue }
             naming.append(file.lastPathComponent)
         }

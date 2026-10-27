@@ -208,7 +208,7 @@ public final class SessionListViewModel {
         groupID: UUID? = nil, loginSetID: UUID? = nil,
         jump: StoredSession.JumpSpec? = nil, jumpSecret: String? = nil,
         filledJumpPassphrase: String? = nil,
-        terminalType: TerminalType? = nil,
+
         appearance: SessionAppearance? = nil
     ) -> StoredSession? {
         let descriptor = BackendDescriptor.descriptor(for: kind)
@@ -263,10 +263,6 @@ public final class SessionListViewModel {
         // block, so a non-SSH session has nowhere to put one — and this line
         // is correctly a no-op there rather than storing a hop nothing dials.
         session.ssh?.jump = jump
-        // The session's own terminal type (plan of 2026-09-19, Task 4),
-        // inside the SSH block for the jump's reason just above; `nil` is
-        // "use the global setting".
-        session.ssh?.terminalType = terminalType
 
         do {
             try store.upsert(session)
@@ -756,21 +752,6 @@ public final class SessionListViewModel {
     public func moveSession(_ session: StoredSession, toGroup groupID: UUID?) {
         var updated = session
         updated.groupID = groupID
-        updateSession(updated, newSecret: nil)
-    }
-
-    /// Persists which window halves were last shown for a session (P2
-    /// terminal-chrome milestone, Task 4), so a session that is reopened
-    /// later comes up the way it was left. Looked up by id rather than
-    /// taking a `StoredSession` directly, so the caller (a toolbar/menu
-    /// toggle handler) does not need to keep its own copy of the session
-    /// around just to write one field into it — a no-op if `sessionID` no
-    /// longer names a stored session (e.g. it was deleted while its tab
-    /// stayed connected).
-    public func updatePaneVisibility(for sessionID: UUID, to visibility: PaneVisibility) {
-        guard let session = sessions.first(where: { $0.id == sessionID }) else { return }
-        var updated = session
-        updated.paneVisibility = visibility
         updateSession(updated, newSecret: nil)
     }
 
@@ -1711,28 +1692,19 @@ public final class SessionListViewModel {
             return ExportedSession(
                 id: session.id, name: session.name, kind: session.kind, fields: fields.raw,
                 groupID: includeGroups ? session.groupID : nil,
-                // Unconditional, unlike `groupID` above: `includeGroups`
-                // gates GROUP membership specifically, and pane visibility
-                // is not a group reference -- it travels with the session
-                // the same way `kind` or `fields` do.
-                paneVisibility: session.paneVisibility,
+
                 appearance: session.appearance,
                 // And the same again for the rank (D2): a number on the
                 // session, gated by nothing. It only means anything next to
                 // the folder the session sits in -- which is why the export
                 // of that folder, above, now carries its ancestors.
                 position: session.position,
-                // The session's own terminal type (Task 4 of 2026-09-19),
-                // a value gated by nothing. `nil` writes no key.
-                terminalType: session.ssh?.terminalType,
+
                 password: password,
                 jumpHost: jumpHost, jumpPort: jumpPort, jumpUsername: jumpUsername,
                 jumpAuthKind: jumpAuthKind, jumpKeyPath: jumpKeyPath, jumpPassword: jumpPassword,
                 jumpTLSTunnel: jumpTLSTunnel,
                 s3SecretAccessKey: s3SecretAccessKey,
-                // Provenance (M24): unconditional, like `paneVisibility` and
-                // unlike `groupID`, not something
-                // `includeGroups` should be able to gate.
                 importSource: session.importSource, importID: session.importID,
                 importedAt: session.importedAt)
         }

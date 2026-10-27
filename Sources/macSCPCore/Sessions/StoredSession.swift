@@ -101,24 +101,6 @@ public struct StoredSession: Codable, Equatable, Identifiable, Sendable {
     /// `nil` for SSH/S3 sessions and on legacy JSON. The password is NOT here
     /// (Keychain only) -- this is `StoredWebDAVConfig`, not the runtime config.
     public var webdav: StoredWebDAVConfig? = nil
-    /// Which window halves (files/terminal) were last shown for this session
-    /// (P2 terminal-chrome milestone, Task 4). Belongs in the same category
-    /// as `groupID` above: a fact about the SESSION, not a connection
-    /// property, so it lives at the top level rather than in a backend's
-    /// field bag. Coded the same way `kind` is (`?? .filesOnly` below,
-    /// mirroring `kind`'s `?? .ssh`): a missing key means a file that
-    /// predates this field, or a session that was never toggled away from
-    /// the default, and either way decodes as `.filesOnly` -- files shown,
-    /// no terminal, which is how every session behaved before this field
-    /// existed.
-    ///
-    /// The earlier default here was `.bothVisible`, and the claim attached
-    /// to it ("exactly how every session behaved before this field
-    /// existed") was false: restoring a saved visible terminal OPENS one
-    /// and starts a shell, so every legacy record would have grown a
-    /// terminal on its next connect. Corrected by maintainer ruling
-    /// (whole-phase re-review, item 1); see `PaneVisibility.filesOnly`.
-    public var paneVisibility: PaneVisibility = .filesOnly
     /// Where this session came from, if it was not hand-made (Cyberduck
     /// import, M24). The importing `BookmarkSource`'s own `id` (e.g.
     /// `"cyberduck"`); `nil` for every session created through the connection
@@ -147,7 +129,7 @@ public struct StoredSession: Codable, Equatable, Identifiable, Sendable {
         ssh: StoredSSHConfig? = nil,
         s3: StoredS3Config? = nil,
         webdav: StoredWebDAVConfig? = nil,
-        paneVisibility: PaneVisibility = .filesOnly,
+
         position: Int = 0,
         importSource: String? = nil,
         importID: String? = nil,
@@ -163,7 +145,6 @@ public struct StoredSession: Codable, Equatable, Identifiable, Sendable {
         self.ssh = ssh
         self.s3 = s3
         self.webdav = webdav
-        self.paneVisibility = paneVisibility
         self.position = position
         self.importSource = importSource
         self.importID = importID
@@ -171,17 +152,10 @@ public struct StoredSession: Codable, Equatable, Identifiable, Sendable {
     }
 
     private enum CodingKeys: String, CodingKey {
-        case id, name, groupID, loginSetID, kind, ssh, s3, webdav, paneVisibility
+        case id, name, groupID, loginSetID, kind, ssh, s3, webdav
         case position, importSource, importID, importedAt, appearance
     }
 
-    /// Explicit rather than synthesized because `kind` needs its `?? .ssh`
-    /// default: synthesized Codable does NOT apply a property default to a
-    /// missing key, and a `sessions-v2.json` written by an earlier build of
-    /// this same milestone may not carry one. `paneVisibility` needs the
-    /// same treatment for the same reason. `position` is the newest member
-    /// of that same set: `decodeIfPresent ?? 0` is what lets a
-    /// file written before free ordering existed keep its file name.
     public init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         id = try c.decode(UUID.self, forKey: .id)
@@ -193,7 +167,6 @@ public struct StoredSession: Codable, Equatable, Identifiable, Sendable {
         ssh = try c.decodeIfPresent(StoredSSHConfig.self, forKey: .ssh)
         s3 = try c.decodeIfPresent(StoredS3Config.self, forKey: .s3)
         webdav = try c.decodeIfPresent(StoredWebDAVConfig.self, forKey: .webdav)
-        paneVisibility = try c.decodeIfPresent(PaneVisibility.self, forKey: .paneVisibility) ?? .filesOnly
         position = try c.decodeIfPresent(Int.self, forKey: .position) ?? 0
         importSource = try c.decodeIfPresent(String.self, forKey: .importSource)
         importID = try c.decodeIfPresent(String.self, forKey: .importID)

@@ -150,9 +150,6 @@
 /* S3-Weiterleitungskontrolle (2026-08-29) — eine Ablehnung nennt, wohin der Endpunkt schicken wollte; „Verbindung fehlgeschlagen“ allein würde das verbergen. */
 "core.s3.redirectRefused %@ %@" = "Verbindung verweigert — der S3-Endpunkt %1$@ hat diese Anfrage nach %2$@ umgeleitet, also auf einen anderen Server. Dorthin wurde nichts gesendet. Wenn du diesem Server vertraust, trag ihn als Endpunkt ein.";
 
-/* TerminalPanelViewModel */
-"core.terminal.shellEnded %@" = "Shell beendet: %@";
-"core.terminal.openFailed %@" = "Shell konnte nicht geöffnet werden: %@";
 
 /* SessionListViewModel */
 "core.session.loadFailed %@" = "Sessions konnten nicht geladen werden: %@";
@@ -178,9 +175,6 @@
 "core.overview.auth.agent" = "ssh-agent";
 "core.overview.value.yes" = "Ja";
 "core.overview.value.no" = "Nein";
-"core.overview.panes.files" = "Dateien";
-"core.overview.panes.terminal" = "Terminal";
-"core.overview.panes.both" = "Dateien und Terminal";
 "core.overview.s3.bucketList" = "Bucket-Liste";
 
 /* File type label (Browser Type Column, 2026-09-04) */

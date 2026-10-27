@@ -88,8 +88,6 @@
 "core.certificate.rejected" = "Conexiune refuzată — certificatul nu a fost confirmat.";
 "core.certificate.trustStoreUnreadable" = "Conexiune refuzată — registrul certificatelor de încredere nu a putut fi citit.";
 "core.s3.redirectRefused %@ %@" = "Conexiune refuzată — punctul de acces S3 %1$@ a redirecționat această cerere către %2$@, un alt server. Nimic nu a fost trimis acolo. Dacă aveți încredere în acel server, introduceți-l ca obiectiv.";
-"core.terminal.shellEnded %@" = "Shell încheiat: %@";
-"core.terminal.openFailed %@" = "Shellul nu a putut fi deschis: %@";
 "core.session.loadFailed %@" = "Încărcarea sesiunilor a eșuat: %@";
 "core.session.saveFailed %@" = "Salvarea sesiunii a eșuat: %@";
 "core.session.deleteFailed %@" = "Eșec la ștergerea sesiunii: %@";
@@ -107,9 +105,6 @@
 "core.overview.auth.agent" = "ssh-agent";
 "core.overview.value.yes" = "Da";
 "core.overview.value.no" = "Nu";
-"core.overview.panes.files" = "Fișiere";
-"core.overview.panes.terminal" = "Terminal";
-"core.overview.panes.both" = "Fișiere și terminal";
 "core.overview.s3.bucketList" = "Lista de bucketuri";
 "core.fileType.bucket" = "Bucket";
 "core.fileType.folder" = "Dosar";

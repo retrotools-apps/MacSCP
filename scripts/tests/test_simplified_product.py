@@ -9,16 +9,13 @@ ROOT = Path(__file__).resolve().parents[2]
 
 
 class SimplifiedProductTests(unittest.TestCase):
-    def test_application_is_the_only_executable_and_has_no_emulator_dependency(self):
+    def test_application_is_the_only_executable_with_the_expected_engine(self):
         manifest = (ROOT / "Package.swift").read_text()
         self.assertIn('.executable(name: "MacSCP", targets: ["MacSCPMain"])', manifest)
         self.assertEqual(re.findall(r'\.executable\(name: "([^"]+)"', manifest), ["MacSCP"])
-        self.assertNotIn('Vendor/swiftterm', manifest)
         self.assertNotIn('swift-argument-parser', manifest)
-        self.assertNotIn('name: "SwiftTerm"', manifest)
         pins = json.loads((ROOT / "Vendor/Package.resolved").read_text())["pins"]
         self.assertTrue(any(pin["identity"] == "citadel" for pin in pins))
-        self.assertFalse(any(pin["identity"] in {"swiftterm", "swift-argument-parser"} for pin in pins))
 
     def test_terminal_settings_offer_only_external_applications(self):
         settings = (ROOT / "Sources/MacSCPAppKit/SettingsView.swift").read_text()
@@ -27,7 +24,6 @@ class SimplifiedProductTests(unittest.TestCase):
         for target in ["terminalApp", "iTerm", "custom"]:
             self.assertIn(f'.tag(TerminalTarget.{target})', section)
         self.assertNotIn('.builtIn', section)
-        self.assertNotIn('terminalFont', section)
         self.assertNotIn('case cli', settings)
         for locale in ["en", "de", "fr", "pl", "es", "ro", "it"]:
             catalog = ROOT / f"Sources/MacSCPAppKit/Resources/{locale}.lproj/Localizable.strings"

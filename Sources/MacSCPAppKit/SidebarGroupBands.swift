@@ -6,6 +6,8 @@ private struct GroupColorsEnabledKey: EnvironmentKey {
 }
 
 extension EnvironmentValues {
+    @Entry var highContrast = false
+    @Entry var groupForeground: Color? = nil
     @Entry var usedGroupColors: Set<GroupColor> = []
     var groupColorsEnabled: Bool {
         get { self[GroupColorsEnabledKey.self] }
@@ -39,6 +41,24 @@ enum SidebarGroupBands {
         let ends: Bool
         let startFraction: Double
         let endFraction: Double
+    }
+
+    /// Leave room for the last entry and for each enclosing region to close.
+    static func bottomContentInset(for layers: [Layer]) -> CGFloat {
+        guard layers.contains(where: \.ends) else { return 0 }
+        return 8 + (layers.map { bottomBackgroundInset(for: $0, in: layers) }.max() ?? 0)
+    }
+
+    /// A header without visible children needs only the enclosing-frame inset.
+    static func headerBottomInset(for layers: [Layer]) -> CGFloat {
+        guard let own = layers.last, own.ends else { return 0 }
+        return bottomBackgroundInset(for: own, in: layers)
+    }
+
+    static func bottomBackgroundInset(for layer: Layer, in layers: [Layer]) -> CGFloat {
+        guard layer.ends, layer.depth > 0 else { return 0 }
+        let enclosingEnds = layers.filter { $0.ends && $0.depth < layer.depth }.count
+        return max(4, CGFloat(enclosingEnds) * 8)
     }
 
     /// Alternate siblings and nesting levels independently of saved hue choices.
@@ -135,6 +155,7 @@ enum SidebarGroupBands {
 struct SidebarGroupBandBackground: View {
     let layers: [SidebarGroupBands.Layer]
     @Environment(\.colorScheme) private var scheme
+    @Environment(\.highContrast) private var highContrast
     @Environment(\.groupColorsEnabled) private var colorsEnabled
     var body: some View {
         ZStack {
@@ -149,17 +170,62 @@ struct SidebarGroupBandBackground: View {
                     bottomLeadingRadius: layer.ends ? 8 : 0,
                     bottomTrailingRadius: layer.ends ? 8 : 0,
                     topTrailingRadius: layer.starts ? 8 : 0)
-                    .fill(LinearGradient(colors: [color.opacity(base + layer.startFraction * 0.02),
-                                                  color.opacity(base + layer.endFraction * 0.02)],
-                                         startPoint: .top, endPoint: .bottom))
+                    .fill(highContrast
+                        ? AnyShapeStyle(GroupSurfaceStyle.surface(hue: layer.hue, customColor: layer.color,
+                            darkerNeutral: layer.darkerNeutral, dark: scheme == .dark, colorsEnabled: colorsEnabled))
+                        : AnyShapeStyle(LinearGradient(colors: [color.opacity(base + layer.startFraction * 0.02),
+                            color.opacity(base + layer.endFraction * 0.02)], startPoint: .top, endPoint: .bottom)))
                     .padding(.leading, 4 + SidebarIndentation.leading(depth: layer.depth))
                     .padding(.trailing, 4 + SidebarIndentation.leading(depth: layer.depth))
                     .padding(.top, layer.starts ? (layer.depth == 0 ? 8 : 2) : 0)
-                    .padding(.bottom, layer.ends && layer.depth > 0 ? 2 : 0)
+                    .padding(.bottom, SidebarGroupBands.bottomBackgroundInset(for: layer, in: layers))
             }
         }
         .allowsHitTesting(false)
         .accessibilityHidden(true)
+    }
+}
+
+/// Solid list colors, shared by group regions and their connection cards.
+@MainActor enum GroupSurfaceStyle {
+    static func color(hue: Double, customColor: GroupColor?, darkerNeutral: Bool, dark: Bool, colorsEnabled: Bool) -> GroupColor {
+        guard colorsEnabled else {
+            return GroupColor(rgb: dark ? (darkerNeutral ? 0x45474A : 0x393B3E)
+                : (darkerNeutral ? 0xD4D4D4 : 0xE4E4E4))
+        }
+        return customColor ?? GroupColor(color: Color(hue: hue, saturation: 0.5, brightness: 0.9))
+            ?? GroupColor(rgb: 0x007AFF)
+    }
+
+    static func surface(hue: Double, customColor: GroupColor?, darkerNeutral: Bool, dark: Bool, colorsEnabled: Bool) -> Color {
+        color(hue: hue, customColor: customColor, darkerNeutral: darkerNeutral,
+              dark: dark, colorsEnabled: colorsEnabled).swiftUIColor
+    }
+
+    static func foreground(hue: Double, customColor: GroupColor?, darkerNeutral: Bool, dark: Bool, colorsEnabled: Bool) -> Color {
+        let surface = color(hue: hue, customColor: customColor, darkerNeutral: darkerNeutral,
+                            dark: dark, colorsEnabled: colorsEnabled)
+        return surface.relativeLuminance > 0.179 ? .black : .white
+    }
+}
+
+/// Apply the innermost group's text palette without changing status colors.
+struct SidebarGroupForeground: ViewModifier {
+    let layers: [SidebarGroupBands.Layer]
+    @Environment(\.highContrast) private var highContrast
+    @Environment(\.groupColorsEnabled) private var colorsEnabled
+    @Environment(\.colorScheme) private var scheme
+
+    private var ink: Color? {
+        guard highContrast, let own = layers.last else { return nil }
+        return GroupSurfaceStyle.foreground(hue: own.hue, customColor: own.color,
+            darkerNeutral: own.darkerNeutral, dark: scheme == .dark, colorsEnabled: colorsEnabled)
+    }
+
+    func body(content: Content) -> some View {
+        content.environment(\.groupForeground, ink)
+            .foregroundStyle(ink ?? .primary, ink?.opacity(0.85) ?? .secondary,
+                             ink?.opacity(0.75) ?? .secondary)
     }
 }
 
@@ -169,6 +235,7 @@ struct GroupContentTint: View {
     var darkerNeutral = false
     var customColor: GroupColor? = nil
     @Environment(\.colorScheme) private var scheme
+    @Environment(\.highContrast) private var highContrast
     @Environment(\.groupColorsEnabled) private var colorsEnabled
     var body: some View {
         if hue != nil || customColor != nil {
@@ -176,10 +243,16 @@ struct GroupContentTint: View {
                 ? (customColor?.swiftUIColor ?? Color(hue: hue ?? 0.62, saturation: scheme == .dark ? 0.38 : 0.45,
                         brightness: scheme == .dark ? 0.94 : 0.82))
                 : Color.primary
-            color.opacity(colorsEnabled ? GroupTintStyle.cardOpacity(dark: scheme == .dark)
-                : GroupTintStyle.cardNeutralOpacity(
-                    darker: darkerNeutral, dark: scheme == .dark))
-                .allowsHitTesting(false).accessibilityHidden(true)
+            Group {
+                if highContrast {
+                    GroupSurfaceStyle.surface(hue: hue ?? 0.62, customColor: customColor,
+                        darkerNeutral: darkerNeutral, dark: scheme == .dark, colorsEnabled: colorsEnabled)
+                } else {
+                    color.opacity(colorsEnabled ? GroupTintStyle.cardOpacity(dark: scheme == .dark)
+                        : GroupTintStyle.cardNeutralOpacity(darker: darkerNeutral, dark: scheme == .dark))
+                }
+            }
+            .allowsHitTesting(false).accessibilityHidden(true)
         }
     }
 }
@@ -205,6 +278,7 @@ struct TunnelGroupAccent: View {
     let hue: Double?
     var customColor: GroupColor? = nil
     @Environment(\.colorScheme) private var scheme
+    @Environment(\.highContrast) private var highContrast
     @Environment(\.groupColorsEnabled) private var colorsEnabled
     var body: some View {
         if hue != nil || customColor != nil {
@@ -244,6 +318,7 @@ struct GroupColorControl: View {
     var color: GroupColor? = nil
     @Binding var isPresented: Bool
     let onChange: (GroupColor?) -> Void
+    @Environment(\.highContrast) private var highContrast
     @Environment(\.groupColorsEnabled) private var colorsEnabled
     var body: some View {
         Button { isPresented.toggle() } label: {

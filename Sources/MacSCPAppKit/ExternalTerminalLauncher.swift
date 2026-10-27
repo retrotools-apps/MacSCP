@@ -8,14 +8,14 @@ import macSCPCore
 /// bridge — that would need a new entitlement. Instead this writes a
 /// disposable `.command` script (built by the pure, security-reviewed
 /// `SSHCommandBuilder`) into its own 0700 temp file and hands it to
-/// `NSWorkspace`, which opens it with the chosen terminal app exactly as if
-/// the user had double-clicked it in Finder. The script removes itself
+/// macOS, which opens it with the chosen terminal app. A cold Terminal launch
+/// uses `open --fresh` to suppress restoration through Launch Services;
+/// running applications receive a normal `NSWorkspace` document-open request.
+/// The script removes itself
 /// before `exec`ing into `ssh` (see `SSHCommandBuilder.scriptContents`), so
 /// nothing lingers after launch except while the app is still starting up.
 @MainActor
 enum ExternalTerminalLauncher {
-    /// Typed failures — no case here ever falls back to a different app or
-    /// to the built-in terminal; the caller surfaces the message as-is.
     enum LaunchError: Error, Equatable {
         /// The chosen app (name for `.terminalApp`/`.iTerm`, path for
         /// `.custom`) could not be resolved to a launchable application.
@@ -38,6 +38,7 @@ enum ExternalTerminalLauncher {
 
     private static let terminalAppBundleID = "com.apple.Terminal"
     private static let iTermBundleID = "com.googlecode.iterm2"
+    private static var pendingTerminalLaunch: Task<Void, any Error>?
     private static var credentialSessions: [UUID: SSHAskpassSession] = [:]
     static var hasCredentialSessions: Bool { !credentialSessions.isEmpty }
 
@@ -82,16 +83,51 @@ enum ExternalTerminalLauncher {
                 credentialSessions.removeValue(forKey: credentialID)
             }
         }
+        var scriptURL: URL?
         do {
-            let scriptURL = try writeScript(for: config, root: root, askpassHelperPath: credentials?.helperURL.path)
-            _ = try await NSWorkspace.shared.open(
-                [scriptURL], withApplicationAt: appURL,
-                configuration: NSWorkspace.OpenConfiguration())
+            let written = try writeScript(for: config, root: root, askpassHelperPath: credentials?.helperURL.path)
+            scriptURL = written
+            try await openScript(written, withApplicationAt: appURL, target: target)
         } catch {
+            if let scriptURL { try? FileManager.default.removeItem(at: scriptURL) }
             if let credentials { await credentials.stop() }
             credentialSessions.removeValue(forKey: credentialID)
             if let error = error as? LaunchError { throw error }
             throw LaunchError.launchFailed(error.localizedDescription)
+        }
+    }
+
+    /// Only a cold Terminal launch may discard saved windows. No forced new instance.
+    static func freshLaunchArguments(target: TerminalTarget, application: URL, script: URL, isRunning: Bool) -> [String]? {
+        guard target == .terminalApp, !isRunning else { return nil }
+        return ["-F", "-a", application.path, "--", script.path]
+    }
+
+    static func launchConfiguration() -> NSWorkspace.OpenConfiguration {
+        let configuration = NSWorkspace.OpenConfiguration()
+        configuration.addsToRecentItems = false
+        return configuration
+    }
+
+    private static func openScript(_ script: URL, withApplicationAt application: URL, target: TerminalTarget) async throws {
+        // A simultaneous request waits for the cold launch, then opens its own document.
+        if target == .terminalApp, let pendingTerminalLaunch { try await pendingTerminalLaunch.value }
+        let isRunning = !NSRunningApplication.runningApplications(withBundleIdentifier: terminalAppBundleID).isEmpty
+        if let arguments = freshLaunchArguments(target: target, application: application, script: script, isRunning: isRunning) {
+            let launch = Task {
+                let result = try await SubprocessRunner.run(URL(fileURLWithPath: "/usr/bin/open"),
+                    arguments: arguments, timeout: .seconds(20))
+                guard result.status == 0 else {
+                    throw LaunchError.launchFailed(result.stderrText.isEmpty
+                        ? POSIXError(.EIO).localizedDescription : result.stderrText)
+                }
+            }
+            pendingTerminalLaunch = launch
+            defer { pendingTerminalLaunch = nil }
+            try await launch.value
+        } else {
+            _ = try await NSWorkspace.shared.open([script], withApplicationAt: application,
+                configuration: launchConfiguration())
         }
     }
 
@@ -135,13 +171,6 @@ enum ExternalTerminalLauncher {
         }
     }
 
-    /// Whether `path` points at a real, launchable application bundle — the
-    /// same check `resolveApplication(target: .custom, ...)` performs right
-    /// before launching. Exposed (not `private`) so `ContentView
-    /// .requestExternalTerminal` can decide, ahead of ever calling `open`,
-    /// whether a configured custom app is usable as the `.builtIn` fallback
-    /// (review finding, M11d fix round 1) instead of silently substituting
-    /// Terminal.app for a validly configured custom app.
     static func isValidCustomApp(atPath path: String?) -> Bool {
         guard let path, !path.isEmpty,
             FileManager.default.fileExists(atPath: path),

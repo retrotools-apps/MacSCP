@@ -80,14 +80,6 @@ struct SessionOverviewModelTests {
 
     // MARK: - Head
 
-    @Test(arguments: [PaneVisibility.filesOnly, .bothVisible, .terminalOnly])
-    func opensShowingDescribesConnectRatherThanThePreviousTerminalLayout(saved: PaneVisibility) {
-        var session = sshSession()
-        session.paneVisibility = saved
-        let overview = model(session)
-        #expect(text(overview, "panes") == CoreL10n.string("core.overview.panes.files"))
-    }
-
     @Test func theHeadIsTheNameTheKindAndTheDescriptorsEndpoint() {
         let overview = model(sshSession())
 
@@ -292,7 +284,6 @@ struct SessionOverviewModelTests {
         #expect(model(s3).hostKey == .notApplicable)
         #expect(model(webdav).hostKey == .notApplicable)
     }
-
 
     @Test func theHistoryIsDerivedFromTheEventsHandedIn() {
         let epoch = Date(timeIntervalSince1970: 1_700_000_000)

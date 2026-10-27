@@ -1527,46 +1527,6 @@ struct CitadelFileSystemIntegrationTests {
         var description: String { "\(step): \(underlying)" }
     }
 
-    /// A PTY shell held open on one connection for the whole case — the
-    /// terminal a tab keeps — together with the one iterator its output is
-    /// read through (`RemoteShell.output` has exactly one consumer).
-    struct HeldShell {
-        let shell: any RemoteShell
-        private var output: AsyncThrowingStream<[UInt8], any Error>.AsyncIterator
-
-        static func open(on connection: CitadelFileSystem) async throws -> HeldShell {
-            let shell = try await connection.openShell(terminal: "xterm-256color", cols: 80, rows: 24)
-            return HeldShell(shell: shell, output: shell.output.makeAsyncIterator())
-        }
-
-        private init(
-            shell: any RemoteShell, output: AsyncThrowingStream<[UInt8], any Error>.AsyncIterator
-        ) {
-            self.shell = shell
-            self.output = output
-        }
-
-        /// Sends an `echo` whose answer the shell has to compute, and reads
-        /// until the answer arrives. The typed line carries `$((6*7))`, the
-        /// answer carries `42`, so the PTY's echo of the input never matches.
-        ///
-        /// No timeout of its own, for the reason `CitadelShellIntegrationTests
-        /// .collectUntil` gives: the read ends when the answer arrives, when
-        /// the stream ends without it, or when the test's `.timeLimit`
-        /// cancels it — and a cancelled read finishes the stream, so it lands
-        /// on the `throw` below with the partial text.
-        mutating func answers(tag: String) async throws {
-            try await shell.send(Array("echo MACSCP_JUMP_\(tag)_$((6*7))\n".utf8))
-            let marker = "MACSCP_JUMP_\(tag)_42"
-            var collected = ""
-            while let chunk = try await output.next() {
-                collected += String(decoding: chunk, as: UTF8.self)
-                if collected.contains(marker) { return }
-            }
-            throw RemoteFSError.protocolError(reason: "marker \(marker) not found in: \(collected)")
-        }
-    }
-
     /// Every connection one jump case dialled, and which of them it has
     /// disconnected. `CitadelFileSystem` has no deinit cleanup, so a
     /// connection a case drops on the floor stays authenticated against the
@@ -1704,22 +1664,14 @@ struct CitadelFileSystemIntegrationTests {
         }
     }
 
-    /// Proves one connection answers on every kind of channel a tab uses:
-    /// a listing and `realpath` over its SFTP channel, the PTY shell held
-    /// open since the connection was dialled, and a fresh PTY shell opened
-    /// and closed now.
     private func proveAnswers(
-        _ connection: CitadelFileSystem, held: inout HeldShell, step: String
+        _ connection: CitadelFileSystem, step: String
     ) async throws {
         do {
             let listing = try await connection.list(path: "/")
             #expect(!listing.isEmpty, "\(step): listing of / was empty")
             let home = try await connection.homeDirectoryPath()
             #expect(home == "/config", "\(step): realpath(.) was \(home)")
-            try await held.answers(tag: step)
-            var fresh = try await HeldShell.open(on: connection)
-            try await fresh.answers(tag: "\(step)_fresh")
-            await fresh.shell.close()
         } catch {
             throw JumpStepFailure(step: step, underlying: error)
         }
@@ -1837,15 +1789,12 @@ struct CitadelFileSystemIntegrationTests {
             first = try await dialJumpPairConnection(
                 firstConfig, knownHosts: knownHosts, step: "dial_first", ledger: ledger)
         }
-        var firstShell: HeldShell?
-        var secondShell: HeldShell?
         var second: CitadelFileSystem?
         do {
-            firstShell = try await HeldShell.open(on: first)
             // In the concurrent pairing connection 2 is already dialled here,
             // so the step does not claim connection 1 is alone.
             try await proveAnswers(
-                first, held: &firstShell!,
+                first,
                 step: pair.dialsConcurrently ? "first_with_second_dialled" : "first_alone")
 
             second = if let pending { pending } else {
@@ -1853,22 +1802,16 @@ struct CitadelFileSystemIntegrationTests {
                     secondConfig, knownHosts: knownHosts, step: "dial_second", ledger: ledger)
             }
             pending = nil
-            secondShell = try await HeldShell.open(on: second!)
-            try await proveAnswers(second!, held: &secondShell!, step: "second")
-            try await proveAnswers(first, held: &firstShell!, step: "first_beside_second")
+            try await proveAnswers(second!, step: "second")
+            try await proveAnswers(first, step: "first_beside_second")
 
-            await secondShell?.shell.close()
-            secondShell = nil
             if let second { await ledger.disconnect(second) }
             second = nil
-            try await proveAnswers(first, held: &firstShell!, step: "first_after_second_closed")
+            try await proveAnswers(first, step: "first_after_second_closed")
 
-            await firstShell?.shell.close()
             await ledger.disconnect(first)
         } catch {
-            await secondShell?.shell.close()
             if let survivor = second ?? pending { await ledger.disconnect(survivor) }
-            await firstShell?.shell.close()
             await ledger.disconnect(first)
             throw error
         }

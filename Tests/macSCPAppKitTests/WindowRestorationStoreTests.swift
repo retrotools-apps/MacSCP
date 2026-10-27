@@ -35,7 +35,7 @@ struct WindowRestorationStoreTests {
         isPrimary: Bool, keepOnTop: Bool = false, sessionID: UUID? = UUID()
     ) -> WindowSeed {
         WindowSeed(
-            tabs: [TabSeed(sessionID: sessionID, paneVisibility: .bothVisible)],
+            tabs: [TabSeed(sessionID: sessionID)],
             keepOnTop: keepOnTop, isPrimary: isPrimary)
     }
 
@@ -91,15 +91,14 @@ struct WindowRestorationStoreTests {
         let sessionID = UUID()
         let seed = WindowSeed(
             tabs: [
-                TabSeed(sessionID: sessionID, paneVisibility: .terminalOnly),
-                TabSeed(sessionID: nil, paneVisibility: .filesOnly),
+                TabSeed(sessionID: sessionID),
+                TabSeed(sessionID: nil),
             ],
             keepOnTop: true, isPrimary: true)
         store.replace([seed], whenEnabled: true)
         let read = store.read()
         #expect(read == [seed])
         #expect(read.first?.tabs.first?.sessionID == sessionID)
-        #expect(read.first?.tabs.first?.paneVisibility == PaneVisibility.terminalOnly)
         #expect(read.first?.keepOnTop == true)
         #expect(read.first?.isPrimary == true)
     }
@@ -197,7 +196,7 @@ struct WindowRestorationStoreTests {
         let store = WindowRestorationStore(directory: dir)
         store.replace(
             [WindowSeed(
-                tabs: [TabSeed(sessionID: UUID(), paneVisibility: .bothVisible)],
+                tabs: [TabSeed(sessionID: UUID())],
                 keepOnTop: true, isPrimary: true)],
             whenEnabled: true)
 
@@ -209,9 +208,7 @@ struct WindowRestorationStoreTests {
             #expect(Set(window.keys) == ["id", "tabIDs", "tabs", "keepOnTop", "isPrimary"])
             let tabs = try #require(window["tabs"] as? [[String: Any]])
             for tab in tabs {
-                #expect(Set(tab.keys) == ["sessionID", "paneVisibility"])
-                let visibility = try #require(tab["paneVisibility"] as? [String: Any])
-                #expect(Set(visibility.keys) == ["showsFiles", "showsTerminal"])
+                #expect(Set(tab.keys) == ["sessionID"])
             }
         }
     }

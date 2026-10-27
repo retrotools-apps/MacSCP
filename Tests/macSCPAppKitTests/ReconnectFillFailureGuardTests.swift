@@ -2,33 +2,6 @@ import Foundation
 import MacSCPTestSupport
 import Testing
 
-/// Guards what an in-place connect shows when the stored-session fill THROWS
-/// (technical backlog of 2026-09-16, Task 5).
-///
-/// `ContentView.fillForm(_:from:)` is declared `throws`: it catches
-/// `LoginResolveError` itself — a dangling login set is a REFUSAL, published
-/// on the form, and returns `false` — and lets anything else out.
-/// `connect(in:stored:paneVisibility:)` used to run that fill in a discarded
-/// throwing `Task`, so such a throw ended the attempt with nothing on screen.
-/// The sidebar's "Open in External Terminal" route, which runs the very same
-/// fill, already caught it and showed `error.localizedDescription`.
-///
-/// Scanned rather than run: no fill this project can drive throws anything
-/// but `LoginResolveError` today (every resolver it calls reads the Keychain
-/// through `try?`), so there is no fixture that reaches the catch. What is
-/// pinned instead is the shape, and one half of it is a compiler boundary:
-///
-/// 1. The connect's task is a `Task<Void, Never>` — a `try` left uncaught
-///    inside it does not compile, so the throw cannot escape again.
-/// 2. Its one `fillForm(` call sits inside a `do` whose `catch` publishes on
-///    the form (`showFailure(`) the text the sidebar route shows,
-///    `error.localizedDescription` — and the sidebar route still shows that
-///    text in its own `catch`, so the two cannot drift apart unnoticed.
-///
-/// Every read goes through `SwiftSource.blankingCommentsAndStrings`, so a
-/// comment quoting either shape satisfies nothing. Every check requires
-/// something present; the scanner self-tests below run it against the old
-/// shape and against three violations.
 @Suite("Reconnect fill-failure guard")
 struct ReconnectFillFailureGuardTests {
     private static let contentViewFile = URL(fileURLWithPath: #filePath)
@@ -45,7 +18,7 @@ struct ReconnectFillFailureGuardTests {
         let source = try SourceCorpus.text(of: Self.contentViewFile)
         let violations = try Self.violations(inSource: source)
         #expect(violations.isEmpty, """
-            `connect(in:stored:paneVisibility:)` does not show a fill that threw the way the \
+            `connect(in:stored:)` does not show a fill that threw the way the \
             sidebar's external-terminal route does: \(violations)
             """)
     }
@@ -56,7 +29,7 @@ struct ReconnectFillFailureGuardTests {
         """
         struct ContentView {
             func connect(
-                in tab: SessionTab, stored: StoredSession, paneVisibility: PaneVisibility? = nil
+                in tab: SessionTab, stored: StoredSession
             ) {
                 guard !tab.isReconnecting else { return }
                 \(connectTask)
@@ -148,7 +121,7 @@ struct ReconnectFillFailureGuardTests {
         let blanked = try SwiftSource.blankingCommentsAndStrings(source)
         var violations: [String] = []
 
-        let connect = try body(ofFunctionWhoseSignatureContains: "stored: StoredSession, paneVisibility:",
+        let connect = try body(ofFunctionWhoseSignatureContains: "stored: StoredSession",
                                named: "func connect(", in: blanked)
         let fillsInConnect = occurrences(of: "fillForm(", in: connect)
         if fillsInConnect != 1 {

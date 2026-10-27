@@ -6,6 +6,38 @@ import macSCPCore
 
 @Suite("Hierarchical sidebar group regions")
 @MainActor struct SidebarGroupBandsTests {
+    @Test func theLastEntryReservesSeparateSpaceForItsGroupAndEveryClosingAncestor() throws {
+        let root = StoredGroup(name: "Root")
+        let child = StoredGroup(name: "Child", parentID: root.id)
+        let first = UUID(), last = UUID()
+        let layers = SidebarGroupBands.build(entries: [
+            .init(id: root.id, groupID: root.id),
+            .init(id: child.id, groupID: child.id),
+            .init(id: first, groupID: child.id),
+            .init(id: last, groupID: child.id)
+        ], groups: [root, child].map(SidebarGroupBands.Group.init))
+        #expect(SidebarGroupBands.bottomContentInset(for: []) == 0)
+        #expect(SidebarGroupBands.bottomContentInset(for: try #require(layers[first])) == 0)
+        let ending = try #require(layers[last])
+        #expect(ending.count == 2 && ending.allSatisfy(\.ends))
+        #expect(SidebarGroupBands.bottomContentInset(for: ending) == 16)
+        #expect(SidebarGroupBands.bottomBackgroundInset(for: ending[0], in: ending) == 0)
+        #expect(SidebarGroupBands.bottomBackgroundInset(for: ending[1], in: ending) == 8)
+    }
+
+    @Test func collapsedHeadersReserveOnlyTheirEnclosingFrame() throws {
+        let root = StoredGroup(name: "Root")
+        let child = StoredGroup(name: "Child", parentID: root.id)
+        let rootOnly = SidebarGroupBands.build(entries: [.init(id: root.id, groupID: root.id)], groups: [.init(root)])
+        #expect(SidebarGroupBands.headerBottomInset(for: try #require(rootOnly[root.id])) == 0)
+        let nested = SidebarGroupBands.build(entries: [.init(id: root.id, groupID: root.id), .init(id: child.id, groupID: child.id)], groups: [root, child].map(SidebarGroupBands.Group.init))
+        #expect(SidebarGroupBands.headerBottomInset(for: try #require(nested[root.id])) == 0)
+        let closing = try #require(nested[child.id])
+        #expect(SidebarGroupBands.headerBottomInset(for: closing) == 8)
+        #expect(SidebarGroupBands.headerBottomInset(for: closing)
+            == SidebarGroupBands.bottomBackgroundInset(for: try #require(closing.last), in: closing))
+    }
+
     @Test func exactColorFlowsIntoEveryGroupBandWithoutChangingSiblingColors() throws {
         let rgb = GroupColor(rgb: 0x123456)
         let root = StoredGroup(name: "Root", color: rgb)

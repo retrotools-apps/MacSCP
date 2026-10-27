@@ -46,35 +46,6 @@ public enum RemoteChecksumOutcome: Sendable, Equatable {
     case algorithmUnavailable(ChecksumAlgorithm)
 }
 
-/// A backend capability queried via `as?`, like `RemoteShellProvider` and
-/// `PresignedURLProvider`: the digest of one file, without moving its bytes
-/// anywhere.
-///
-/// Where that digest comes from is the backend's business and the answer
-/// says which: SSH has the far side compute it, the local file system
-/// computes it here over a file that is already here, S3 reports the ETag
-/// its listing carries, and WebDAV answers that it cannot. That is every
-/// backend this project has — so a surface asks the same question of all of
-/// them and never branches on `ConnectionKind`. What no backend does is
-/// download a file in order to hash it; the maintainer ruled that out on
-/// 2026-08-27, fallbacks included, and it is why S3's answer is an ETag or
-/// nothing.
-///
-/// Read the parameter list, because it is the whole design. A path and one
-/// of three algorithms — and no third parameter. Nothing here carries a
-/// command, an argument list, an executable name, or a flag, so a caller
-/// cannot phrase one. Not because a test forbids it: because there is no
-/// such expression. `ChecksumCommandForm` supplies the tool and its
-/// arguments from a two-case enum, the path is interpolated only through
-/// `PosixQuoting.singleQuoted` into a single shell word, and the line that
-/// results is a `ChecksumCommandLine`, whose initializer no other file can
-/// reach.
-///
-/// A general execution entry point would have been the alternative, and it
-/// would have been a new surface every future reviewer had to watch. This
-/// project's record with source-scanning guards over such surfaces is in
-/// `CLAUDE.md`, and it is why the narrow capability is the design rather
-/// than a preference.
 public protocol RemoteChecksumProvider: Sendable {
     /// The digest of the file at `path` under `algorithm`.
     ///

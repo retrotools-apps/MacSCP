@@ -20,7 +20,7 @@ struct WindowRestorationPlanTests {
     ) -> WindowSeed {
         WindowSeed(
             tabs: (0..<sessions).map { _ in
-                TabSeed(sessionID: UUID(), paneVisibility: .filesOnly)
+                TabSeed(sessionID: UUID())
             },
             keepOnTop: keepOnTop, isPrimary: isPrimary)
     }
@@ -91,34 +91,6 @@ struct WindowRestorationPlanTests {
         let second = Self.describedWindow(isPrimary: true)
         #expect(WindowRestorationPlan.primarySeed(flag: true, stored: [first, second]) == first)
         #expect(WindowRestorationPlan.seedsToOpen(flag: true, stored: [first, second]) == [second])
-    }
-
-    // MARK: - Which pane visibility a restored tab connects with
-
-    /// A saved layout is not permission to open a shell. Only an explicit
-    /// request, such as the sidebar's Open Terminal action, may do that.
-    @Test func anExplicitOverrideWinsOverEverything() {
-        #expect(WindowRestorationPlan.paneVisibility(
-            override: .terminalOnly, restored: .bothVisible, stored: .filesOnly)
-            == PaneVisibility.terminalOnly)
-    }
-
-    @Test func aRestoredTabDoesNotStartATerminalWithoutAnExplicitRequest() {
-        #expect(WindowRestorationPlan.paneVisibility(
-            override: nil, restored: .bothVisible, stored: .filesOnly)
-            == PaneVisibility.filesOnly)
-    }
-
-    @Test func anOrdinaryConnectDoesNotRestoreAPreviouslyVisibleTerminal() {
-        #expect(WindowRestorationPlan.paneVisibility(
-            override: nil, restored: nil, stored: .bothVisible)
-            == PaneVisibility.filesOnly)
-    }
-
-    @Test(arguments: [PaneVisibility.filesOnly, .bothVisible, .terminalOnly])
-    func ordinaryConnectAlwaysShowsFilesRegardlessOfSavedLayout(saved: PaneVisibility) {
-        #expect(WindowRestorationPlan.paneVisibility(
-            override: nil, restored: saved, stored: saved) == PaneVisibility.filesOnly)
     }
 
     // MARK: - Which session a restored tab's description names

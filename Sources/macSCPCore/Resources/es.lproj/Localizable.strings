@@ -88,8 +88,6 @@
 "core.certificate.rejected" = "Conexión rechazada: certificado no confirmado.";
 "core.certificate.trustStoreUnreadable" = "Conexión rechazada: no se ha podido leer el almacén de certificados de confianza.";
 "core.s3.redirectRefused %@ %@" = "La conexión se negó — el punto final S3 %1$@ redireccionó esta solicitud a %2$@, un servidor diferente. No se envió nada allí. Si confía en ese servidor, ingrese como punto final.";
-"core.terminal.shellEnded %@" = "Shell terminó: %@";
-"core.terminal.openFailed %@" = "No se ha podido abrir el shell: %@";
 "core.session.loadFailed %@" = "Failed to load sessions: %@";
 "core.session.saveFailed %@" = "Failed to save session: %@";
 "core.session.deleteFailed %@" = "Failed to delete session: %@";
@@ -107,9 +105,6 @@
 "core.overview.auth.agent" = "ssh-agent";
 "core.overview.value.yes" = "Sí";
 "core.overview.value.no" = "No";
-"core.overview.panes.files" = "Archivos";
-"core.overview.panes.terminal" = "Terminal";
-"core.overview.panes.both" = "Archivos y terminales";
 "core.overview.s3.bucketList" = "Lista de buckets";
 "core.fileType.bucket" = "Bucket";
 "core.fileType.folder" = "Folder";

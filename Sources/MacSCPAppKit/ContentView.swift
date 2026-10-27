@@ -333,13 +333,8 @@ struct ContentView: View {
     /// The width the session sidebar comes up at, read from `SettingsStore`
     /// once, when the window is built.
     ///
-    /// Read once and never written again, deliberately: while the window is
-    /// open the live width belongs to the split view, which is what the
-    /// user's drag actually moves. Feeding a changing value back into the
-    /// sidebar's ideal width would push against that drag. What flows the
-    /// other way — the dragged width back into `SettingsStore` — is
-    /// `SidebarWidthRecorder`'s job, and it deliberately does not come back
-    /// through here.
+    /// Updated only while the sidebar is absent, so restoring the divider
+    /// does not feed layout measurements back into an active drag.
     @State var sidebarOpeningWidth: CGFloat
     @State var isSidebarVisible = true
     @State var showsTunnelWorkspace = false
@@ -387,12 +382,7 @@ struct ContentView: View {
         /// `TabsViewModel.activate(_:)` answers an id naming no tab by
         /// leaving the active tab alone.
         let existingTabID: UUID
-        /// The row's pane override, carried through the query so "Open
-        /// Anyway" starts the SAME thing that was asked for —
-        /// `.terminalOnly` for the row's "Open Terminal" entry, `nil` for
-        /// an ordinary connect. Without it, answering the query would
-        /// quietly turn an "Open Terminal" into a plain connect.
-        let paneVisibility: PaneVisibility?
+
     }
 
     /// A sidebar start that stopped because some tab already holds the
@@ -847,7 +837,7 @@ struct ContentView: View {
     /// Mirrored into `tabCommands.isActiveTabConnected` via `.onChange` below
     /// (M11d/T2) — `MacSCPApp`'s "Terminal" menu lives in a separate Scene
     /// that doesn't observe `tabsModel`, so this is the value it reads to
-    /// enable/disable its two entries.
+    /// enable or disable its external terminal command.
     private var isActiveTabConnected: Bool { activeTab.isConnected }
 
     /// Mirrored into `tabCommands.activeTabSupportsShell` via `.onChange`
@@ -856,26 +846,6 @@ struct ContentView: View {
     /// `MacSCPApp`'s "Terminal" menu needs to know that too.
     var activeTabSupportsShell: Bool {
         BackendDescriptor.descriptor(for: activeTab.connectionViewModel.kind).capabilities.supportsShell
-    }
-
-    /// Mirrored into `tabCommands.activeTabTerminalToggleIsUnlocked` via
-    /// `.onChange` below (whole-phase review, Fix 2), same
-    /// rationale/mechanism as `activeTabSupportsShell` above: the "Terminal"
-    /// menu's Show/Hide entry lives in a Scene that cannot see `tabsModel`,
-    /// and without this it stayed enabled while `toggleTerminal`'s own pane-
-    /// lock guard silently swallowed the click.
-    ///
-    /// Reads `SessionTab.paneToggleState` — the same method the toolbar's
-    /// own `.disabled` reads — so the menu entry and the toolbar button
-    /// agree by construction rather than by two spellings of one rule.
-    /// `true` while nothing is connected: the lock has no opinion there, and
-    /// `isActiveTabConnected` already disables the entry.
-    var activeTabTerminalToggleIsUnlocked: Bool {
-        guard let session = activeTab.session else { return true }
-        return activeTab.paneToggleState(
-            for: .terminal, terminalIsVisible: session.terminal.isVisible,
-            hasShell: activeTabSupportsShell
-        ).isEnabled
     }
 
     var body: some View {
@@ -887,6 +857,7 @@ struct ContentView: View {
         // without changing behavior.
         mainContent
             .environment(\.groupColorsEnabled, settingsStore.groupColorsEnabled)
+            .environment(\.highContrast, settingsStore.highContrast)
             .environment(\.usedGroupColors, Set(sessionListViewModel.groups.compactMap(\.color)
                 + TunnelManager.shared.allGroups.compactMap(\.color)))
             // Keeps `tabCommands.isActiveTabConnected` in sync (M11d/T2) —
@@ -908,14 +879,7 @@ struct ContentView: View {
             .onChange(of: activeTabSupportsShell, initial: true) { _, newValue in
                 tabCommands.activeTabSupportsShell = newValue
             }
-            // Keeps `tabCommands.activeTabTerminalToggleIsUnlocked` in sync
-            // (whole-phase review, Fix 2) — see that property's doc comment.
-            // Same mirror shape as the two above; without it the flag would
-            // sit on its `true` default forever and the menu entry would be
-            // enabled while the click cannot land.
-            .onChange(of: activeTabTerminalToggleIsUnlocked, initial: true) { _, newValue in
-                tabCommands.activeTabTerminalToggleIsUnlocked = newValue
-            }
+
             // Keeps `tabCommands.keepOnTop` in sync (Detachable Tabs plan,
             // Task 4) — same mirror shape as the three above, and applies
             // `WindowLevelPlan`'s decision to THIS window's `NSWindow` in
@@ -1115,7 +1079,7 @@ struct ContentView: View {
             jump: form.buildJumpSpec(),
             jumpSecret: form.jumpSourceMode == .session ? nil : form.jumpPassword,
             filledJumpPassphrase: form.filledJumpPassphrase,
-            terminalType: form.terminalTypeOverride,
+
             appearance: form.appearance)
     }
 
@@ -1154,25 +1118,6 @@ struct ContentView: View {
         form.beginEditing(stored)
     }
 
-    /// After a successful connect: build the panes of THIS tab and save the
-    /// session if requested. `storedName` is the display name for the tab/
-    /// window title when connecting to an already-stored session
-    /// (`connect(in:stored:)`). It exists because
-    /// `connectionViewModel.saveName` cannot be trusted here: the field
-    /// survives toggling "Save as session" off and earlier sessions, so an
-    /// UNSAVED connection could inherit a stale, unrelated name (M5f/T5
-    /// review).
-    // NOTE (M9d): `startSession` stays SYNCHRONOUS deliberately. Its two call
-    // sites are already inside `async` contexts (the connect button's `Task`
-    // in `ConnectionFormView`, and `connect(in:stored:)`'s `Task` below), so
-    // the remote home directory is resolved there — with `await` — and
-    // handed in as `startPath`. Marking `startSession` itself `async` was
-    // tried first and had to be reverted: it made the compiler apply
-    // stricter concurrency checking to the WHOLE function body, which then
-    // flagged the `shellProvider` capture in the `openShell` closure below.
-    // That particular objection is gone — `RemoteShellProvider` is `Sendable`
-    // now — but the function stays sync anyway, because resolving the home
-    // directory exactly once per connect is what the two call sites want.
     func startSession(
         in tab: SessionTab, with fs: any RemoteFileSystem, storedName: String? = nil,
         startPath: String = "/"
@@ -1203,25 +1148,6 @@ struct ContentView: View {
         // folder — the folder one keeps returning to — does not spend a
         // fresh thread rediscovering the same stuck entry on every visit.
         let stuckPaths = StuckPaths()
-        // The terminal type (plan of 2026-09-19, Task 4), resolved when a
-        // shell OPENS rather than here: the stored session this tab is
-        // connected to is named by `activeStoredSessionID`, which both
-        // connect paths set only after this function has built the panel
-        // (the saved-on-connect branch below, and `connect(in:stored:)`
-        // after its call), and a change made in Settings or in the session
-        // editor then reaches the next shell of this connection too. An
-        // unsaved connection has no stored session and uses the global
-        // setting. `[weak tab]`: the panel lives inside `tab.session`.
-        //
-        // The sessions are asked of the registry — the window holding this
-        // tab NOW — rather than captured from this window's own
-        // `sessionListViewModel` (plan of 2026-09-24, Task 6). A captured
-        // list is the window the tab was BUILT in: a tab dragged into
-        // another window kept reading it, and once that window closed it
-        // read a list nothing reloads again. An empty answer — tab gone,
-        // tab parked between windows, window closed — means the global
-        // setting, never another window's list; see
-        // `TabRegistry.sessionsOfWindowHolding(_:)`.
         tab.session = BrowserSession(
             id: sessionID,
             localFS: LocalFileSystem(fetchesOwnerGroup: wantsOwnerGroup, stuckPaths: stuckPaths),
@@ -1231,7 +1157,7 @@ struct ContentView: View {
                 startPath: NSHomeDirectory(),
                 logCategory: "browser.local"),
             remote: RemoteBrowserViewModel(fs: fs, startPath: startPath, logCategory: "browser.remote"),
-            terminal: TerminalPanelViewModel(openShell: { _, _, _ in throw CancellationError() }),
+
             editManager: EditSessionManager(sessionID: sessionID, queue: queue),
             // Both callers of `startSession` already resolved this via
             // `homeDirectoryPath()` before calling in (see this function's
@@ -1397,113 +1323,16 @@ struct ContentView: View {
         startSession(in: tab, with: fs, startPath: home)
     }
 
-    // MARK: - Pane visibility (P2 terminal-chrome milestone, Task 4)
-
-    /// Restores `tab`'s pane visibility to what was last saved for `stored`,
-    /// right after `startSession` has built a fresh `BrowserSession` for it.
-    /// A no-op when `tab.session` is somehow absent (defensive only — the
-    /// caller always calls this immediately after `startSession`, which sets
-    /// it).
-    ///
-    /// A fresh `TerminalPanelViewModel.isVisible` always starts `false`, so
-    /// making the terminal come up visible again means CALLING THE SAME
-    /// TOGGLE the toolbar's Terminal button calls in `.builtIn` mode —
-    /// `TerminalPanelViewModel.toggle()` — rather than reaching into its
-    /// `isVisible` property directly and separately deciding whether to open
-    /// a shell. There is only ever one "make the terminal appear" path; this
-    /// is that path, run once at connect time instead of by a click. Opening
-    /// a shell here is therefore the intended reading of "opens as it last
-    /// stood": the shell channel multiplexes over the connection `fs` just
-    /// established (architecture invariant — one SSH connection per window,
-    /// SFTP and the terminal share it), so this adds no second connection,
-    /// no extra host-key/TOFU prompt, and no separate audit entry (shell
-    /// opens are not an `AuditEvent.Kind` case) — nothing a user would
-    /// experience as a surprise.
-    ///
-    /// The DECISION — which halves the saved value means, with `hasShell`
-    /// folded in — moved to `SessionTab.applyRestoredPaneVisibility` in the
-    /// whole-phase re-review (item 2), so it can be tested at all; what is
-    /// left here is the one thing that cannot be: calling `toggle()` on the
-    /// session this method was handed. See that method for the rest of this
-    /// comment's reasoning, which now lives next to the code it describes.
-    ///
-    /// `hasShell` is folded in through `tab.effectivePaneVisibility` itself —
-    /// the SAME method `paneToggleState` and the render condition call — not
-    /// a hand-rebuilt `PaneVisibility(showsFiles:showsTerminal:)` that
-    /// happens to compute the identical fold today (fix round 1: the first
-    /// draft of this method did exactly that, which is drift waiting to
-    /// happen — two call sites computing the same thing independently can
-    /// start disagreeing the moment either one changes, and
-    /// `PaneRenderConditionGuardTests` cannot see this file, only
-    /// `ContentView+Detail.swift`). Reusing the method itself means there is
-    /// only ever one place that fold is written down. `tab.showsFiles` is
-    /// set to the RAW saved value first — never the repaired one — matching
-    /// how `showsFiles` behaves everywhere else in this type: the repair is
-    /// something every read site applies fresh via `effectivePaneVisibility`,
-    /// never something baked back into the stored raw boolean.
-    ///
-    /// This is the STORED-session path only, and deliberately still is
-    /// (whole-phase review, Fix 1). The ad-hoc connect path needs no
-    /// counterpart here: `showsFiles` lives on `BrowserSession` now, so a
-    /// connect with nothing saved comes up on the default because the
-    /// session it just built has never been told otherwise — not because
-    /// some second call site remembered to reset it. What this method adds
-    /// is the one thing that cannot be structural: putting a DECIDED value
-    /// on screen.
-    ///
-    /// Which value that is, it does not decide (P3c/T2): the caller passes
-    /// it — files only for an ordinary connect, or
-    /// `PaneVisibility.terminalOnly` for the sidebar's "Open Terminal"
-    /// entry. Taking a `PaneVisibility` rather than the `StoredSession` is
-    /// what keeps this method the single reveal path for both instead of
-    /// growing a second one beside it.
-    func restorePaneVisibility(
-        for tab: SessionTab, visibility: PaneVisibility, descriptor: BackendDescriptor
-    ) {
-        guard tab.session != nil else { return }
-        _ = tab.applyRestoredPaneVisibility(.filesOnly, hasShell: false)
-    }
-
-    /// Persists the active tab's current pane visibility into its stored
-    /// session, if it is connected to one (P2 terminal-chrome milestone,
-    /// Task 4) — called after every Files/Terminal toggle click, in addition
-    /// to the in-memory flip those toggles already perform. This records
-    /// layout state, not permission to open a shell on a later connection.
-    ///
-    /// Reads `SessionTab.effectivePaneVisibility` — the SAME method the
-    /// toolbar's `paneToggleState` and the render condition read — so what
-    /// gets written is exactly what is now on screen, not a re-derivation
-    /// that could disagree with it.
-    ///
-    /// A no-op for an ad-hoc (unsaved) connection, which has no
-    /// `StoredSession` to persist into.
-    func persistActivePaneVisibility() {
-        guard let sessionID = activeTab.activeStoredSessionID, let session = activeTab.session
-        else { return }
-        let visibility = activeTab.effectivePaneVisibility(
-            terminalIsVisible: session.terminal.isVisible, hasShell: activeTabSupportsShell)
-        sessionListViewModel.updatePaneVisibility(for: sessionID, to: visibility)
-    }
-
     @discardableResult
     func connectFromSidebar(
         _ stored: StoredSession
     ) -> AlreadyOpenSessionRequest? {
-        sidebarStart(stored, paneVisibility: nil)
+        sidebarStart(stored)
     }
 
-    /// Sidebar row "Open Terminal" (P3c/T2): the SAME start a sidebar row
-    /// performs, differing in one argument — the session comes up showing
-    /// the terminal instead of the file browser.
-    ///
-    /// The already-open query, the tab rule (`sidebarConnectTarget`), the
-    /// in-flight guard, an already-connected session, and every failure
-    /// path are therefore not "the same as Connect" by inspection but by
-    /// construction: this method is `connectFromSidebar` with the pane
-    /// override filled in, and both are one line onto `sidebarStart`. Two
-    /// entries that behaved differently for no reason would only confuse.
+    /// Opens the stored connection in the configured external terminal.
     func openTerminalFromSidebar(_ stored: StoredSession) {
-        sidebarStart(stored, paneVisibility: .terminalOnly)
+        openExternalTerminalFromSidebar(stored)
     }
 
     /// What a sidebar row's start actually does ("Sitzung ist schon offen",
@@ -1534,27 +1363,27 @@ struct ContentView: View {
     /// of only being parked, and `AlreadyOpenSessionTests` reads it there.
     @discardableResult
     func sidebarStart(
-        _ stored: StoredSession, paneVisibility: PaneVisibility?
+        _ stored: StoredSession
     ) -> AlreadyOpenSessionRequest? {
         guard let existing = tabsModel.tabHolding(
             stored.id, storedSessionIDOf: \.activeStoredSessionID)
         else {
             startWithoutAsking(
-                stored, paneVisibility: paneVisibility)
+                stored)
             return nil
         }
         let request = AlreadyOpenSessionRequest(
-            stored: stored, existingTabID: existing.id, paneVisibility: paneVisibility)
+            stored: stored, existingTabID: existing.id)
         alreadyOpenRequest = request
         return request
     }
 
     func startWithoutAsking(
-        _ stored: StoredSession, paneVisibility: PaneVisibility?
+        _ stored: StoredSession
     ) {
         let target = tabsModel.sidebarConnectTarget(
             activeTabIsConnected: activeTab.isConnected, makeTab: makeSidebarTab)
-        connect(in: target, stored: stored, paneVisibility: paneVisibility)
+        connect(in: target, stored: stored)
     }
 
     /// The fresh tab `startWithoutAsking`'s tab rule asks for: the window's
@@ -1574,22 +1403,8 @@ struct ContentView: View {
         tabsModel.activate(request.existingTabID)
     }
 
-    /// Fills the tab's form from the store + keychain and connects right
-    /// away. No teardown of any other tab.
-    ///
-    /// `paneVisibility` overrides which halves the session comes up
-    /// showing (P3c/T2). `nil` means "whatever this session saved", the P2
-    /// behaviour, and it is what every caller passes except the sidebar
-    /// start (`startWithoutAsking`), which forwards whatever the row asked
-    /// for — `.terminalOnly` for the "Open Terminal" entry and `nil` for an
-    /// ordinary connect. That override is the ONLY thing that entry changes
-    /// about a connect: it comes through this same method, so the tab rule,
-    /// the reconnect guard, the fill, the failure handling and the audit
-    /// record are not a second implementation that could drift from this
-    /// one. Nothing is persisted either way — see `PaneVisibility
-    /// .terminalOnly`.
     func connect(
-        in tab: SessionTab, stored: StoredSession, paneVisibility: PaneVisibility? = nil
+        in tab: SessionTab, stored: StoredSession
     ) {
         guard !tab.isReconnecting else { return }
         // Connecting to a DIFFERENT session ends the episode the lost
@@ -1652,23 +1467,6 @@ struct ContentView: View {
                 // .failed where "/" always worked.
                 let resolved = (try? await fs.homeDirectoryPath()) ?? "/"
                 let home = resolved.hasPrefix("/") ? resolved : "/"
-                // Hand-off guard (connection-liveness plan, Task 6 fix
-                // round 2, Critical — measured by review): `form.connect()`
-                // already refuses to return a result for an attempt Core
-                // itself has superseded (`ConnectionViewModel
-                // .currentAttempt`), but Cancel can still land in the
-                // window AFTER that `await` returns and BEFORE this line —
-                // `await fs.homeDirectoryPath()` above is itself an `await`,
-                // and during it `ConnectionViewModel.state` is already
-                // `.idle` (the dial succeeded), not `.connecting`, so
-                // nothing Core-side observes a Cancel that arrives here.
-                // `tab.reconnectAttempt` is the one thing Cancel moves
-                // UNCONDITIONALLY (see that property's own doc comment) —
-                // checking it here, immediately before the hand-off, is
-                // what stops this exact attempt from setting `tab.session`,
-                // `activeStoredSessionID`, restoring pane visibility, or
-                // writing an audit record for a connection the user already
-                // backed out of.
                 guard tab.reconnectAttempt == myAttempt else {
                     // Same reasoning as `handleAdHocConnected`'s own
                     // refusal branch: `fs` is a live, open connection with
@@ -1682,33 +1480,11 @@ struct ContentView: View {
                 }
                 startSession(in: tab, with: fs, storedName: stored.name, startPath: home)
                 tab.activeStoredSessionID = stored.id
-                // Pane visibility (P2 terminal-chrome milestone, Task 4):
-                // restore what was last shown for THIS stored session, now
-                // that `startSession` has built a fresh `BrowserSession` for
-                // it. Reuses `descriptor` (already resolved above for
-                // `stored.kind`) rather than re-deriving it.
-                //
-                // The caller's explicit Open Terminal override may start
-                // a shell. Saved/restored layouts are not a request to do
-                // so: WindowRestorationPlan returns files only on Connect.
-                // restorePaneVisibility applies that decision unchanged.
-                //
-                // The restored description is cleared as it is used: it
-                // describes the launch this tab came back from, not every
-                // later connect the user makes on it.
-                let restoredPanes = tab.restoredPaneVisibility
-                tab.restoredPaneVisibility = nil
                 // And the restored pointer with it: a connected tab shows
                 // its browser, and on a later disconnect it should fall
                 // back to this window's own sidebar selection rather than
                 // to the session it happened to be restored with.
                 tab.restoredSessionID = nil
-                restorePaneVisibility(
-                    for: tab,
-                    visibility: WindowRestorationPlan.paneVisibility(
-                        override: paneVisibility, restored: restoredPanes,
-                        stored: stored.paneVisibility),
-                    descriptor: descriptor)
                 // Audit recorder (M9b/T3): this IS the stored-session connect
                 // path — attach right after `activeStoredSessionID`, once
                 // `tab.session` (set inside `startSession`) exists.
@@ -1767,7 +1543,6 @@ struct ContentView: View {
             }
         }
     }
-
 
     /// The stored session a lost tab's "Reconnect" would redial, or `nil`
     /// (connection-liveness plan, Task 7).
@@ -2140,33 +1915,6 @@ struct ContentView: View {
         dismissConnectFailure(tab)
     }
 
-    /// Fills `form` from a stored session — the ONE fill both callers of a
-    /// stored session's data share (P3c/T2): the connect below, and the
-    /// sidebar's "Open in External Terminal" entry, which resolves the very
-    /// same form and hands the result to a launcher instead of dialling it.
-    /// Writing these steps a second time for the second caller is the defect
-    /// this milestone exists to avoid; `ConnectionViewModel
-    /// .resolveConfigWithoutDialing()` is its Core-side half.
-    ///
-    /// Returns `false` when it refused, having published the reason on
-    /// `form` (`showFailure`) exactly as this code did when it was inline —
-    /// so the caller that HAS this form on screen needs to do nothing, and
-    /// the caller that does not can read the message back off `form.state`
-    /// and put it somewhere the user can see. The `field:` each refusal
-    /// carries is meaningful only to the on-screen form; nothing is lost by
-    /// the other caller ignoring it.
-    ///
-    /// Every branch here is the code that used to live inline in
-    /// `connect(in:stored:paneVisibility:)`, moved unchanged — the comments
-    /// below still describe their own decisions and their own review
-    /// history.
-    ///
-    /// `throws` because it always could: the resolution calls inside catch
-    /// `LoginResolveError` and nothing else, and anything else they raise
-    /// (a keychain read, say) travelled straight out of the enclosing `Task`
-    /// when this code was inline. Declaring it keeps that shape visible
-    /// instead of turning it into a `try?` that would swallow the difference
-    /// between "refused for a reason" and "something went wrong".
     func fillForm(_ form: ConnectionViewModel, from stored: StoredSession) throws -> Bool {
         // ONE fill for every protocol (M23/T7). `kind` FIRST (M22/T8):
         // assigning it resets `values` to that backend's defaults, so a
@@ -2775,11 +2523,6 @@ struct ContentView: View {
                 return
             }
         } catch {
-            // Not a refusal but a failure (see `fillForm`'s `throws`). Shown
-            // in the same `localizedDescription` fallback `performExternalOpen`
-            // uses for an error it has no specific wording for — and the text
-            // `connect(in:stored:paneVisibility:)` puts on its form for the
-            // same throw (technical backlog of 2026-09-16, Task 5).
             externalTerminalErrorMessage = error.localizedDescription
             return
         }

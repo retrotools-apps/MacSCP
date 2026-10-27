@@ -731,6 +731,16 @@ final class TunnelManager {
         }
     }
 
+    /// Changes the saved display name without stopping the active forwarding.
+    func rename(_ profile: TunnelProfile, to name: String) throws {
+        guard var current = allProfiles.first(where: { $0.id == profile.id }) else { return }
+        let name = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !name.isEmpty else { throw TunnelGroupError.emptyName }
+        current.name = name
+        try store.upsert(current)
+        reload()
+    }
+
     /// Writes a profile and drops whatever runner it had.
     ///
     /// **An edited profile is stopped**, and that is a decision rather than a

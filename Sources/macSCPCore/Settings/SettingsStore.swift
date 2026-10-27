@@ -54,6 +54,11 @@ enum JSONValue: Codable, Equatable, Sendable {
 @Observable
 @MainActor
 public final class SettingsStore {
+    public var highContrast: Bool {
+        get { boolValue(for: "highContrast", default: false) }
+        set { setBool(newValue, for: "highContrast") }
+    }
+
     private enum Keys {
         static let maxConcurrentTransfers = "maxConcurrentTransfers"
         static let uploadLimitKBs = "uploadLimitKBs"
@@ -63,16 +68,6 @@ public final class SettingsStore {
         static let showHiddenFiles = "showHiddenFiles"
         static let autoRefreshEnabled = "autoRefreshEnabled"
         static let autoRefreshIntervalSeconds = "autoRefreshIntervalSeconds"
-        static let terminalFontName = "terminalFontName"
-        static let terminalFontSize = "terminalFontSize"
-        static let terminalCursorStyle = "terminalCursorStyle"
-        static let terminalCursorBlink = "terminalCursorBlink"
-        static let terminalCopyOnSelect = "terminalCopyOnSelect"
-        static let terminalPasteOnRightClick = "terminalPasteOnRightClick"
-        static let terminalType = "terminalType"
-        static let terminalTheme = "terminalTheme"
-        static let terminalImportedTheme = "terminalImportedTheme"
-        static let terminalImportedThemeName = "terminalImportedThemeName"
         static let notificationsEnabled = "notificationsEnabled"
         static let terminalTarget = "terminalTarget"
         static let customTerminalAppPath = "customTerminalAppPath"
@@ -106,11 +101,6 @@ public final class SettingsStore {
         static let showHiddenFiles = false
         static let autoRefreshEnabled = true
         static let autoRefreshIntervalSeconds = 5
-        static let terminalFontSize = 13
-        static let terminalCursorStyle = TerminalCursorStyle.block
-        static let terminalCursorBlink = true
-        static let terminalCopyOnSelect = false
-        static let terminalPasteOnRightClick = false
         static let notificationsEnabled = true
         static let menuBarEnabled = true
         static let presignedDefaultExpiry = PresignedExpiry.oneHour
@@ -275,159 +265,6 @@ public final class SettingsStore {
         set { setInt(clamp(newValue, 2, 300), for: Keys.autoRefreshIntervalSeconds) }
     }
 
-    /// Custom terminal font family name (M9d); nil/empty = use the system
-    /// monospaced default. Persisted like `defaultEditorPath`.
-    public var terminalFontName: String? {
-        get { stringValue(for: Keys.terminalFontName) }
-        set { setString(newValue, for: Keys.terminalFontName) }
-    }
-
-    /// Terminal font point size, clamped to 9...24 on BOTH ends (default 13)
-    /// — same forward-compat pattern as `autoRefreshIntervalSeconds`: a
-    /// hand-edited settings.json cannot produce an unreadable terminal.
-    public var terminalFontSize: Int {
-        get {
-            clamp(
-                intValue(for: Keys.terminalFontSize, default: Defaults.terminalFontSize),
-                9, 24)
-        }
-        set { setInt(clamp(newValue, 9, 24), for: Keys.terminalFontSize) }
-    }
-
-    /// Terminal cursor shape (M9d). An unrecognized raw value on disk
-    /// (future app version, or hand-edited garbage) reads as `.block`
-    /// instead of crashing or propagating `nil`.
-    public var terminalCursorStyle: TerminalCursorStyle {
-        get {
-            guard case .string(let value)? = raw[Keys.terminalCursorStyle] else {
-                return Defaults.terminalCursorStyle
-            }
-            return TerminalCursorStyle(rawValue: value) ?? .block
-        }
-        set {
-            raw[Keys.terminalCursorStyle] = .string(newValue.rawValue)
-            persist()
-        }
-    }
-
-    /// Whether the terminal cursor blinks (M9d). Default ON.
-    public var terminalCursorBlink: Bool {
-        get { boolValue(for: Keys.terminalCursorBlink, default: Defaults.terminalCursorBlink) }
-        set { setBool(newValue, for: Keys.terminalCursorBlink) }
-    }
-
-    /// Whether ending a mouse selection in the terminal copies it to the
-    /// clipboard. Default OFF: a selection that silently replaces the
-    /// clipboard is opt-in. A separate switch from
-    /// `terminalPasteOnRightClick` (maintainer decision, 2026-09-16).
-    public var terminalCopyOnSelect: Bool {
-        get { boolValue(for: Keys.terminalCopyOnSelect, default: Defaults.terminalCopyOnSelect) }
-        set { setBool(newValue, for: Keys.terminalCopyOnSelect) }
-    }
-
-    public var terminalPasteOnRightClick: Bool {
-        get { boolValue(for: Keys.terminalPasteOnRightClick, default: Defaults.terminalPasteOnRightClick) }
-        set { setBool(newValue, for: Keys.terminalPasteOnRightClick) }
-    }
-
-    /// The terminal type a shell opens with unless its session overrides
-    /// it (plan of 2026-09-19, Task 4). Stored as the name itself; a name
-    /// this build does not offer — a hand edit, or a later build's wider
-    /// list — reads as `TerminalType.default` rather than reaching the
-    /// server unchecked. Default `xterm-256color`, the name every shell
-    /// opened with before this setting existed.
-    public var terminalType: TerminalType {
-        get {
-            guard case .string(let value)? = raw[Keys.terminalType] else {
-                return TerminalType.default
-            }
-            return TerminalType(rawValue: value) ?? .default
-        }
-        set {
-            raw[Keys.terminalType] = .string(newValue.rawValue)
-            persist()
-        }
-    }
-
-    /// Which theme the terminal is painted with (plan of 2026-09-19, "The
-    /// answered wishes", Task 3): one of the shipped presets, or the
-    /// imported one. GLOBAL — there is no per-session override, decided in
-    /// the task brief.
-    ///
-    /// A raw value this build does not know — a later build's preset, or a
-    /// hand edit — reads as `TerminalThemeChoice.default`, the look the
-    /// terminal has always had, rather than propagating `nil`. Same shape
-    /// as `terminalType` above.
-    ///
-    /// `.imported` with nothing stored under `terminalImportedTheme` reads
-    /// as the default too. `TerminalTheme.resolved(choice:imported:)` would
-    /// paint the terminal correctly either way, but the CHOICE is what the
-    /// Settings picker binds to, and a choice no row carries leaves that
-    /// picker showing nothing at all (review of 2026-09-20, Minor #7). So
-    /// the fallback happens here, once, rather than at each surface.
-    public var terminalThemeChoice: TerminalThemeChoice {
-        get {
-            guard case .string(let value)? = raw[Keys.terminalTheme],
-                let choice = TerminalThemeChoice(rawValue: value)
-            else {
-                return TerminalThemeChoice.default
-            }
-            if choice == .imported, importedTerminalTheme == nil {
-                return .default
-            }
-            return choice
-        }
-        set {
-            raw[Keys.terminalTheme] = .string(newValue.rawValue)
-            persist()
-        }
-    }
-
-    /// The theme read out of the `.itermcolors` file the user last
-    /// imported, or `nil` when none has been. Stored as colours, in this
-    /// same `settings.json` — an imported theme is a handful of hex values,
-    /// not a file worth keeping a copy of, and keeping it here means it
-    /// travels with the rest of the settings.
-    ///
-    /// Storing a theme does not select it; `terminalThemeChoice` does that.
-    /// Assigning `nil` forgets the import.
-    public var importedTerminalTheme: TerminalTheme? {
-        get {
-            guard let value = raw[Keys.terminalImportedTheme] else { return nil }
-            return TerminalTheme(settingsValue: value)
-        }
-        set {
-            raw[Keys.terminalImportedTheme] = newValue?.settingsValue
-            // Forgetting the import takes a choice that NAMED it with it,
-            // so nothing is left on disk pointing at a theme that is gone.
-            // Scoped deliberately: a chosen preset is none of this
-            // setter's business.
-            if newValue == nil, case .string(TerminalThemeChoice.importedRawValue)? =
-                raw[Keys.terminalTheme]
-            {
-                raw[Keys.terminalTheme] = .string(TerminalThemeChoice.default.rawValue)
-            }
-            persist()
-        }
-    }
-
-    /// What to call the imported theme — the name of the file it came from,
-    /// already stripped of its extension and of anything unprintable by
-    /// `ITermColorsImport.themeName(forFileNamed:)`. `nil` when the file's
-    /// name yielded nothing usable; the App then shows a translated word
-    /// instead. Persisted like `terminalFontName`.
-    public var importedTerminalThemeName: String? {
-        get { stringValue(for: Keys.terminalImportedThemeName) }
-        set { setString(newValue, for: Keys.terminalImportedThemeName) }
-    }
-
-    /// The theme the terminal is actually painted with, resolved from the
-    /// two properties above. The App reads THIS — no surface resolves the
-    /// choice itself, so there is one place the fallbacks live.
-    public var resolvedTerminalTheme: TerminalTheme {
-        TerminalTheme.resolved(choice: terminalThemeChoice, imported: importedTerminalTheme)
-    }
-
     /// Whether MacSCP posts a macOS notification when a connection is lost,
     /// a transfer fails or a port forwarding fails (next build of
     /// 2026-09-17, Task 7). One switch for all three. Default ON: the
@@ -506,10 +343,8 @@ public final class SettingsStore {
         }
     }
 
-    /// Compact sidebar mode (sidebar-polish plan, Task 2): tighter row
-    /// padding on session rows — the one thing the mode changes. Default OFF — a
-    /// settings.json predating this key opens the sidebar exactly as it
-    /// always has.
+    /// Tighter connection and tunnel rows with auxiliary metadata hidden.
+    /// Disabled by default; the saved profiles and their actions are unchanged.
     public var sidebarCompact: Bool {
         get { boolValue(for: Keys.sidebarCompact, default: Defaults.sidebarCompact) }
         set { setBool(newValue, for: Keys.sidebarCompact) }
@@ -531,8 +366,6 @@ public final class SettingsStore {
         set { setBool(newValue, for: Keys.groupColorsEnabled) }
     }
 
-    /// External application used to open an SSH session. Missing, unknown
-    /// and removed built-in target values migrate to macOS Terminal.
     public var terminalTarget: TerminalTarget {
         get {
             guard case .string(let value)? = raw[Keys.terminalTarget] else {
@@ -546,23 +379,11 @@ public final class SettingsStore {
         }
     }
 
-    /// Absolute path to the .app bundle used when `terminalTarget == .custom`
-    /// (M11d); nil/empty when unset. Same nil/empty-collapsing accessor
-    /// pattern as `defaultEditorPath`/`terminalFontName`.
     public var customTerminalAppPath: String? {
         get { stringValue(for: Keys.customTerminalAppPath) }
         set { setString(newValue, for: Keys.customTerminalAppPath) }
     }
 
-    /// The `CFBundleShortVersionString` running the last time the app
-    /// decided whether to show the "What's New" sheet (What's New plan,
-    /// Task 2); `nil` before that decision has ever been made — a fresh
-    /// install, or a settings.json predating this key. `WhatsNewModel
-    /// .releasesToShow` reads it as `lastSeen`, and the App layer writes it
-    /// right after making that decision (see `MacSCPApp.init`'s doc
-    /// comment for why immediately rather than after the sheet closes).
-    /// Same nil/empty-collapsing accessor pattern as `customTerminalAppPath`
-    /// /`terminalFontName`.
     public var lastSeenVersion: String? {
         get { stringValue(for: Keys.lastSeenVersion) }
         set { setString(newValue, for: Keys.lastSeenVersion) }
@@ -704,11 +525,6 @@ public final class SettingsStore {
     /// layer's recording rule, not this range.
     public nonisolated static let sidebarWidthRange: ClosedRange<Int> = 170...340
 
-    /// Default expiry the share-link sheet pre-fills (M14). The user can
-    /// still override it per link; this only sets the initial selection.
-    /// An unrecognized raw value on disk (future app version, or
-    /// hand-edited garbage) reads as `.oneHour` instead of crashing or
-    /// propagating `nil` — same pattern as `terminalCursorStyle`.
     public var presignedDefaultExpiry: PresignedExpiry {
         get {
             guard case .string(let value)? = raw[Keys.presignedDefaultExpiry] else {
@@ -722,15 +538,6 @@ public final class SettingsStore {
         }
     }
 
-    /// Which digest procedure the checksum action asks for. SHA-256 by
-    /// default.
-    ///
-    /// An unrecognized raw value on disk (a future app version, or a
-    /// hand-edited file) reads as the preferred algorithm — the same
-    /// fallback shape as `presignedDefaultExpiry` and
-    /// `terminalCursorStyle`, and here it matters more than in either:
-    /// falling back to a broken procedure would quietly downgrade what the
-    /// app computes, without anything on screen saying so.
     public var checksumAlgorithm: ChecksumAlgorithm {
         get {
             guard case .string(let value)? = raw[Keys.checksumAlgorithm] else {
@@ -744,11 +551,6 @@ public final class SettingsStore {
         }
     }
 
-    /// What happens when a session's connection is found gone. Default
-    /// `.offerOnly` — reconnecting re-authenticates, so nothing happens
-    /// without a click. An unrecognized raw value on disk (future app
-    /// version, or hand-edited garbage) reads as `.offerOnly` instead of
-    /// crashing or propagating `nil` — same pattern as `terminalCursorStyle`.
     public var reconnectBehaviour: ReconnectBehaviour {
         get {
             guard case .string(let value)? = raw[Keys.reconnectBehaviour] else {
@@ -798,68 +600,6 @@ public final class SettingsStore {
         set { setInt(clamp(newValue, 15, 600), for: Keys.keepAliveIntervalSeconds) }
     }
 
-    /// Connection-establishment timeout in seconds —
-    /// `BackendDescriptor.sshDescriptor`'s `connect` closure reads this and
-    /// hands it to `CitadelFileSystem.connect`. Bounds the TCP-level connect
-    /// of whichever hop goes through Citadel's `SSHClient.connect(host:...)`:
-    /// the jump hop when there is one, otherwise the target directly.
-    ///
-    /// The SAME value also bounds a LATER wait: a tab's dial opens its SFTP
-    /// child channel through
-    /// `SFTPStartBound.run(deadline:sleeper:open:closeClient:)`, and the
-    /// deadline it passes is this connect timeout
-    /// (`CitadelFileSystem.connect`). Citadel's own open waits on the
-    /// server's SFTP version reply with no timer of its own — the 15s timer
-    /// in `openSFTP` is already succeeded by the time that wait begins
-    /// (`Citadel/Sources/Citadel/SFTP/Client/SFTPClient.swift:558`,
-    /// `timeoutCheck.succeed` before the version future) — and a server
-    /// without the subsystem never sends a reply at all. A FORWARDING dial
-    /// stops at
-    /// `CitadelFileSystem.connectAuthenticated` and opens no SFTP channel
-    /// (`SSHForwardingConnection.connect`), so it spends this value once.
-    ///
-    /// ## Three stages, and this setting reaches only two of them
-    ///
-    /// Between those two waits sits a wait this setting cannot touch, and
-    /// naming only the two it does touch is how a "roughly twice" claim got
-    /// into four catalogues and three comments before it was measured.
-    /// Re-measured against the vendored Citadel source on 2026-09-27:
-    ///
-    /// 1. **TCP connect** — `.connectTimeout(settings.connectTimeout)` on
-    ///    the `ClientBootstrap`
-    ///    (`Citadel/Sources/Citadel/ClientSession.swift:223`). This setting.
-    ///    Bounds the connect attempt and nothing after it.
-    /// 2. **Handshake and user auth** — a hardcoded `.seconds(10)`:
-    ///    `addHandlers` builds `ClientHandshakeHandler(eventLoop:
-    ///    loginTimeout: .seconds(10))`
-    ///    (`Citadel/Sources/Citadel/ClientSession.swift:170-173`), and both
-    ///    routes in reach it: the bootstrap's channel initializer for a
-    ///    direct dial (`ClientSession.swift:221`) and `SSHClient.jump(to:)`
-    ///    for a second hop (`Citadel/Sources/Citadel/Client.swift:207`) —
-    ///    EVERY hop, not only a jump's second one. This repo already
-    ///    records it as `CitadelFileSystem.citadelLoginTimer`, "once per
-    ///    hop". Not reachable from here at any value.
-    /// 3. **SFTP version wait** — this setting again, as above.
-    ///
-    /// So a direct tab dial's worst case is `2 × value + 10s`, not `2 ×
-    /// value`. At the clamp MINIMUM of 5 that is about 20s — four times
-    /// what was set — at the default 10 it is about 30s, and only near the
-    /// clamp maximum of 120 does the ratio approach 2. A multiplier is
-    /// therefore the wrong shape for this fact and is not stated as one,
-    /// here or in the footer (`settings.connection.timeout.footer`).
-    ///
-    /// Through a JUMP HOST the fixed window is paid twice, because stage 2
-    /// runs per hop: the second hop (`SSHClient.jump(to:)`, tunneled
-    /// through the already-open first) has no TCP connect step of its own
-    /// for stage 1 to bound, but it does get its own 10s login timer. Worst
-    /// case `2 × value + 20s`. A jump-host chain is that much less
-    /// configurable by this value; recorded as a known limitation, not a
-    /// bug to fix here.
-    ///
-    /// Clamped to 5...120 on BOTH ends, default 10, which is NIO's own
-    /// `ClientBootstrap` default; Citadel overrides that to 30s, and this
-    /// setting deliberately keeps NIO's shorter default instead. Same
-    /// forward-compat pattern as `terminalFontSize`.
     public var connectTimeoutSeconds: Int {
         get {
             clamp(

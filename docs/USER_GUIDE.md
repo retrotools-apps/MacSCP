@@ -73,8 +73,7 @@ Moving a tab or replacing its connection separates the views.
 ## SSH terminals and tabs
 
 Use **SSH** or **⌘T** to open an external terminal. Terminal, iTerm and other
-configured terminal applications run their own SSH connection. MacSCP has no
-integrated terminal emulator or supported command-line client.
+configured terminal applications run their own SSH connection.
 
 **Disconnect** ends the session while keeping its tab. **⌘W** closes the tab.
 **⌘1–9** selects a session tab; **⌃Tab** and **⌃⇧Tab** cycle through them.
@@ -150,3 +149,50 @@ and paths: inspect them before sharing.
 
 Use GitHub Issues for ordinary bugs and [SECURITY.md](../SECURITY.md) for
 suspected vulnerabilities. Do not post credentials or private infrastructure data.
+
+
+### Contrast and appearance
+
+In Settings → View, choose Low contrast for the original appearance or High
+contrast for stronger group surfaces, clearer row separation and filled icon
+badges. High contrast uses solid chosen group colors in both the sidebar and
+cards, with black or white text and tunnel indicators selected for readability;
+selection uses an outline. Group blocks leave space below their last entry, and parent groups
+enclose their subgroups with a separate inset. Collapsed group labels stay
+vertically centered. The preference is saved and applies to every macSCP window.
+Connection and tunnel editors offer
+a circular color palette and an icon grid inspired by Reminders. Custom colors
+remain available through the color picker.
+
+### Managing tunnels
+
+All tunnels has an Active only switch beneath its heading, separated from
+Start all and Stop all. It shows established tunnels, including degraded ones;
+connecting and reconnecting tunnels remain visible when the filter is off.
+Filtering does not change the scope of the batch start and stop commands.
+Right-click a tunnel in the workspace or sidebar to rename, duplicate, edit,
+move or delete it. Renaming preserves the running connection. Duplicating opens
+an editor with automatic start disabled and proposes a free local port; remote
+forwardings require choosing another remote listen port. Saving an edit stops
+the edited tunnel; deleting asks for confirmation and stops it.
+
+When Terminal is closed, SSH uses the macOS fresh-launch option to skip saved
+windows. When Terminal is already running, the requested session opens in the
+existing application. Global preferences and existing windows are preserved.
+
+When a local or SOCKS tunnel fails because its port is occupied, its More actions
+(…) and context menus offer **Free port and restart…**. Review the process names
+and PIDs before confirming: this terminates those processes, forcibly if needed,
+and may discard their unsaved work. macOS requests administrator authorization
+when required. If ownership changes or release fails, MacSCP does not restart the
+tunnel. Remote forwarding ports cannot be released from the local Mac.
+
+Hiding and showing the connections/tunnels sidebar preserves its current width
+within each window, including after switching between these workspaces.
+
+Compact sidebar in Appearance hides group color dots, connection status dots,
+protocol badges and associated-tunnel indicators in the connections sidebar.
+In the tunnels sidebar it hides group and status dots and the matching generated
+“ · port” suffix from tunnel names. Custom identity icons remain visible; full
+names, endpoint details and status remain available through tooltips and the
+workspace. Switching this preference never renames or edits a saved profile.

@@ -593,16 +593,6 @@ public enum SessionImportPlanner {
         return descriptor.firstViolation(in: values, requireSecrets: false) != nil
     }
 
-    /// Builds the planned session for one file entry under an already-decided
-    /// id and name, so the unchanged, replaced and renamed paths cannot drift
-    /// apart in how they map the file's fields.
-    ///
-    /// `replacing` is the stored record this entry overwrites, on the two
-    /// paths that overwrite one (the id-addressed update and the arbitrated
-    /// Replace), and `nil` everywhere else. Its presence is what
-    /// `replacesExisting` reports; the record itself is read for the one
-    /// setting a file may leave unsaid without meaning "clear it": the
-    /// terminal type.
     private static func makePlanned(
         from fileSession: ExportedSession, id: UUID, name: String, groupID: UUID?,
         replacing: StoredSession? = nil, keepsExistingSecret: Bool = false
@@ -703,17 +693,6 @@ public enum SessionImportPlanner {
         // record on load" is the store's own rule, and for this one shape it
         // is the ONLY rule doing any rejecting.
         var session = StoredSession(id: id, name: name, groupID: groupID, kind: kind)
-        // `?? .filesOnly`, same pattern as `kind ?? .ssh` a few lines up:
-        // `nil` means a payload written before this field existed, and
-        // resolves to the same "nothing recorded" default `StoredSession.
-        // init(from:)` applies for a legacy `sessions.json` -- files shown,
-        // no terminal, so an import cannot make a session open a shell it
-        // never asked for (see `PaneVisibility.filesOnly`). No remapping needed
-        // (unlike `groupID`, which points at a file-local group id the
-        // caller has already resolved to a real one) -- pane visibility is a
-        // value, not a reference, so the file's own value becomes the
-        // imported session's directly.
-        session.paneVisibility = fileSession.paneVisibility ?? .filesOnly
         session.appearance = fileSession.appearance
         // `?? 0`: a rank is a value, not a reference.
         // a rank is the file's own, needs no remapping (unlike `groupID` and
@@ -743,21 +722,6 @@ public enum SessionImportPlanner {
             ssh.jump = jump
             session.ssh = ssh
         }
-        // The terminal type (plan of 2026-09-19, Task 4, fix round 1), after
-        // the jump for the same reason: it lives in the SSH block, so a
-        // non-SSH session has nowhere to put one and this is a no-op there.
-        // The file's value wins; a file that says nothing keeps the replaced
-        // record's own override, because a missing key in an old export (or
-        // in any Cyberduck entry) must never erase a setting the user made.
-        // A new session, which replaces nothing, gets the file's value or
-        // none — "use the global setting".
-        session.ssh?.terminalType = fileSession.terminalType ?? replacing?.ssh?.terminalType
-        // The kind's single secret always travels in the same
-        // `password` slot -- for `.ssh` this is the SSH password, for
-        // `.webdav` the WebDAV password, and for `.s3` the secret access
-        // key (all stored in the Keychain under the session's own id at
-        // apply time). Only `.s3` needs a column of its own, because its
-        // export writes `password` as nil.
         let secret = kind == .s3 ? fileSession.s3SecretAccessKey : fileSession.password
         return PlannedSession(
             session: session, password: secret,

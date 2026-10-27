@@ -3,25 +3,6 @@ import Testing
 
 @testable import MacSCPAppKit
 
-/// What `ContentView.teardown(_:reason:)` leans on, exercised without
-/// Docker. `BoundedCloseTests` already pins the race itself; these are the
-/// claims that belong to the App-layer wrapper around it — that a stage
-/// which does not come back is abandoned, that abandoning one stage does
-/// not cost the next one its turn, and that every stage carries a bound and
-/// a name.
-///
-/// Only the two stages this type still covers appear below. Teardown's
-/// first stage, `transferQueue.cancelAll(reason:)`, is not one of them any
-/// more — it is called directly and unbounded, for the reason
-/// `ContentView.teardown(_:reason:)` records; what pins THAT is
-/// `LivenessGiveUpOrderingTests`, behaviorally, not this file.
-///
-/// What these cannot show, and what only the gated
-/// `LivenessProbeDropIntegrationTests
-/// .teardownWithAnOpenShellAgainstAStillFrozenPeerTerminates` shows, is that
-/// `teardown` actually routes its stages through this type against a real
-/// frozen peer. A revert to bare `await session.terminal.shutdown()` would
-/// leave everything below green.
 @Suite("Teardown stage bounds")
 struct TeardownStageTests {
     /// Suspends forever — `BoundedCloseTests.neverReturns`' shape, for its
@@ -56,7 +37,7 @@ struct TeardownStageTests {
         // the abandonment BRANCH, and spending the real bound to reach it
         // would put five seconds into the ungated suite for nothing. The
         // production value is asserted separately, below.
-        let finished = await TeardownStage.shutDownTerminal
+        let finished = await TeardownStage.stopEditWatchers
             .runBounded(boundSeconds: 0) { await self.neverReturns() }
         #expect(finished == false)
     }
@@ -94,7 +75,7 @@ struct TeardownStageTests {
         let ran = Flag()
         let abandoned = await TeardownStage.stopEditWatchers
             .runBounded(boundSeconds: 0) { await self.neverReturns() }
-        let followed = await TeardownStage.shutDownTerminal.runBounded { ran.raise() }
+        let followed = await TeardownStage.stopEditWatchers.runBounded { ran.raise() }
         #expect(abandoned == false)
         #expect(followed == true)
         #expect(ran.isRaised)

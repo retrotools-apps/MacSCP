@@ -6,9 +6,11 @@ public struct TunnelAppearance: Codable, Hashable, Sendable {
 
     public var icon: Icon
     public var tint: SessionAppearance.Tint
+    public var customColor: GroupColor?
     public var applicationLogo: String?
 
-    public init(icon: Icon = .automatic, tint: SessionAppearance.Tint = .blue, applicationLogo: String? = nil) {
+    public init(icon: Icon = .automatic, tint: SessionAppearance.Tint = .blue, applicationLogo: String? = nil, customColor: GroupColor? = nil) {
+        self.customColor = customColor
         self.icon = icon
         self.tint = tint
         self.applicationLogo = applicationLogo

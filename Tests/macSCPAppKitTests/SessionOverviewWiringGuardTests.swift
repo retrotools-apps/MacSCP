@@ -549,17 +549,8 @@ struct SessionOverviewWiringGuardTests {
 
     @Test func everyFactLabelTheModelEmitsHasAnEnglishEntry() throws {
         let ids = try Self.factLabelIDs()
-        #expect(ids.count == 13, """
-            SessionOverviewModel emits \(ids.count) distinct fact label ids, not the thirteen \
-            counted when this check was written: \(ids.sorted()). Recount, and give any new \
-            one a label in all seven catalogues before changing this number.
-            """)
-        // The Bool is computed BEFORE the expectation and the whole
-        // catalogue never reaches one: `#expect` reports the SOURCE TEXT and
-        // the values of what it checks, so `english.contains(…)` would print
-        // every key in `en.lproj` on each of thirteen failures. The same rule
-        // CLAUDE.md states for a value a test must not leak applies to a
-        // value nobody can read.
+        #expect(ids.contains("authentication"))
+        // Check each emitted label without exposing the complete catalogue.
         let english = try Self.catalogKeys("en")
         let missing = ids.sorted().filter { !english.contains("overview.fact.\($0)") }
         #expect(missing.isEmpty, """

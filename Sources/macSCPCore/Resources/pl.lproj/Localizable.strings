@@ -152,9 +152,6 @@
 /* Kontrola przekierowań S3 (2026-08-29) — odmowa wskazuje, dokąd punkt końcowy chciał wysłać żądanie. */
 "core.s3.redirectRefused %@ %@" = "Połączenie odrzucone — punkt końcowy S3 %1$@ przekierował to żądanie do %2$@, czyli na inny serwer. Nic tam nie zostało wysłane. Jeśli ufasz temu serwerowi, wpisz go jako punkt końcowy.";
 
-/* TerminalPanelViewModel */
-"core.terminal.shellEnded %@" = "Powłoka zakończona: %@";
-"core.terminal.openFailed %@" = "Nie udało się otworzyć powłoki: %@";
 
 /* SessionListViewModel */
 "core.session.loadFailed %@" = "Nie udało się wczytać sesji: %@";
@@ -180,9 +177,6 @@
 "core.overview.auth.agent" = "ssh-agent";
 "core.overview.value.yes" = "Tak";
 "core.overview.value.no" = "Nie";
-"core.overview.panes.files" = "Pliki";
-"core.overview.panes.terminal" = "Terminal";
-"core.overview.panes.both" = "Pliki i terminal";
 "core.overview.s3.bucketList" = "Lista bucketów";
 
 /* File type label (Browser Type Column, 2026-09-04) */

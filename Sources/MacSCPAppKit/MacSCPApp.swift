@@ -79,24 +79,14 @@ final class TabCommands {
     /// Internal shortcut to installed Cyberduck bookmarks. The menu's
     /// unified import instead detects a selected bookmark file or folder.
     var importFromCyberduck: (() -> Void)?
-    /// Terminal menu (M11d/T2): these two entries always offer BOTH ways to
-    /// open a session's shell, regardless of `SettingsStore.terminalTarget`
-    /// — the setting only picks what ⌘T/the toolbar button do, it never
-    /// takes either capability away.
-    var toggleTerminal: (() -> Void)?
+    /// Opens the active SSH session in the configured external terminal.
     var openExternalTerminal: (() -> Void)?
-    /// Transfer-bar toggle (M11o): the "Show/Hide Transfers" menu entry and
-    /// ⌘⇧Y drive this. Each window fills in its own closure, which toggles
-    /// that window's active tab's `transfersPanelVisible`, and the menu
-    /// reaches only the focused window's — there is no key-window check
-    /// anywhere on this bridge any more. Enabled state mirrors
-    /// `isActiveTabConnected` (same as the Terminal entries).
     var toggleTransfers: (() -> Void)?
     /// Mirrors `ContentView`'s active tab connection state (M11d/T2): this
     /// `TabCommands` instance is the only thing `MacSCPApp`'s `.commands`
     /// closure observes, and that closure builds a separate Scene that does
     /// NOT see `ContentView`'s own `tabsModel` — so the enabled state of the
-    /// two Terminal menu entries above has to be mirrored here explicitly
+    /// external Terminal command above has to be mirrored here explicitly
     /// (see `ContentView`'s `.onChange(of: isActiveTabConnected)`).
     var isActiveTabConnected = false
     /// Capability gate (M12/T7b): `false` while the active tab's backend
@@ -106,40 +96,7 @@ final class TabCommands {
     /// reason (this Scene doesn't see `tabsModel`). Defaults `true` so the
     /// menu behaves exactly as before this feature until the mirror runs.
     var activeTabSupportsShell = true
-    /// Pane lock (P2 terminal-chrome milestone; whole-phase review, Fix 2):
-    /// `false` while the terminal is the last visible half, so turning it off
-    /// would empty the window. `ContentView` mirrors
-    /// `SessionTab.paneToggleState(for: .terminal, …).isEnabled` here the
-    /// same way it mirrors `activeTabSupportsShell` above, and for the same
-    /// reason (this Scene cannot see `tabsModel`).
-    ///
-    /// It exists because `toggleTerminal`'s closure checks the lock and
-    /// returns — and a menu entry that is enabled and does nothing is exactly
-    /// what `PaneToggleState`'s own doc comment rules out ("disabled rather
-    /// than silently inert, so the user can see why a click does not land").
-    /// The toolbar button got this right from the start via its own
-    /// `.disabled`; the menu entry lives in another Scene and could only get
-    /// it through a mirror.
-    ///
-    /// Defaults `true` for the same reason `activeTabSupportsShell` does: the
-    /// menu must behave exactly as before until the mirror has run once. The
-    /// disconnected case is not this flag's business — `isActiveTabConnected`
-    /// already covers it.
-    var activeTabTerminalToggleIsUnlocked = true
-    /// Whether the "Show/Hide Terminal" entry can do anything at all: a
-    /// connected tab, on a backend with a shell, whose terminal half is not
-    /// the last visible one. The menu's `.disabled` reads THIS rather than
-    /// re-spelling the three conditions, so the entry and
-    /// `toggleTerminal`'s own guards cannot drift apart on what "would not
-    /// land" means.
-    ///
-    /// "Open in External Terminal" deliberately does NOT read this: that
-    /// route never touches `TerminalPanelViewModel.isVisible`, so the pane
-    /// lock has nothing to say about it (documented deliberate asymmetry,
-    /// Task 3).
-    var canToggleTerminal: Bool {
-        isActiveTabConnected && activeTabSupportsShell && activeTabTerminalToggleIsUnlocked
-    }
+
     /// "Move Tab to New Window" (Detachable Tabs plan, Task 2) — the Window
     /// menu's route to the action the tab strip's context menu also offers.
     /// Same bridge shape as the entries above; it moves the ACTIVE tab of
@@ -601,7 +558,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
     }
 
-
     /// The last synchronous moment the process has, and all that is left of
     /// what this callback used to do.
     ///
@@ -1002,7 +958,6 @@ struct MacSCPApp: App {
         .defaultSize(width: MainWindowSizePlan.defaultSize.width, height: MainWindowSizePlan.defaultSize.height)
         .restorationBehavior(.disabled)
         .commands { MacSCPCommands(settingsStore: settingsStore, settingsBridge: settingsBridge, updater: applicationUpdater) }
-
 
         // The menu-bar status item is an AppKit `NSStatusItem` driven by
         // `menuBarController` (created in `init`), NOT a SwiftUI scene —

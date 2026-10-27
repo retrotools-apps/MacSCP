@@ -3,15 +3,6 @@ import MacSCPTestSupport
 import Testing
 @testable import macSCPCore
 
-/// One-shot signal (mirrors `PlainSignal` in
-/// `RemoteBrowserViewModelTests`/`TerminalPanelViewModelTests`, duplicated
-/// per file per that established convention). Nothing in this file ever
-/// calls `Task.cancel()` — the tests below simulate a decider's own
-/// cancellation by returning `nil`, a value, not a `Task`-level
-/// cancellation — so `wait()` routes through `awaitResumption`
-/// (`Tests/MacSCPTestSupport/AwaitResumption.swift`) for the same reason
-/// every other bare continuation in `Tests/` does, with no change to what
-/// these tests exercise.
 private final class PlainSignal: @unchecked Sendable {
     private let lock = NSLock()
     private var fired = false
@@ -40,10 +31,6 @@ private final class PlainSignal: @unchecked Sendable {
     }
 }
 
-/// Records which conflicts the decider was actually asked about, in order.
-/// File-scoped and privately named (not `Counter`) so this suite cannot
-/// collide with — or be broken by a rename of — the module-level `Counter`
-/// actor declared in `TerminalPanelViewModelTests.swift`.
 private actor DeciderCallLog {
     private(set) var names: [String] = []
     func record(_ name: String) { names.append(name) }

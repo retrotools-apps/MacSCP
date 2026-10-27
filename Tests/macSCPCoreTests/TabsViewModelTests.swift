@@ -386,9 +386,7 @@ struct TabsViewModelTests {
         vm.addTab(b); vm.addTab(c)
         let entries = TabContextMenu.entries(
             atIndex: 0, ofTabCount: vm.tabs.count,
-            supportsShell: false, isAdHoc: false, isConnected: true, hasStoredSession: false,
-            filesToggle: PaneToggleState(isOn: true, isEnabled: false),
-            terminalToggle: PaneToggleState(isOn: false, isEnabled: false))
+            supportsShell: false, isAdHoc: false, isConnected: true, hasStoredSession: false)
         let steps = entries.compactMap { entry -> TabMoveStep? in
             guard case .move(let step) = entry else { return nil }
             return step

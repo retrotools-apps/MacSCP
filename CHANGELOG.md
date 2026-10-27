@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.2.0] (2026-10-27)
+
+### Highlights
+
+* **appearance:** Reminders-inspired contrast, appearance pickers and compact sidebars.
+* **tunnels:** Filtering, management menus and confirmed port recovery.
+* **fixes:** Preserved sidebar width, fixed first SSH launch and removed the integrated terminal.
+
 ## [1.0.0] (2026-10-25)
 
 ### Highlights

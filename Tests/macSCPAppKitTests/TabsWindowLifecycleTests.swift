@@ -550,7 +550,7 @@ struct TabsWindowLifecycleTests {
         var answer = WindowSeed(tabs: [], keepOnTop: false, isPrimary: true)
         registry.registerWindowDescriber({ answer }, for: window)
         let later = WindowSeed(
-            tabs: [TabSeed(sessionID: UUID(), paneVisibility: .bothVisible)],
+            tabs: [TabSeed(sessionID: UUID())],
             keepOnTop: true, isPrimary: true)
         answer = later
         #expect(registry.describeAllWindows() == [later])
@@ -795,16 +795,11 @@ struct TabsWindowLifecycleTests {
                 signature — re-anchor this guard.
                 """)
         let stopsWatchers = teardown.contains("TeardownStage.stopEditWatchers.runBounded")
-        let shutsDownTerminal = teardown.contains("TeardownStage.shutDownTerminal.runBounded")
         #expect(stopsWatchers, """
             TabTeardown.run(_:reason:) no longer runs the edit watchers through \
             TeardownStage.stopEditWatchers.runBounded.
             """)
-        #expect(shutsDownTerminal, """
-            TabTeardown.run(_:reason:) no longer runs the terminal shutdown through \
-            TeardownStage.shutDownTerminal.runBounded — the one stage measured \
-            to need a bound.
-            """)
+
     }
 
     /// Negative, beside the two positives above: a window closing is not

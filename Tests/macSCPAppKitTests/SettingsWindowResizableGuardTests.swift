@@ -182,8 +182,6 @@ struct SettingsWorkspaceTests {
                 selection: .constant(.general), onClose: {})
         }
             .frame(width: 1000, height: 650).environment(\.colorScheme, scheme)
-        let renderer = ImageRenderer(content: view)
-        #expect(try #require(renderer.nsImage).isValid)
         _ = NSApplication.shared
         let window = NSWindow(contentRect: NSRect(x: -10000, y: -10000, width: 1000, height: 650),
                               styleMask: [.titled, .resizable], backing: .buffered, defer: false)
@@ -197,5 +195,9 @@ struct SettingsWorkspaceTests {
         host.layoutSubtreeIfNeeded()
         #expect(window.frame.size == before.size)
         #expect(window.frameAutosaveName.isEmpty)
+        #expect(host.bounds.width > 0 && host.bounds.height > 0)
+        let bitmap = try #require(host.bitmapImageRepForCachingDisplay(in: host.bounds))
+        host.cacheDisplay(in: host.bounds, to: bitmap)
+        #expect(bitmap.pixelsWide > 0 && bitmap.pixelsHigh > 0)
     }
 }

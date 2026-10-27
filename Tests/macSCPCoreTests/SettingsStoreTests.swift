@@ -465,142 +465,6 @@ struct SettingsStoreTests {
         #expect(store.autoRefreshIntervalSeconds == 5)
     }
 
-    // MARK: - Terminal appearance (M9d Task 1)
-
-    @Test func terminalAppearanceDefaults() {
-        let dir = makeTempDirectory()
-        defer { try? FileManager.default.removeItem(at: dir) }
-        let store = SettingsStore(directory: dir)
-        #expect(store.terminalFontName == nil)
-        #expect(store.terminalFontSize == 13)
-        #expect(store.terminalCursorStyle == .block)
-        #expect(store.terminalCursorBlink == true)
-    }
-
-    @Test func terminalFontSizeSetterClampsBelowRange() {
-        let dir = makeTempDirectory()
-        defer { try? FileManager.default.removeItem(at: dir) }
-        let store = SettingsStore(directory: dir)
-        store.terminalFontSize = 8
-        #expect(store.terminalFontSize == 9)
-    }
-
-    @Test func terminalFontSizeSetterClampsAboveRange() {
-        let dir = makeTempDirectory()
-        defer { try? FileManager.default.removeItem(at: dir) }
-        let store = SettingsStore(directory: dir)
-        store.terminalFontSize = 99
-        #expect(store.terminalFontSize == 24)
-    }
-
-    /// Forward-compat pattern (see `outOfRangeValuesOnDiskAreClampedOnLoad`):
-    /// a hand-edited settings.json can carry an out-of-range raw value
-    /// directly, bypassing the setter — the GETTER must clamp too.
-    @Test func terminalFontSizeGetterClampsRawValueBelowRange() throws {
-        let dir = makeTempDirectory()
-        defer { try? FileManager.default.removeItem(at: dir) }
-        try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
-        let json = """
-            {"terminalFontSize": 0}
-            """
-        try Data(json.utf8).write(to: fileURL(dir))
-
-        let store = SettingsStore(directory: dir)
-        #expect(store.terminalFontSize == 9)
-    }
-
-    @Test func terminalFontSizeGetterClampsRawValueAboveRange() throws {
-        let dir = makeTempDirectory()
-        defer { try? FileManager.default.removeItem(at: dir) }
-        try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
-        let json = """
-            {"terminalFontSize": 1000}
-            """
-        try Data(json.utf8).write(to: fileURL(dir))
-
-        let store = SettingsStore(directory: dir)
-        #expect(store.terminalFontSize == 24)
-    }
-
-    /// An unrecognized raw cursor style string (e.g. a future value this
-    /// app version doesn't know, or hand-edited garbage) must read as the
-    /// safe default `.block`, never crash or propagate `nil`.
-    @Test func terminalCursorStyleUnknownRawValueReadsAsBlock() throws {
-        let dir = makeTempDirectory()
-        defer { try? FileManager.default.removeItem(at: dir) }
-        try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
-        let json = """
-            {"terminalCursorStyle": "weird"}
-            """
-        try Data(json.utf8).write(to: fileURL(dir))
-
-        let store = SettingsStore(directory: dir)
-        #expect(store.terminalCursorStyle == .block)
-    }
-
-    @Test func terminalAppearanceSettingsRoundtrip() {
-        let dir = makeTempDirectory()
-        defer { try? FileManager.default.removeItem(at: dir) }
-        let store = SettingsStore(directory: dir)
-        store.terminalFontName = "Menlo"
-        store.terminalFontSize = 16
-        store.terminalCursorStyle = .bar
-        store.terminalCursorBlink = false
-
-        let reloaded = SettingsStore(directory: dir)
-        #expect(reloaded.terminalFontName == "Menlo")
-        #expect(reloaded.terminalFontSize == 16)
-        #expect(reloaded.terminalCursorStyle == .bar)
-        #expect(reloaded.terminalCursorBlink == false)
-    }
-
-    @Test func loadingOldSettingsFileWithoutTerminalAppearanceKeysUsesDefaults() throws {
-        let dir = makeTempDirectory()
-        defer { try? FileManager.default.removeItem(at: dir) }
-        try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
-        let json = """
-            {"maxConcurrentTransfers": 4, "uploadLimitKBs": 10, "downloadLimitKBs": 20}
-            """
-        try Data(json.utf8).write(to: fileURL(dir))
-
-        let store = SettingsStore(directory: dir)
-        #expect(store.terminalFontName == nil)
-        #expect(store.terminalFontSize == 13)
-        #expect(store.terminalCursorStyle == .block)
-        #expect(store.terminalCursorBlink == true)
-    }
-
-    // MARK: - Terminal mouse behaviour (next build 2026-09-17, Task 6)
-
-    /// Both switches are opt-in: a right click that pastes into a remote
-    /// shell, or a selection that silently replaces the clipboard, is not
-    /// something a settings.json predating these keys may start doing.
-    @Test func terminalCopyOnSelectAndPasteOnRightClickDefaultOff() {
-        let dir = makeTempDirectory()
-        defer { try? FileManager.default.removeItem(at: dir) }
-        let store = SettingsStore(directory: dir)
-        #expect(store.terminalCopyOnSelect == false)
-        #expect(store.terminalPasteOnRightClick == false)
-    }
-
-    /// Two separate switches: flipping one must not move the other, in
-    /// either direction, and each survives a reload on its own.
-    @Test func terminalCopyOnSelectAndPasteOnRightClickRoundtripIndependently() {
-        let dir = makeTempDirectory()
-        defer { try? FileManager.default.removeItem(at: dir) }
-        let store = SettingsStore(directory: dir)
-        store.terminalCopyOnSelect = true
-        let afterCopy = SettingsStore(directory: dir)
-        #expect(afterCopy.terminalCopyOnSelect == true)
-        #expect(afterCopy.terminalPasteOnRightClick == false)
-
-        store.terminalCopyOnSelect = false
-        store.terminalPasteOnRightClick = true
-        let afterPaste = SettingsStore(directory: dir)
-        #expect(afterPaste.terminalCopyOnSelect == false)
-        #expect(afterPaste.terminalPasteOnRightClick == true)
-    }
-
     // MARK: - Notifications (next build of 2026-09-17, Task 7)
 
     /// One switch gates all three notifications, and it starts ON: the
@@ -664,9 +528,6 @@ struct SettingsStoreTests {
         #expect(store.customTerminalAppPath == nil)
     }
 
-    /// An unrecognized raw target string (future app version, or hand-edited
-    /// garbage) must read as the safe default `.terminalApp` — same pattern as
-    /// `terminalCursorStyleUnknownRawValueReadsAsBlock`.
     @Test(arguments: ["builtIn", "weird"])
     func terminalTargetLegacyOrUnknownRawValueReadsAsTerminalApp(rawValue: String) throws {
         let dir = makeTempDirectory()
@@ -876,9 +737,6 @@ struct SettingsStoreTests {
         #expect(reloaded.presignedDefaultExpiry == .oneDay)
     }
 
-    /// An unrecognized raw expiry string (future app version, or hand-edited
-    /// garbage) must read as the safe default `.oneHour` — same pattern as
-    /// `terminalCursorStyleUnknownRawValueReadsAsBlock`.
     @Test func presignedDefaultExpiryUnknownRawValueReadsAsOneHour() throws {
         let dir = makeTempDirectory()
         defer { try? FileManager.default.removeItem(at: dir) }

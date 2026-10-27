@@ -4,102 +4,70 @@ import Testing
 
 @Suite("Tab context menu")
 struct TabContextMenuTests {
-    private static let bothVisible = PaneToggleState(isOn: true, isEnabled: true)
-    private static let visibleAndLocked = PaneToggleState(isOn: true, isEnabled: false)
-    private static let hidden = PaneToggleState(isOn: false, isEnabled: true)
-    /// What `PaneVisibility.toggleState(for: .terminal, hasShell: false)`
-    /// answers: nothing to show, and no way to ask for it.
-    private static let unavailable = PaneToggleState(isOn: false, isEnabled: false)
-
     @Test func aLoneTabOffersNothingButClosing() {
         #expect(TabContextMenu.entries(
             atIndex: 0, ofTabCount: 1,
-            supportsShell: false, isAdHoc: false, isConnected: true, hasStoredSession: false,
-            filesToggle: Self.visibleAndLocked, terminalToggle: Self.unavailable) == [.close])
+            supportsShell: false, isAdHoc: false, isConnected: true, hasStoredSession: false) == [.close])
     }
 
     @Test func theFirstOfThreeCannotMoveLeft() {
         #expect(TabContextMenu.entries(
             atIndex: 0, ofTabCount: 3,
-            supportsShell: false, isAdHoc: false, isConnected: true, hasStoredSession: false,
-            filesToggle: Self.visibleAndLocked, terminalToggle: Self.unavailable)
+            supportsShell: false, isAdHoc: false, isConnected: true, hasStoredSession: false)
             == [.close, .closeOthers, .move(.right), .moveToNewWindow])
     }
 
     @Test func theLastOfThreeCannotMoveRight() {
         #expect(TabContextMenu.entries(
             atIndex: 2, ofTabCount: 3,
-            supportsShell: false, isAdHoc: false, isConnected: true, hasStoredSession: false,
-            filesToggle: Self.visibleAndLocked, terminalToggle: Self.unavailable)
+            supportsShell: false, isAdHoc: false, isConnected: true, hasStoredSession: false)
             == [.close, .closeOthers, .move(.left), .moveToNewWindow])
     }
 
     @Test func aMiddleTabMovesBothWays() {
         #expect(TabContextMenu.entries(
             atIndex: 1, ofTabCount: 3,
-            supportsShell: false, isAdHoc: false, isConnected: true, hasStoredSession: false,
-            filesToggle: Self.visibleAndLocked, terminalToggle: Self.unavailable)
+            supportsShell: false, isAdHoc: false, isConnected: true, hasStoredSession: false)
             == [.close, .closeOthers, .move(.left), .move(.right), .moveToNewWindow])
     }
 
-
-    @Test(arguments: [false, true])
-    func connectedSessionsOfferOnlyAnExternalTerminal(legacyTerminalVisible: Bool) {
+    @Test func connectedSessionsOfferOnlyAnExternalTerminal() {
         let entries = TabContextMenu.entries(
             atIndex: 0, ofTabCount: 1,
-            supportsShell: true, isAdHoc: false, isConnected: true, hasStoredSession: false,
-            filesToggle: Self.bothVisible,
-            terminalToggle: legacyTerminalVisible ? Self.bothVisible : Self.hidden)
+            supportsShell: true, isAdHoc: false, isConnected: true, hasStoredSession: false)
         #expect(entries == [.close, .openExternalTerminal])
     }
-
-
-    /// The mirror of the test above, and not a restatement of it: the
-    /// locked half is the TERMINAL this time. That layout is not
-    /// hypothetical — it is exactly what the sidebar row's "Open Terminal"
-    /// entry produces (`PaneVisibility.terminalOnly`), so a menu that
-    /// offered "Hide Terminal" there would empty the window on the one
-    /// route that reaches it most often.
 
     @Test func aDisconnectedTabOffersNoPaneEntries() {
         let entries = TabContextMenu.entries(
             atIndex: 0, ofTabCount: 1,
-            supportsShell: true, isAdHoc: false, isConnected: false, hasStoredSession: false,
-            filesToggle: Self.bothVisible, terminalToggle: Self.bothVisible)
-        #expect(!entries.contains(.pane(.files, .hide)))
-        #expect(!entries.contains(.pane(.terminal, .hide)))
+            supportsShell: true, isAdHoc: false, isConnected: false, hasStoredSession: false)
         #expect(!entries.contains(.openExternalTerminal))
     }
 
     @Test func theExternalTerminalNeedsAShellAndAConnection() {
         #expect(TabContextMenu.entries(
             atIndex: 0, ofTabCount: 1,
-            supportsShell: true, isAdHoc: false, isConnected: true, hasStoredSession: false,
-            filesToggle: Self.bothVisible, terminalToggle: Self.hidden)
+            supportsShell: true, isAdHoc: false, isConnected: true, hasStoredSession: false)
             .contains(.openExternalTerminal))
         #expect(!TabContextMenu.entries(
             atIndex: 0, ofTabCount: 1,
-            supportsShell: false, isAdHoc: false, isConnected: true, hasStoredSession: false,
-            filesToggle: Self.bothVisible, terminalToggle: Self.hidden)
+            supportsShell: false, isAdHoc: false, isConnected: true, hasStoredSession: false)
             .contains(.openExternalTerminal))
     }
-
 
     @Test func savingIsOfferedOnlyForAConnectedAdHocTab() {
         #expect(TabContextMenu.entries(
             atIndex: 0, ofTabCount: 1,
-            supportsShell: false, isAdHoc: true, isConnected: true, hasStoredSession: false,
-            filesToggle: Self.visibleAndLocked, terminalToggle: Self.unavailable)
+            supportsShell: false, isAdHoc: true, isConnected: true, hasStoredSession: false)
             .contains(.saveAsSession))
         #expect(!TabContextMenu.entries(
             atIndex: 0, ofTabCount: 1,
-            supportsShell: false, isAdHoc: true, isConnected: false, hasStoredSession: false,
-            filesToggle: Self.visibleAndLocked, terminalToggle: Self.unavailable)
+            supportsShell: false, isAdHoc: true, isConnected: false, hasStoredSession: false)
             .contains(.saveAsSession))
         #expect(!TabContextMenu.entries(
             atIndex: 0, ofTabCount: 1,
-            supportsShell: false, isAdHoc: false, isConnected: true, hasStoredSession: false,
-            filesToggle: Self.visibleAndLocked, terminalToggle: Self.unavailable)
+            supportsShell: false, isAdHoc: false, isConnected: true, hasStoredSession: false)
             .contains(.saveAsSession))
     }
 
@@ -112,8 +80,7 @@ struct TabContextMenuTests {
     @Test func aLoneTabIsNotOfferedAWindowOfItsOwn() {
         #expect(!TabContextMenu.entries(
             atIndex: 0, ofTabCount: 1,
-            supportsShell: false, isAdHoc: false, isConnected: true, hasStoredSession: false,
-            filesToggle: Self.visibleAndLocked, terminalToggle: Self.unavailable)
+            supportsShell: false, isAdHoc: false, isConnected: true, hasStoredSession: false)
             .contains(.moveToNewWindow))
     }
 
@@ -124,8 +91,7 @@ struct TabContextMenuTests {
         for index in 0..<3 {
             #expect(TabContextMenu.entries(
                 atIndex: index, ofTabCount: 3,
-                supportsShell: false, isAdHoc: false, isConnected: false, hasStoredSession: false,
-                filesToggle: Self.unavailable, terminalToggle: Self.unavailable)
+                supportsShell: false, isAdHoc: false, isConnected: false, hasStoredSession: false)
                 .contains(.moveToNewWindow))
         }
     }
@@ -138,16 +104,14 @@ struct TabContextMenuTests {
     @Test func anUnconnectedTabMovesIntoAWindowOfItsOwnToo() {
         #expect(TabContextMenu.entries(
             atIndex: 0, ofTabCount: 2,
-            supportsShell: false, isAdHoc: false, isConnected: false, hasStoredSession: false,
-            filesToggle: Self.unavailable, terminalToggle: Self.unavailable)
+            supportsShell: false, isAdHoc: false, isConnected: false, hasStoredSession: false)
             .contains(.moveToNewWindow))
     }
 
     @Test func theOrderIsFixedRegardlessOfWhichEntriesApply() {
         #expect(TabContextMenu.entries(
             atIndex: 1, ofTabCount: 3,
-            supportsShell: true, isAdHoc: true, isConnected: true, hasStoredSession: true,
-            filesToggle: Self.bothVisible, terminalToggle: Self.hidden)
+            supportsShell: true, isAdHoc: true, isConnected: true, hasStoredSession: true)
             == [.close, .closeOthers, .move(.left), .move(.right), .moveToNewWindow,
                 .duplicateTab,
                 .openExternalTerminal, .saveAsSession])
@@ -163,23 +127,19 @@ struct TabContextMenuTests {
     @Test func duplicateTabIsOfferedOnlyWithAStoredSession() {
         #expect(TabContextMenu.entries(
             atIndex: 0, ofTabCount: 1,
-            supportsShell: false, isAdHoc: false, isConnected: true, hasStoredSession: true,
-            filesToggle: Self.visibleAndLocked, terminalToggle: Self.unavailable)
+            supportsShell: false, isAdHoc: false, isConnected: true, hasStoredSession: true)
             .contains(.duplicateTab))
         #expect(TabContextMenu.entries(
             atIndex: 0, ofTabCount: 1,
-            supportsShell: false, isAdHoc: false, isConnected: false, hasStoredSession: true,
-            filesToggle: Self.unavailable, terminalToggle: Self.unavailable)
+            supportsShell: false, isAdHoc: false, isConnected: false, hasStoredSession: true)
             .contains(.duplicateTab))
         #expect(!TabContextMenu.entries(
             atIndex: 0, ofTabCount: 1,
-            supportsShell: false, isAdHoc: true, isConnected: true, hasStoredSession: false,
-            filesToggle: Self.visibleAndLocked, terminalToggle: Self.unavailable)
+            supportsShell: false, isAdHoc: true, isConnected: true, hasStoredSession: false)
             .contains(.duplicateTab))
         #expect(!TabContextMenu.entries(
             atIndex: 0, ofTabCount: 1,
-            supportsShell: false, isAdHoc: false, isConnected: false, hasStoredSession: false,
-            filesToggle: Self.unavailable, terminalToggle: Self.unavailable)
+            supportsShell: false, isAdHoc: false, isConnected: false, hasStoredSession: false)
             .contains(.duplicateTab))
     }
 }

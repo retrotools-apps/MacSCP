@@ -48,7 +48,7 @@ struct AppearanceCataloguePicker: View {
                     .foregroundStyle(.secondary).frame(maxWidth: .infinity, maxHeight: .infinity)
             } else {
                 ScrollView {
-                    LazyVGrid(columns: [GridItem(.adaptive(minimum: 76), spacing: 8)], spacing: 8) {
+                    LazyVGrid(columns: [GridItem(.adaptive(minimum: 48), spacing: 8)], spacing: 8) {
                         ForEach(matches) { entry in
                             let selected = AppearanceCatalogue.selectionID(appearance) == entry.id
                             Button {
@@ -56,14 +56,12 @@ struct AppearanceCataloguePicker: View {
                                 appearance.applicationLogo = entry.logo
                                 onSelect()
                             } label: {
-                                VStack(spacing: 6) {
-                                    AppearanceIcon(icon: entry.icon, applicationLogo: entry.logo, kind: kind, size: 26)
-                                        .foregroundStyle(appearance.tint.color)
-                                    Text(entry.title).font(.caption).lineLimit(2).multilineTextAlignment(.center)
-                                }
-                                .frame(maxWidth: .infinity).frame(height: 68).padding(4)
-                                .background(selected ? Color.accentColor.opacity(0.15) : Color.clear,
-                                            in: RoundedRectangle(cornerRadius: 7))
+                                AppearanceIcon(icon: entry.icon, applicationLogo: entry.logo, kind: kind, size: 24)
+                                    .foregroundStyle(selected ? .white : Color.primary.opacity(0.7))
+                                    .frame(width: 42, height: 42)
+                                    .background(selected ? appearance.displayColor : Color.primary.opacity(0.08), in: Circle())
+                                    .padding(4)
+                                    .overlay { Circle().stroke(selected ? appearance.displayColor : .clear, lineWidth: 2) }
                                 .contentShape(Rectangle())
                             }
                             .buttonStyle(.plain).help(entry.title).accessibilityLabel(entry.title)

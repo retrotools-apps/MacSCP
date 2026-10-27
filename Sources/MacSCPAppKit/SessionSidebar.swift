@@ -179,16 +179,7 @@ struct SessionSidebar: View {
     /// Background context menu "Logins…" entry (M10b/T3) — opens the
     /// login-sets management sheet, directly below "Known Hosts…".
     let onShowLogins: () -> Void
-    /// Compact sidebar mode (sidebar-polish plan, Task 2; extended to
-    /// folder rows 2026-09-05) — `SettingsStore.sidebarCompact`, read by
-    /// `ContentView` and handed over as a plain fact: nothing in this file has to know a
-    /// settings layer exists. Forwarded as `isCompact` to each
-    /// `SessionRow` (row padding only, 5pt to 2pt) AND to each
-    /// `SidebarGroupRow` (folder padding only, 3pt to 1pt) — no ordering,
-    /// no selection behaviour, no keyboard handling, and no other element
-    /// of either row: the session row's protocol badge stays visible in
-    /// both densities (fix round 2, coordinator ruling 2026-09-04 — see
-    /// `SessionRow.isCompact`'s own doc comment).
+    /// Hides auxiliary badges and uses tighter rows without changing actions.
     let sidebarCompact: Bool
     var onShowTunnels: () -> Void = {}
     var onShowSettings: () -> Void = {}
@@ -540,8 +531,10 @@ struct SessionSidebar: View {
             case .session(let id):
                 if let session = visibility.session(id) {
                     sessionRow(session)
+                        .modifier(SidebarGroupForeground(layers: bands[row.id] ?? []))
                         .padding(.leading, SidebarIndentation.leading(depth: row.depth))
                         .padding(.trailing, SidebarIndentation.leading(depth: row.depth))
+                        .padding(.bottom, SidebarGroupBands.bottomContentInset(for: bands[row.id] ?? []))
                         .listRowBackground(SidebarGroupBandBackground(layers: bands[row.id] ?? []))
                 }
             case .group(let id):
@@ -559,8 +552,11 @@ struct SessionSidebar: View {
                             .accessibilityAddTraits(.isButton)
                             .accessibilityAction { selectGroup(group) }
                     }
+                    .modifier(SidebarGroupForeground(layers: bands[row.id] ?? []))
                     .padding(.leading, SidebarIndentation.leading(depth: row.depth))
-                    .listRowInsets(EdgeInsets(top: row.depth == 0 ? 8 : 2, leading: 4, bottom: 2, trailing: 4))
+                    .padding(.top, row.depth == 0 ? 8 : 2)
+                    .padding(.bottom, SidebarGroupBands.headerBottomInset(for: bands[row.id] ?? []))
+                    .listRowInsets(EdgeInsets(top: 0, leading: 4, bottom: 0, trailing: 4))
                     .listRowSeparator(.hidden)
                     .listRowBackground(SidebarGroupBandBackground(layers: bands[row.id] ?? []))
                 }
@@ -968,14 +964,7 @@ private struct SidebarGroupRow: View {
     /// carries it: `moveToMenuItems` needs the whole set to derive this
     /// folder's eligible targets and to look each target's name up by id.
     let groups: [StoredGroup]
-    /// Compact sidebar mode (sidebar-polish plan, Task 2; extended to
-    /// folder rows on the maintainer's dev-build report of 2026-09-05: "the
-    /// compact sidebar does not reduce the spacing between the folders").
-    /// `SessionRow.isCompact` carries the identical rule and the identical
-    /// reasoning — see that property's own doc comment — so it is not
-    /// repeated here: a plain fact handed down from `SessionSidebar`, one
-    /// padding density change (`.padding(.vertical, 3)` to `1`), nothing
-    /// else about the row.
+    /// Compact groups omit the color control and tighten vertical padding.
     let isCompact: Bool
     let onStartRename: () -> Void
     let onCommitRename: () -> Void
@@ -1023,9 +1012,11 @@ private struct SidebarGroupRow: View {
                 SidebarGroupTitle(name: group.name)
             }
             Spacer(minLength: 0)
-            GroupColorControl(hue: group.colorHue, color: group.color, isPresented: $choosingColor, onChange: onColor)
+            if !isCompact {
+                GroupColorControl(hue: group.colorHue, color: group.color, isPresented: $choosingColor, onChange: onColor)
+            }
         }
-        .padding(.vertical, isCompact ? 1 : 3)
+        .padding(.vertical, isCompact ? 0 : 1)
         .padding(.horizontal, 2)
         // Both the surface and the border are `SidebarDropTargetPlan`'s
         // answer, drawn without a condition of this view's own: the answer
@@ -1093,6 +1084,7 @@ private struct SidebarGroupRow: View {
 /// A single session row: dot, name (or inline rename field),
 /// hover/selection/active styling, drag source, context menu.
 private struct SessionRow: View {
+    @Environment(\.groupForeground) private var groupForeground
     let session: StoredSession
     let isActive: Bool
     let isConnected: Bool
@@ -1109,21 +1101,8 @@ private struct SessionRow: View {
     /// plain presentation fact, so
     /// this row does not need to know a settings layer exists.
     ///
-    /// Two rulings narrowed this to exactly one change (coordinator,
-    /// 2026-09-04). Fix round 1: the DEFAULT (non-compact) row must not
-    /// change at all — an earlier attempt drew `connectionSummary` as a
-    /// second line whenever this was `false`; that line is gone,
-    /// `connectionSummary` reaches the user only through
-    /// `.help(connectionSummary)`, as it always did. Fix round 2: the
-    /// protocol badge (`Text(kindBadgeLabel)`) — "how a row reads its
-    /// backend at a glance" — stays visible in BOTH densities; an earlier
-    /// attempt hid it behind `if !isCompact`, which the ruling reversed as
-    /// making compact rows ambiguous. So: `false` (the default) is the row
-    /// exactly as it was before this setting existed — one line, badge
-    /// shown, `.padding(.vertical, 5)`. `true` changes exactly the
-    /// padding, to `.padding(.vertical, 2)` — nothing else. No ordering,
-    /// no selection behaviour, no keyboard handling changes either way —
-    /// `onInput`/`SessionRowActivation` are untouched by this flag.
+    /// Compact rows omit protocol and tunnel badges, plus status dots.
+    /// Configured identity icons, tooltips and interaction remain available.
     let isCompact: Bool
     let onInput: (SessionRowInput, StoredSession) -> Bool
     let onEdit: () -> Void
@@ -1262,7 +1241,7 @@ private struct SessionRow: View {
 
     var body: some View {
         HStack(spacing: 6) {
-            SessionSidebarIdentity(appearance: session.appearance ?? .init(), kind: session.kind, isConnected: isConnected)
+            SessionSidebarIdentity(appearance: session.appearance ?? .init(), kind: session.kind, isConnected: isConnected, isCompact: isCompact)
 
             if isRenaming {
                 TextField("", text: $renameDraft)
@@ -1274,52 +1253,35 @@ private struct SessionRow: View {
                 Text(session.name)
                     .lineLimit(1)
                     .fontWeight(isActive ? .semibold : .regular)
-                    .foregroundStyle(isActive ? DesignTokens.remoteBlue : Color.primary)
+                    .foregroundStyle(groupForeground ?? (isActive ? DesignTokens.remoteBlue : Color.primary))
             }
 
             Spacer(minLength: 0)
 
-            // Protocol badge (M12/T7b): "SCP"/"S3" from the backend
-            // descriptor — unobtrusive, same small-label typography as the
-            // sidebar's own section headers above. KEPT in both densities
-            // (sidebar-polish plan, Task 2, fix round 2, coordinator
-            // ruling 2026-09-04): it is how a row reads its backend at a
-            // glance, and hiding it would make a compact row ambiguous.
-            // Compact mode is the padding change alone — see `isCompact`.
-            Text(kindBadgeLabel)
-                .font(.system(size: 10.5, weight: .semibold))
-                .foregroundStyle(DesignTokens.inkTertiary)
-                .fixedSize(horizontal: true, vertical: false)
+            // Auxiliary connection metadata is omitted in compact mode.
+            if !isCompact {
+                Text(kindBadgeLabel)
+                    .font(.system(size: 10.5, weight: .semibold))
+                    .foregroundStyle(groupForeground?.opacity(0.8) ?? DesignTokens.inkTertiary)
+                    .fixedSize(horizontal: true, vertical: false)
 
-            // Port-forwarding glyph (port-forwarding plan, Task 7). Drawn in
-            // BOTH densities, for the same reason the protocol badge above
-            // it is: compact mode is the padding change alone, and a row
-            // that hid whether its forwardings were up would be hiding the
-            // one thing about them that is visible without a menu.
-            //
-            // Colour is never the only channel: the symbol says whether
-            // this is a forwarding or a warning about one, and the text
-            // beside it says how many are up, how many connections failed
-            // in a row, or `!`. Both come from `tunnelGlyph`; this view
-            // chooses neither, and since fix round 1 (2026-09-20) that is
-            // true of the symbol as well — it used to be spelled here.
-            // The status count precedes the icon so the icon stays at the
-            // trailing edge. No empty tunnel column pushes the badge inward.
-            if let glyph = tunnelGlyph {
-                HStack(spacing: 2) {
-                    if let text = glyph.text {
-                        Text(text).font(.system(size: 10, weight: .semibold))
+                // State, symbol and count all come from the shared glyph plan.
+                if let glyph = tunnelGlyph {
+                    HStack(spacing: 2) {
+                        if let text = glyph.text {
+                            Text(text).font(.system(size: 10, weight: .semibold))
+                        }
+                        if glyph.symbol == TunnelSymbols.tunnel {
+                            TunnelIcon(size: 12)
+                        } else {
+                            Image(systemName: glyph.symbol)
+                                .font(.system(size: 9, weight: .semibold))
+                        }
                     }
-                    if glyph.symbol == TunnelSymbols.tunnel {
-                        TunnelIcon(size: 12)
-                    } else {
-                        Image(systemName: glyph.symbol)
-                            .font(.system(size: 9, weight: .semibold))
-                    }
+                    .foregroundStyle(groupForeground ?? glyph.tint.color)
+                    .help(tunnelTooltip)
+                    .fixedSize(horizontal: true, vertical: false)
                 }
-                .foregroundStyle(glyph.tint.color)
-                .help(tunnelTooltip)
-                .fixedSize(horizontal: true, vertical: false)
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)

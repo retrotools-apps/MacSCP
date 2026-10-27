@@ -282,21 +282,6 @@ public final class ConnectionViewModel {
     /// Group assignment shown by the picker — applies while saving a new
     /// session (`shouldSaveSession == true`) AND while editing a stored one.
     public var selectedGroupID: UUID?
-    /// The session's own terminal type, `nil` for "use the global setting"
-    /// (plan of 2026-09-19, Task 4). Shown and saved beside `selectedGroupID`
-    /// while saving a new session and while editing a stored
-    /// one — and, like `selectedGroupID`, reset by `exitEditMode()`, so a
-    /// choice made for one session never travels into the next form. SSH
-    /// only: a non-SSH session has no SSH block to carry it.
-    public var terminalTypeOverride: TerminalType?
-    /// Three-way login switcher state (M10b/T3). The App layer reads this to
-    /// decide whether to show the login-set picker or the manual
-    /// username/password/key fields; it also fills `username`/`authChoice`/
-    /// `keyPath`/`password` from the selected set right before connect/save
-    /// (`SessionListViewModel.resolveTargetLoginSet(form:)`, M29-P2), so
-    /// those fields still carry the values the rest of this view model
-    /// already knows how to validate and connect with — `.set` needs no
-    /// separate connect/validate path here.
     public var loginMode: LoginMode = .manual
     /// The chosen login set in `.set` mode, `nil` while none is selected yet.
     public var selectedLoginSetID: UUID?
@@ -1799,7 +1784,6 @@ public final class ConnectionViewModel {
         saveName = stored.name
         selectedGroupID = stored.groupID
         appearance = stored.appearance ?? SessionAppearance()
-        terminalTypeOverride = stored.ssh?.terminalType
         // A referenced login set (M10b/T3) puts the form straight into Set
         // mode with that set preselected; a manual session goes to Manual
         // exactly as before — see the doc comment on `loginMode`.
@@ -1883,7 +1867,6 @@ public final class ConnectionViewModel {
         editingOriginal = nil
         selectedGroupID = nil
         appearance = SessionAppearance()
-        terminalTypeOverride = nil
         loginMode = .manual
         selectedLoginSetID = nil
         saveAsNewLoginSet = false
@@ -2052,7 +2035,6 @@ public final class ConnectionViewModel {
         // Same place and reason as the jump: the override lives in the SSH
         // block. Written even when `nil`, which is how "Use the global
         // setting" clears an override the session had.
-        session.ssh?.terminalType = terminalTypeOverride
 
         state = .idle
         return session

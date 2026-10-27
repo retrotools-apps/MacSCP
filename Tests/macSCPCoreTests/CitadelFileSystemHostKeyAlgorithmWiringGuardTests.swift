@@ -3,32 +3,6 @@ import MacSCPTestSupport
 import Testing
 @testable import macSCPCore
 
-/// Guards that a hop cannot be dialed without MacSCP's custom host-key
-/// algorithms being registered first.
-///
-/// NIOSSH builds its key-exchange offer out of a process-global registry, so
-/// a dial that ran before `HostKeyAlgorithms.registerOnce()` would simply
-/// stop offering `rsa-sha2-512` — and every RSA-only server would fail with
-/// `keyExchangeNegotiationFailure`. The only automated proof of the offer
-/// itself lives in `HostKeyTypeIntegrationTests`, which needs the Docker rig
-/// and which CI does not run: deleting the registration left the entire
-/// ungated suite green, because `RSASHA2HostKeyTests` registers for itself.
-/// That gap is what this file closes.
-///
-/// The property is held STRUCTURALLY rather than by scanning for a call
-/// beside a call: `CitadelFileSystem` funnels both hops through one private
-/// `connectWithRegisteredAlgorithms`, and what is checked here is that the
-/// funnel is still the only way out. A scan is still a scan — same boundary
-/// as the project's other wiring guards (`PaneVisibilityWiringGuardTests`) —
-/// but the thing it has to keep true is now one line in one function instead
-/// of a habit at every call site.
-///
-/// Fail-closed throughout: an unreadable file, a funnel that cannot be
-/// found, or counts other than the ones counted by hand here (one dial
-/// inside the funnel, two hops calling it) are failures rather than silent
-/// passes. The negative check — nothing dials outside the funnel — is never
-/// alone: it is stated as an equality against the inside count, which is
-/// itself pinned to one.
 @Suite("CitadelFileSystem host-key algorithm registration guard")
 struct CitadelFileSystemHostKeyAlgorithmWiringGuardTests {
     /// `#filePath` is `<repoRoot>/Tests/macSCPCoreTests/<this file>`; three

@@ -1635,16 +1635,6 @@ extension CitadelFileSystem: TransportCloseReporting {
     }
 }
 
-extension CitadelFileSystem: RemoteShellProvider {
-    /// Shell channel over the SAME connection as SFTP (multiplexed, like WinSCP).
-    public func openShell(
-        terminal: String, cols: Int, rows: Int
-    ) async throws -> any RemoteShell {
-        try await CitadelShell.open(
-            client: client, terminal: terminal, cols: cols, rows: rows)
-    }
-}
-
 extension CitadelFileSystem: WindowedFileAccess {
     public func openWindowedFile(path: String) async throws -> any ByteWindowReader {
         do {
@@ -1759,40 +1749,6 @@ extension CitadelFileSystem: ServerInformationProvider {
 }
 
 extension CitadelFileSystem: ChecksumCommandChannel {
-    /// Runs `line` as an SSH `exec` request on the SAME connection SFTP and
-    /// the terminal use — a third kind of child channel beside them — and
-    /// returns its STANDARD OUTPUT.
-    ///
-    /// Standard error is dropped, never merged. `ChecksumOutputReader`
-    /// refuses output of more than one line, so on any far side that writes
-    /// a word of its own — a banner, a shell complaining about a locale —
-    /// merging the two streams would report "no checksum" for every file.
-    ///
-    /// `CitadelShell` is the other command path on this connection and was
-    /// read before this was written: it is not the one to reuse here. It
-    /// opens a PTY, which is exactly what makes it wrong for a value — a PTY
-    /// merges standard error into standard output at the terminal, echoes
-    /// what is written to it, and carries no exit status, so its output is
-    /// the shell's screen rather than a command's answer.
-    ///
-    /// A non-zero exit throws, which is what makes the presence probe's
-    /// answer a simple "did this throw".
-    ///
-    /// The collecting itself — standard output only, bounded, the exit status
-    /// read off Citadel's `CommandFailed` — is `SSHClient
-    /// .collectingStandardOutput(of:limit:onStandardOutput:)` below, shared with the
-    /// diagnosis's exec probes on a jump host
-    /// (`SSHForwardingConnection.standardOutput(of:into:)`). What stays here is
-    /// what is the checksum's own: the bound, the error an overrun is
-    /// reported as, and a non-zero exit turned into a throw.
-    ///
-    /// What the bound above this does NOT do, said plainly because
-    /// `BoundedClose` abandons rather than stops: when `ChecksumBounds`
-    /// elapses, the caller is released but the far side keeps hashing, and
-    /// this exec channel stays open until the connection closes. That is one
-    /// idle child channel per abandoned request, on a connection that is
-    /// already in trouble — the same trade `BoundedSFTPSession.closeBounded`
-    /// makes, and the reason the run bound is minutes rather than seconds.
     func standardOutput(of line: ChecksumCommandLine) async throws -> String {
         let output: RemoteCommandOutput
         do {

@@ -129,8 +129,6 @@ struct WindowLevelPlanTests {
             """)
     }
 
-    /// Toggling the entry calls the focused box's `toggleKeepOnTop`, the
-    /// same bridge shape as `moveTabToNewWindow`/`toggleTerminal` above it.
     @Test func theEntryTogglesThroughTheFocusedBox() throws {
         let source = try Self.code(of: Self.commandsFile)
         #expect(source.contains("tabCommands?.toggleKeepOnTop"), """

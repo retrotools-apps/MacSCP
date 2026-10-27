@@ -484,25 +484,6 @@ final class TabRegistry {
         return list
     }
 
-    /// The stored sessions of the window that currently holds the tab `id` —
-    /// what a per-session setting of that tab is looked up in, read at the
-    /// moment it is needed rather than captured when the tab was built.
-    ///
-    /// **Empty is "ask the global setting", never "ask another window".**
-    /// Three states answer empty and they are deliberately not distinguished:
-    /// `id` is `nil` (the tab is gone), the registry holds the tab in no
-    /// window (parked mid-move, waiting for a window that has not appeared),
-    /// or the window holding it registered no session list any more (it
-    /// closed). A lookup that fell back to some OTHER window's list would
-    /// answer with a setting the user last edited somewhere else, and one
-    /// that kept a closed window's list alive would contradict this type's
-    /// rule that it never keeps a window's view model alive. The caller's
-    /// resolver — `TerminalType.resolved(sessionOverride:global:)` for the
-    /// terminal type — turns an empty list into the global setting on its
-    /// own, because no session in it can match.
-    ///
-    /// Nothing about windows travels the other way: Core is handed a plain
-    /// `[StoredSession]` and never learns that a window exists.
     func sessionsOfWindowHolding(_ id: UUID?) -> [StoredSession] {
         guard let id, let window = windowHolding(id),
               let list = sessionList(for: window)

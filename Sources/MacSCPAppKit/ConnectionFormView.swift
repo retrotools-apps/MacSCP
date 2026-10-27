@@ -14,11 +14,6 @@ struct ConnectionFormView: View {
     /// instance is shared (the sidebar, the login picker), unlike
     /// `KnownHostsSheet`'s throwaway store instance.
     let sessionList: SessionListViewModel
-    /// The global terminal type (`SettingsStore.terminalType`), which the
-    /// terminal-type override row names as what "Use the global setting"
-    /// currently means. A value rather than the store: the form reads
-    /// nothing else from Settings.
-    let globalTerminalType: TerminalType
     /// The window's own managed-key store and secret store — the same two
     /// instances `ContentView.init` resolves and `fillForm`, the two save
     /// paths and the key-import sheet already read (`ContentView.swift`,

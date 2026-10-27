@@ -112,9 +112,7 @@ struct LivenessGiveUpOrderingTests {
             remoteFS: remoteFS,
             local: RemoteBrowserViewModel(fs: LocalFileSystem(), startPath: NSHomeDirectory()),
             remote: RemoteBrowserViewModel(fs: remoteFS, startPath: "/"),
-            terminal: TerminalPanelViewModel(openShell: { _, _, _ in
-                throw CancellationError()
-            }),
+
             editManager: EditSessionManager(sessionID: sessionID, queue: tab.transferQueue),
             homePath: "/")
         tab.liveness = .degraded

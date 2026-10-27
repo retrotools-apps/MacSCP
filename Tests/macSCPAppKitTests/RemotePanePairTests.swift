@@ -202,7 +202,7 @@ struct RemotePairTestFixture {
         tab.session = BrowserSession(id: id, localFS: LocalFileSystem(), remoteFS: fs,
             local: RemoteBrowserViewModel(fs: LocalFileSystem(), startPath: NSHomeDirectory()),
             remote: RemoteBrowserViewModel(fs: fs, startPath: path),
-            terminal: TerminalPanelViewModel(openShell: { _, _, _ in throw CancellationError() }),
+
             editManager: EditSessionManager(sessionID: id, queue: tab.transferQueue), homePath: path)
     }
 

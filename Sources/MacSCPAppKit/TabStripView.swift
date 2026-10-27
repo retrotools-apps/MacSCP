@@ -403,14 +403,6 @@ enum TabMenuEntryTitle {
             return L10n.string("window.moveTabToNewWindow", "Move Tab to New Window")
         case .duplicateTab:
             return L10n.string("tab.duplicate", "Duplicate Tab")
-        case .pane(.files, .show):
-            return L10n.string("tabs.menu.showFiles", "Show Files")
-        case .pane(.files, .hide):
-            return L10n.string("tabs.menu.hideFiles", "Hide Files")
-        case .pane(.terminal, .show):
-            return L10n.string("tabs.menu.showTerminal", "Show Terminal")
-        case .pane(.terminal, .hide):
-            return L10n.string("tabs.menu.hideTerminal", "Hide Terminal")
         case .openExternalTerminal:
             return L10n.string("tabs.menu.openExternalTerminal", "Open in External Terminal")
         case .saveAsSession:

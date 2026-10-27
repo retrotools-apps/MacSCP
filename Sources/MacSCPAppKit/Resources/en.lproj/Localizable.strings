@@ -66,40 +66,12 @@
 
 /* Settings — Terminal tab (M9d) */
 "settings.tab.terminal" = "Terminal";
-"settings.terminal.font" = "Font";
-"settings.terminal.systemFont" = "System (SF Mono)";
-"settings.terminal.size %lld" = "Size: %lld pt";
-"settings.terminal.cursor" = "Cursor";
-"settings.terminal.cursor.block" = "Block";
-"settings.terminal.cursor.bar" = "Bar";
-"settings.terminal.cursor.underline" = "Underline";
-"settings.terminal.cursorBlink" = "Blinking";
-"settings.terminal.copyOnSelect" = "Copy text when you select it";
-"settings.terminal.pasteOnRightClick" = "Paste on right-click";
-"settings.terminal.type" = "Terminal type";
-"settings.terminal.type.footer" = "The name the server is told (TERM); it decides which features programs on the server use. The terminal itself does not change. Applies to the next shell that opens; a session can choose its own in its editor.";
-"terminal.type.xterm-256color" = "xterm-256color (256 colors)";
-"terminal.type.xterm" = "xterm (8 colors)";
-"terminal.type.vt100" = "vt100 (no colors)";
-"settings.terminal.theme.header" = "Colors";
-"settings.terminal.theme" = "Theme";
-"settings.terminal.theme.import" = "Import iTerm2 Colors…";
-"settings.terminal.theme.forget" = "Remove Import";
-"settings.terminal.theme.footer" = "A theme sets the background, the text, the cursor and the sixteen colors programs on the server ask for by number. You can import a color file exported by iTerm2 (a file ending in .itermcolors); MacSCP keeps the colors, not the file. Only one import is kept at a time.";
-"settings.terminal.theme.refused.title" = "Import failed";
-"settings.terminal.theme.refused" = "That file could not be read as an iTerm2 color file. Export the theme from iTerm2 again and pick the .itermcolors file it writes.";
-"terminal.theme.macSCP" = "MacSCP (dark)";
-"terminal.theme.midnight" = "Midnight (dark)";
-"terminal.theme.paper" = "Paper (light)";
-"terminal.theme.imported" = "Imported theme";
 "settings.terminal.target.header" = "External Terminal";
 "settings.terminal.target" = "Open sessions in";
-"settings.terminal.target.builtIn" = "Built-in Terminal";
 "settings.terminal.target.terminalApp" = "Terminal";
 "settings.terminal.target.iTerm" = "iTerm";
 "settings.terminal.target.custom" = "Custom App…";
 "settings.terminal.target.footer" = "Both ways to open a session stay available from the Terminal menu, regardless of this setting.";
-"settings.terminal.target.builtInFallback.footer" = "When “Built-in” is selected, that menu item opens your custom app if one is set, otherwise Terminal.";
 "settings.terminal.target.noneChosen" = "No app chosen";
 
 /* Settings — SSH tab, connection behaviour (Task 9) */
@@ -235,8 +207,6 @@
 "browser.filesToggle" = "Files";
 "browser.filesToggleHelp" = "Show/hide files";
 "browser.ssh" = "SSH";
-"browser.terminalToggle" = "Terminal";
-"browser.terminalToggleHelp" = "Show/hide terminal (⌘T)";
 "browser.terminalOpenExternalHelp" = "Open in external terminal (⌘T)";
 "browser.transfersToggle" = "Transfers";
 "browser.transfersToggleHelp" = "Show/hide transfers (⌘⇧Y)";
@@ -262,9 +232,6 @@
 "browser.pathBar.listingFailed %@" = "Couldn't list the directory: %@";
 "browser.pathBar.candidateCount %lld" = "%lld matches";
 
-/* Terminal panel */
-"terminal.ended" = "Shell ended.";
-"terminal.reopen" = "Reopen";
 
 /* Remote file table columns */
 "filetable.column.name" = "Name";
@@ -369,9 +336,6 @@
 "connection.field.password.unchanged" = "unchanged";
 "connection.field.group" = "Group";
 "connection.field.group.new.help" = "Creates a group inside the chosen one, or at the top level when no group is chosen";
-"connection.field.terminalType" = "Terminal type";
-"connection.field.terminalType.useGlobal %@" = "Use the global setting (%@)";
-"connection.field.terminalType.help" = "The name the server is told for this session's terminal (TERM). The terminal itself does not change.";
 "connection.saveAndConnect" = "Save & connect";
 
 /* Menu commands (M7a/T4) */
@@ -506,8 +470,6 @@
 "tab.duplicate" = "Duplicate Tab";
 "tabs.menu.showFiles" = "Show Files";
 "tabs.menu.hideFiles" = "Hide Files";
-"tabs.menu.showTerminal" = "Show Terminal";
-"tabs.menu.hideTerminal" = "Hide Terminal";
 "tabs.menu.openExternalTerminal" = "Open in External Terminal";
 "tabs.menu.saveAsSession" = "Save as Session…";
 
@@ -659,7 +621,6 @@
 "menu.importSessions" = "Import Sessions…";
 "menu.importLogins" = "Import Logins…";
 "menu.terminal" = "Terminal";
-"menu.terminal.toggle" = "Show/Hide Terminal";
 "menu.terminal.openExternal" = "Open in External Terminal";
 
 /* Known hosts sheet (M10a/T2) */
@@ -1261,7 +1222,6 @@
 "overview.fact.baseURL" = "Server URL";
 "overview.fact.nextcloudPath" = "Nextcloud path";
 "overview.fact.group" = "Group";
-"overview.fact.panes" = "Opens showing";
 "overview.hostKey" = "Host key";
 "overview.hostKey.unknown" = "Not known yet — the next connect asks";
 "overview.secret" = "Password";
@@ -1718,3 +1678,26 @@
 "remotePair.serverRoute" = "Copies on the server";
 "remotePair.serverCopyUnavailable" = "Server-side copying is unavailable for this connection.";
 "whatsNew.1.0.diagnostics" = "Check the configured connection route, trace failed connections, inspect connected-server information and measure upload/download throughput in Mbit/s.";
+
+/* Appearance contrast and tunnel management */
+"settings.appearance.contrast" = "Contrast";
+"settings.appearance.lowContrast" = "Low contrast";
+"settings.appearance.highContrast" = "High contrast";
+"tunnels.activeOnly" = "Active only";
+"tunnels.noActive" = "No active tunnels";
+"tunnel.action.rename" = "Rename…";
+"tunnel.action.duplicate" = "Duplicate…";
+"tunnels.copy %@" = "%@ copy";
+"tunnel.field.name" = "Name";
+"tunnel.action.edit" = "Edit";
+
+/* Explicit recovery of occupied local tunnel ports. */
+"tunnel.release.action" = "Free port and restart…";
+"tunnel.release.title" = "Free this port and restart the tunnel?";
+"tunnel.release.confirm" = "Terminate and restart";
+"tunnel.release.warning" = "The following processes will be terminated, forcibly if necessary. Their connections and unsaved work may be lost. macOS will request administrator authorization if required.";
+"tunnel.release.error" = "Could not free the port";
+"tunnel.release.unavailable" = "The process using this port could not be identified.";
+"tunnel.release.changed" = "The port owner changed. Try again to review the current process.";
+"tunnel.release.protected" = "This port belongs to MacSCP or a system process. Stop its listener from the owning application.";
+"tunnel.release.failed" = "The port could not be released. The tunnel was not restarted.";

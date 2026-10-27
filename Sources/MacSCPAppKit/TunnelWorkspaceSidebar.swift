@@ -6,6 +6,16 @@ enum TunnelWorkspaceSelection: Hashable {
 }
 
 enum TunnelCatalog {
+    /// Generated names append the listen port. Compact presentation strips
+    /// only that exact suffix; the saved name and custom text stay untouched.
+    static func sidebarName(_ profile: TunnelProfile, compact: Bool) -> String {
+        guard compact else { return profile.name }
+        let suffix = " · \(TunnelEndpoints.listener(profile).port)"
+        guard profile.name.hasSuffix(suffix) else { return profile.name }
+        let name = String(profile.name.dropLast(suffix.count))
+        return name.trimmingCharacters(in: .whitespaces).isEmpty ? profile.name : name
+    }
+
     static func profiles(selection: TunnelWorkspaceSelection, profiles: [TunnelProfile], groups: [TunnelGroup]) -> [TunnelProfile] {
         let profiles = DisplayNameOrder.sorted(profiles, by: \.name)
         switch selection {
@@ -85,8 +95,10 @@ enum TunnelCatalog {
 /// Navigation is window-local; groups and runner state remain process-wide.
 struct TunnelWorkspaceSidebar: View {
     let manager: TunnelManager
+    var sessions: [StoredSession] = []
     var selection: Binding<TunnelWorkspaceSelection> = .constant(.all)
     var decider: HostKeyDecider = .refusing
+    var sidebarCompact = false
     let onSessions: () -> Void
     var onSettings: () -> Void = {}
     var onNewTunnel: () -> Void = {}
@@ -120,11 +132,17 @@ struct TunnelWorkspaceSidebar: View {
                         switch entry {
                         case .group(let row):
                             groupSection(row.group, depth: row.depth)
-                                .listRowInsets(EdgeInsets(top: row.depth == 0 ? 8 : 2, leading: 4, bottom: 2, trailing: 4))
+                                .modifier(SidebarGroupForeground(layers: bands[entry.id] ?? []))
+                                .padding(.top, row.depth == 0 ? 8 : 2)
+                                .padding(.bottom, SidebarGroupBands.headerBottomInset(for: bands[entry.id] ?? []))
+                                .listRowInsets(EdgeInsets(top: 0, leading: 4, bottom: 0, trailing: 4))
                                 .listRowBackground(SidebarGroupBandBackground(layers: bands[entry.id] ?? []))
                         case .profile(let profile, let depth):
-                            tunnelRow(profile).padding(.leading, SidebarIndentation.leading(depth: depth))
+                            tunnelRow(profile)
+                                .modifier(SidebarGroupForeground(layers: bands[entry.id] ?? []))
+                                .padding(.leading, SidebarIndentation.leading(depth: depth))
                                 .padding(.trailing, SidebarIndentation.leading(depth: depth))
+                                .padding(.bottom, SidebarGroupBands.bottomContentInset(for: bands[entry.id] ?? []))
                                 .listRowBackground(SidebarGroupBandBackground(layers: bands[entry.id] ?? []))
                         }
                     }
@@ -180,14 +198,16 @@ struct TunnelWorkspaceSidebar: View {
                 Button { selection.wrappedValue = .group(group.id) } label: {
                     SidebarGroupTitle(name: group.name)
                         .frame(maxWidth: .infinity, alignment: .leading)
-                        .padding(.horizontal, 2).padding(.vertical, 3)
+                        .padding(.horizontal, 2).padding(.vertical, 1)
                         .contentShape(Rectangle())
                 }
                 .help(group.name)
-                GroupColorControl(hue: group.colorHue, color: group.color, isPresented: Binding(
-                    get: { choosingGroupColor == group.id },
-                    set: { choosingGroupColor = $0 ? group.id : nil })) { hue in
-                    setColor(hue, for: group)
+                if !sidebarCompact {
+                    GroupColorControl(hue: group.colorHue, color: group.color, isPresented: Binding(
+                        get: { choosingGroupColor == group.id },
+                        set: { choosingGroupColor = $0 ? group.id : nil })) { hue in
+                        setColor(hue, for: group)
+                    }
                 }
             }
             .contextMenu {
@@ -227,29 +247,22 @@ struct TunnelWorkspaceSidebar: View {
             HStack(spacing: 6) {
                 TunnelServiceIcon(appearance: profile.appearance, size: 14)
                     .overlay(alignment: .bottomTrailing) {
-                        Circle().fill(tint(state)).frame(width: 5, height: 5)
-                            .overlay { Circle().stroke(DesignTokens.sidebarSurface, lineWidth: 1) }
-                            .offset(x: 2, y: 2)
+                        if !sidebarCompact {
+                            Circle().fill(tint(state)).frame(width: 5, height: 5)
+                                .overlay { Circle().stroke(DesignTokens.sidebarSurface, lineWidth: 1) }
+                                .offset(x: 2, y: 2)
+                        }
                     }
-                Text(profile.name).lineLimit(1).truncationMode(.tail)
+                Text(TunnelCatalog.sidebarName(profile, compact: sidebarCompact)).lineLimit(1).truncationMode(.tail)
                 Spacer(minLength: 0)
             }
-            .padding(.horizontal, 4).padding(.vertical, 5)
+            .padding(.horizontal, 4).padding(.vertical, sidebarCompact ? 2 : 5)
             .contentShape(Rectangle())
             .background(selection.wrappedValue == .profile(profile.id) ? Color.accentColor.opacity(0.14) : .clear,
                         in: RoundedRectangle(cornerRadius: 6))
         }
         .help(profile.name + "\n" + TunnelProfilesSheet.stateTooltip(state))
-        .contextMenu {
-            Button(L10n.string("tunnel.action.start", "Start")) { Task { await manager.start(profile, decider: decider) } }
-            Button(L10n.string("tunnel.action.stop", "Stop")) { Task { await manager.stop(profile) } }
-            Menu(L10n.string("sidebar.moveTo", "Move to")) {
-                Button(L10n.string("tunnels.group.ungrouped", "Ungrouped")) { move(profile, to: nil) }
-                ForEach(manager.allGroups) { group in
-                    Button(TunnelGroup.path(group, in: manager.allGroups)) { move(profile, to: group.id) }
-                }
-            }
-        }
+        .modifier(TunnelProfileActions(profile: profile, sessions: sessions, manager: manager, decider: decider))
     }
 
     private func move(_ profile: TunnelProfile, to id: UUID?) {

@@ -97,10 +97,8 @@ struct SessionDuplicationTests {
 
     @Test func thePaneLayoutAndTheRankTravel() {
         var template = sshSession(name: "web")
-        template.paneVisibility = .bothVisible
         template.position = 7
         let copy = SessionDuplication.copy(of: template, avoiding: [template])
-        #expect(copy.paneVisibility == .bothVisible)
         #expect(copy.position == 7)
     }
 

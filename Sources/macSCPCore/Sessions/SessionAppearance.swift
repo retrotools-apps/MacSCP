@@ -29,9 +29,11 @@ public struct SessionAppearance: Codable, Equatable, Sendable {
     public var icon: Icon
     public var tint: Tint
     /// Optional catalogue identifier, never a file path or remote URL.
+    public var customColor: GroupColor?
     public var applicationLogo: String?
 
-    public init(icon: Icon = .automatic, tint: Tint = .blue, applicationLogo: String? = nil) {
+    public init(icon: Icon = .automatic, tint: Tint = .blue, applicationLogo: String? = nil, customColor: GroupColor? = nil) {
+        self.customColor = customColor
         self.icon = icon
         self.tint = tint
         self.applicationLogo = applicationLogo

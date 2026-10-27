@@ -157,12 +157,6 @@ struct WindowRestorationWiringGuardTests {
             beginEditing( prefill here, which put the form in edit mode and \
             offered "Save & connect" instead.)
             """)
-        #expect(body.contains("restoredPaneVisibility"), """
-            makeRestoredTab(from:) no longer carries the described pane \
-            visibility onto the tab — a disconnected tab has no panes yet, \
-            so this is the only place the description can be kept until the \
-            tab connects.
-            """)
     }
 
     // MARK: - The file is written at quit, and only there
@@ -287,28 +281,10 @@ struct WindowRestorationWiringGuardTests {
             """)
     }
 
-    // MARK: - The described pane visibility lands somewhere
-
-    /// The connect path is the only place a described visibility can be
-    /// applied, because a restored tab has no panes until it connects.
-    /// The explicit-request policy is `WindowRestorationPlan.paneVisibility`'s
-    /// (pinned in `WindowRestorationPlanTests`); this pins that connect
-    /// asks it rather than re-deriving it.
-    @Test func connectResolvesPaneVisibilityThroughThePlan() throws {
+    @Test func connectClearsTheRestoredSessionPointer() throws {
         let body = try Self.body("func connect(", in: Self.contentViewFile)
-        #expect(body.contains("WindowRestorationPlan.paneVisibility("), """
-            connect(in:stored:paneVisibility:) no longer resolves the pane \
-            visibility through WindowRestorationPlan — a saved layout could \
-            start a terminal without an explicit request.
-            """)
-        #expect(body.contains("restoredPaneVisibility = nil"), """
-            connect(in:stored:paneVisibility:) no longer clears the tab's \
-            restoredPaneVisibility — the description would keep overriding \
-            every later connect on that tab, including one the user made \
-            after changing the panes.
-            """)
         #expect(body.contains("restoredSessionID = nil"), """
-            connect(in:stored:paneVisibility:) no longer clears the tab's \
+            connect(in:stored:) no longer clears the tab's \
             restoredSessionID — a later disconnect would put the restored \
             session's overview back instead of this window's own sidebar \
             selection.
@@ -327,7 +303,7 @@ struct WindowRestorationWiringGuardTests {
     /// keeps its initializers in extensions: the two struct bodies hold
     /// stored properties and nothing else.
     @Test func theSeedTypesStoreIdentifiersAndBooleansOnly() throws {
-        let allowed: Set<String> = ["UUID", "UUID?", "[UUID]", "[TabSeed]", "Bool", "PaneVisibility"]
+        let allowed: Set<String> = ["UUID", "UUID?", "[UUID]", "[TabSeed]", "Bool"]
         let code = try Self.code(of: Self.seedFile)
         for declaration in ["struct WindowSeed: Codable, Hashable, Sendable",
                             "struct TabSeed: Codable, Hashable, Sendable"] {
@@ -363,7 +339,7 @@ struct WindowRestorationWiringGuardTests {
         let tab = Self.storedProperties(
             in: try TransferQueueBarCancelGuardTests.declarationBody(
                 of: "struct TabSeed: Codable, Hashable, Sendable", in: code))
-        #expect(Set(tab.map(\.name)) == ["sessionID", "paneVisibility"])
+        #expect(Set(tab.map(\.name)) == ["sessionID"])
     }
 
     /// `let`/`var` declarations with an explicit type annotation, as

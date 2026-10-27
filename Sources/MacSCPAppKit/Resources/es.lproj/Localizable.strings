@@ -57,40 +57,12 @@
 "settings.transfers.presignedExpiry.header" = "S3 Compartir Enlaces";
 "settings.transfers.presignedExpiry" = "Caducidad de enlace de acción predeterminado";
 "settings.tab.terminal" = "Terminal";
-"settings.terminal.font" = "Fuente";
-"settings.terminal.systemFont" = "Sistema (SF Mono)";
-"settings.terminal.size %lld" = "Tamaño: %lld pt";
-"settings.terminal.cursor" = "Cursor";
-"settings.terminal.cursor.block" = "Bloque";
-"settings.terminal.cursor.bar" = "Barra";
-"settings.terminal.cursor.underline" = "Subrayado";
-"settings.terminal.cursorBlink" = "Intermitente";
-"settings.terminal.copyOnSelect" = "Copiar texto cuando lo seleccione";
-"settings.terminal.pasteOnRightClick" = "Pegar con clic derecho";
-"settings.terminal.type" = "Tipo de terminal";
-"settings.terminal.type.footer" = "El nombre del servidor se dice (TERM); decide qué programas tiene en el uso del servidor. El terminal en sí no cambia. Se aplica a la próxima caparazón que se abre; una sesión puede elegir su propio en su editor.";
-"terminal.type.xterm-256color" = "xterm-256color (256 colores)";
-"terminal.type.xterm" = "xterm (8 colores)";
-"terminal.type.vt100" = "vt100 (sin colores)";
-"settings.terminal.theme.header" = "Colores";
-"settings.terminal.theme" = "Tema";
-"settings.terminal.theme.import" = "Importar iTerm2 Colores…";
-"settings.terminal.theme.forget" = "Quitar la importación";
-"settings.terminal.theme.footer" = "Un tema establece el fondo, el texto, el cursor y los dieciséis programas de colores en el servidor piden por número. Puede importar un archivo de color exportado por iTerm2 (un archivo que termina en .itermcolors); MacSCP mantiene los colores, no el archivo. Sólo una importación se mantiene a la vez.";
-"settings.terminal.theme.refused.title" = "La importación falló";
-"settings.terminal.theme.refused" = "Ese archivo no se puede leer como un archivo de color iTerm2. Exportar el tema de iTerm2 de nuevo y elegir el archivo .itermcolors que escribe.";
-"terminal.theme.macSCP" = "MacSCP (oscuro)";
-"terminal.theme.midnight" = "Medianoche (oscuro)";
-"terminal.theme.paper" = "Papel (claro)";
-"terminal.theme.imported" = "Tema importado";
 "settings.terminal.target.header" = "Terminal externo";
 "settings.terminal.target" = "Sesiones abiertas en";
-"settings.terminal.target.builtIn" = "Terminal incorporada";
 "settings.terminal.target.terminalApp" = "Terminal";
 "settings.terminal.target.iTerm" = "iTerm";
 "settings.terminal.target.custom" = "Aplicación personalizada…";
 "settings.terminal.target.footer" = "Ambas formas de abrir una sesión de estancia disponible en el menú Terminal, independientemente de este ajuste.";
-"settings.terminal.target.builtInFallback.footer" = "Cuando se selecciona \"Built-in\", ese elemento del menú abre su aplicación personalizada si se establece, de lo contrario Terminal.";
 "settings.terminal.target.noneChosen" = "No se ha elegido ninguna aplicación";
 "settings.connection.timeout.header" = "Tiempo de espera de conexión";
 "settings.connection.timeout %lld" = "Renuncia después de los segundos de %lld";
@@ -202,8 +174,6 @@
 "browser.filesToggle" = "Archivos";
 "browser.filesToggleHelp" = "Mostrar y ocultar archivos";
 "browser.ssh" = "SSH";
-"browser.terminalToggle" = "Terminal";
-"browser.terminalToggleHelp" = "Terminal de ducha/hido ( solubleT)";
 "browser.terminalOpenExternalHelp" = "Abrir en terminal exterior ( solubleT)";
 "browser.transfersToggle" = "Transferencias";
 "browser.transfersToggleHelp" = "Mostrar/ocultar transferencias (⌘⇧Y)";
@@ -226,8 +196,6 @@
 "browser.pathBar.copied" = "¡Policía!";
 "browser.pathBar.listingFailed %@" = "No podía listar el directorio: %@";
 "browser.pathBar.candidateCount %lld" = "Partidos %lld";
-"terminal.ended" = "Shell terminó.";
-"terminal.reopen" = "Reabrir";
 "filetable.column.name" = "Nombre";
 "filetable.column.size" = "Tamaño";
 "filetable.column.modified" = "Modificado";
@@ -287,9 +255,6 @@
 "connection.field.password.unchanged" = "sin cambios";
 "connection.field.group" = "Grupo";
 "connection.field.group.new.help" = "Crea un grupo dentro del elegido, o en el nivel superior cuando no se elige ningún grupo";
-"connection.field.terminalType" = "Tipo de terminal";
-"connection.field.terminalType.useGlobal %@" = "Utilice el entorno global (%@)";
-"connection.field.terminalType.help" = "El nombre del servidor es dicho para el terminal de esta sesión (TERM). El terminal en sí no cambia.";
 "connection.saveAndConnect" = "Guardar &amp; conectar";
 "menu.toggleHidden" = "Mostrar / evitar archivos ocultos";
 "menu.transfers.toggle" = "Show/Hide Transfers";
@@ -390,8 +355,6 @@
 "tab.duplicate" = "Duplicado Tab";
 "tabs.menu.showFiles" = "Mostrar archivos";
 "tabs.menu.hideFiles" = "Ocultar archivos";
-"tabs.menu.showTerminal" = "Mostrar Terminal";
-"tabs.menu.hideTerminal" = "Ocultar la terminal";
 "tabs.menu.openExternalTerminal" = "Abierto en Terminal Externa";
 "tabs.menu.saveAsSession" = "Guardar como sesión…";
 "window.moveTabToNewWindow" = "Mover Tab a Nueva Ventana";
@@ -517,7 +480,6 @@
 "menu.importSessions" = "Sesiones de importación…";
 "menu.importLogins" = "Importar accesos…";
 "menu.terminal" = "Terminal";
-"menu.terminal.toggle" = "Mostrar/Hide Terminal";
 "menu.terminal.openExternal" = "Abierto en Terminal Externa";
 "knownHosts.title" = "Conocidos anfitriones";
 "knownHosts.column.host" = "Servidor";
@@ -1040,7 +1002,6 @@
 "overview.fact.baseURL" = "URL del servidor";
 "overview.fact.nextcloudPath" = "Ruta Nextcloud";
 "overview.fact.group" = "Grupo";
-"overview.fact.panes" = "Abres mostrando";
 "overview.hostKey" = "La clave del host";
 "overview.hostKey.unknown" = "Aún no se sabe - la próxima conexión pide";
 "overview.secret" = "Contraseña";
@@ -1485,3 +1446,26 @@
 "remotePair.serverRoute" = "Copias en el servidor";
 "remotePair.serverCopyUnavailable" = "La copia en el servidor no está disponible para esta conexión.";
 "whatsNew.1.0.diagnostics" = "Compruebe la ruta configurada, trace conexiones fallidas, consulte información del servidor conectado y mida la subida y bajada en Mbit/s.";
+
+/* Appearance contrast and tunnel management */
+"settings.appearance.contrast" = "Contraste";
+"settings.appearance.lowContrast" = "Contraste bajo";
+"settings.appearance.highContrast" = "Contraste alto";
+"tunnels.activeOnly" = "Solo activos";
+"tunnels.noActive" = "No hay túneles activos";
+"tunnel.action.rename" = "Renombrar…";
+"tunnel.action.duplicate" = "Duplicar…";
+"tunnels.copy %@" = "Copia de %@";
+"tunnel.field.name" = "Nombre";
+"tunnel.action.edit" = "Editar";
+
+/* Explicit recovery of occupied local tunnel ports. */
+"tunnel.release.action" = "Liberar puerto y reiniciar…";
+"tunnel.release.title" = "¿Liberar este puerto y reiniciar el túnel?";
+"tunnel.release.confirm" = "Terminar y reiniciar";
+"tunnel.release.warning" = "Los siguientes procesos se terminarán, por la fuerza si es necesario. Sus conexiones y trabajo sin guardar podrían perderse. macOS solicitará autorización de administrador si es necesario.";
+"tunnel.release.error" = "No se pudo liberar el puerto";
+"tunnel.release.unavailable" = "No se pudo identificar el proceso que utiliza este puerto.";
+"tunnel.release.changed" = "El propietario del puerto ha cambiado. Vuelva a revisar el proceso actual.";
+"tunnel.release.protected" = "Este puerto pertenece a MacSCP o a un proceso del sistema. Detenga su escucha desde la aplicación correspondiente.";
+"tunnel.release.failed" = "No se pudo liberar el puerto. El túnel no se reinició.";

@@ -552,33 +552,6 @@ struct SessionRowActivationWiringTests {
 
     // MARK: - Guard K: every callback that reaches the host is an effect value
 
-    /// The route three rounds of enumeration missed, each time by reading
-    /// the previous round's list instead of the sidebar's callbacks.
-    /// `onConnect` was wrapped in a type this view cannot fire; the two
-    /// terminal callbacks were left plain closures — and "Open Terminal" IS
-    /// a connect, by its own doc comment and by
-    /// `ContentView.openTerminalFromSidebar`, which is `connectFromSidebar`
-    /// plus `paneVisibility:`. A single line, `onOpenTerminal(session)` in
-    /// the function that moves the selection, made every single click dial
-    /// with the whole suite green; the same line in the imported-hosts row
-    /// did it with a correct `count: 1`.
-    ///
-    /// `onOpenExternalTerminal` is held to the same rule although MacSCP
-    /// itself never dials on that route: it reads the keychain and hands the
-    /// resolved configuration to a program that does. The user's host is
-    /// reached either way, which is what a stray click would amount to.
-    ///
-    /// What this guard pins is the DECLARATIONS, not a behaviour: spelling
-    /// one of them as a closure again re-opens every route at once and
-    /// changes nothing any behavioural test in this project can observe.
-    ///
-    /// Its limit, stated rather than implied: it knows these callbacks by
-    /// name. A FOURTH callback that reaches a host, added under a new name,
-    /// is a new capability nothing here would notice — no syntactic rule
-    /// separates it from `onEdit`, which takes the same `StoredSession` and
-    /// only opens a form. What holds then is `SessionRowInput`'s doc: an
-    /// entry that starts a session on the user's host is an input, and
-    /// anything else is not.
     @Test func everyHostReachingCallbackOfTheSidebarIsAnEffectValue() throws {
         let lines = try Self.sourceLines()
         for declaration in Self.hostReachingDeclarations {

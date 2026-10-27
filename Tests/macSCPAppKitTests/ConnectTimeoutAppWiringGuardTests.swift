@@ -2,44 +2,8 @@ import Foundation
 import MacSCPTestSupport
 import Testing
 
-/// Guards the App-layer leg of the connect-timeout wiring:
-/// `ContentView+Lifecycle.swift`'s connector closure must forward the local
-/// `connectTimeoutSeconds` — read fresh from `settingsStore` at the moment
-/// the closure actually runs, not hoisted to a stale capture at tab-creation
-/// time — as `BackendDescriptor.openConnection(...)`'s `timeoutSeconds:`
-/// argument, rather than a hardcoded literal.
-///
-/// The argument carries a label since dialing moved behind
-/// `openConnection`, but the label is not what this guard is about: an
-/// `Int` literal or a stale capture passed under the right label compiles
-/// exactly as cleanly as the real local does and looks identical to
-/// call-site code review. `CitadelFileSystemConnectTimeoutWiringGuardTests`
-/// already guards that `CitadelFileSystem.swift` forwards its OWN
-/// `connectTimeout` parameter honestly; this is the twin guard one layer
-/// up, over a differently-shaped call, which is why it lives in its own
-/// file rather than as another case in that scanner.
-///
-/// Same boundary as the project's other wiring guards (see
-/// `PaneVisibilityWiringGuardTests`'s doc comment): a SOURCE-TEXT scan, not
-/// a behavioral test. Fail-closed: an unreadable file, an unrecognized call
-/// shape, or an argument count other than 4 all count as failures.
-///
-/// The other three arguments are counted, not read, and the count is here
-/// to catch the parser drifting rather than the code changing — the
-/// call's arity is the compiler's business. So a decider argument that has
-/// quietly stopped asking anybody, `certificate: .asking { _ in true }`,
-/// passes this guard unchanged. Measured 2026-08-28: it passes the whole
-/// test run unchanged as well. That is a gap in the project rather than in
-/// this file, which is about the timeout; it is written down here because
-/// this is the call site, and a reader who finds the argument list already
-/// under a guard should not conclude that the whole list is.
 @Suite("App-layer connect-timeout wiring guard")
 struct ConnectTimeoutAppWiringGuardTests {
-    /// `#filePath` here is
-    /// `<repoRoot>/Tests/macSCPAppKitTests/ConnectTimeoutAppWiringGuardTests.swift`;
-    /// three `deletingLastPathComponent()` calls recover the repo root
-    /// regardless of `swift test`'s working directory (same trick as
-    /// `PaneVisibilityWiringGuardTests`, which lives beside this file).
     private static let repoRoot: URL = URL(fileURLWithPath: #filePath)
         .deletingLastPathComponent().deletingLastPathComponent()
         .deletingLastPathComponent()

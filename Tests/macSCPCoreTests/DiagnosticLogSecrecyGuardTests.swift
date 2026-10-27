@@ -136,7 +136,7 @@ struct DiagnosticLogSecrecyGuardTests {
     /// addition.
     private static let fixedCategories: Set<String> = [
         "app", "browser.local", "browser.remote", "connect", "sftp",
-        "shell", "transfer", "error", "tunnel",
+        "transfer", "error", "tunnel",
     ]
 
     /// The files under `Sources/` in which the forwarding walk actually
@@ -725,81 +725,6 @@ struct DiagnosticLogSecrecyGuardTests {
             this task added regressed.
             """)
 
-        // Positives 2, 3 and 4 (see this type's doc comment): a file that
-        // routes its lines through its own wrapper contributes NOTHING to the
-        // negative below unless `collectForwardedCallSites()` reaches it — the
-        // wrapper's own marker call interpolates nothing at all.
-        //
-        // Positive 2 is round 4's replacement for a check that could not fail.
-        // Round 3 asserted, per collected file, that the walk yielded at least
-        // one call site — but the collection SKIPPED a file whose call-site
-        // list came back empty, so every entry it returned was non-empty by
-        // construction and the assertion was dead code wearing a guard's
-        // failure message. The collection now filters on whether the walk
-        // NAMED a forwarder (see `WalkResult`), which made the observation
-        // possible and showed round 3's property to be not merely dead but
-        // FALSE.
-        //
-        // The table below is the record of 2026-09-06 and 2026-09-16; the
-        // 2026-09-19 re-run (lost-connection cause) measured only WHICH files
-        // yield sites, not their five numbers, and found two more —
-        // `ContentView+Detail` and `ContentView` — which is why
-        // `filesWithReachableForwardedSites` has nine names and this table
-        // seven rows.
-        //
-        // Measured 2026-09-06 by running the walk and printing what it
-        // collects, per file, with the name set split into seeds and the names
-        // the fixpoint grew onto — RE-RUN the same way on 2026-09-06 for the
-        // CLI-store plan's Task 5 round 3, which is where every number below
-        // comes from except the two `Tunnel` rows, re-run on 2026-09-16 for
-        // Task 2 of that day's technical backlog (that run measured only
-        // those two files, after reproducing both of their 2026-09-06 rows on
-        // the parent commit). TWELVE files under `Sources/` have a forwarder;
-        // SEVEN of them yield call sites:
-        //
-        //   file                       all  seeded  names  seeds  direct
-        //   CitadelFileSystem           23      11     13      1       2
-        //   TunnelRunner                18       9      9      1       2
-        //   RemoteBrowserViewModel       8       8      9      1       2
-        //   ContentView+Lifecycle        7       4      8      2       2
-        //   MacSCPApp                    7       5      6      4       6
-        //   TunnelStore                  3       3      4      1       1
-        //   TunnelManager                3       2      4      2       2
-        //
-        // 2026-09-16: `TunnelStore` was `6 6 7 1 1` — its three writes stopped
-        // reading through the marker-holding `load()`, so `upsert`, `delete`
-        // and `deleteAll` left the name set and their three call sites left
-        // the walk. `TunnelManager` was `3 1 4 1 1` — a second marker call,
-        // in `forgetEverything(for:)`, made that function a seed as well.
-        //
-        // Three rows moved and one is new, and the re-run is what found them:
-        // `TunnelManager` because round 3 put its unreadable-store line inside
-        // a private function its own entry point calls; `TunnelStore` because
-        // round 2 moved the decode into `decode()`, which `readProfiles()`
-        // reaches WITHOUT going through the marker-holding `load()`, so one
-        // name and one call site left the walk; and `MacSCPApp`, which this
-        // table had recorded as `6 4 5 3 5` — stale since the port-forwarding
-        // plan's own final round added the call that took the tree from 39 to
-        // 40. A table nobody re-runs is a comment, not a measurement.
-        //
-        // and FIVE yield none, correctly — `CitadelShell`, `ConnectionViewModel`,
-        // `LocalFileSystem`, `LocalMetadataSource`, `TransferEngine`. In every
-        // one of those the name set equals the seed set: the fixpoint never
-        // grew, because the function holding the marker is ordinary public API
-        // that nothing in its own file calls. There is no wrapper to reach
-        // through and nothing hidden — those lines interpolate at the marker
-        // (or are constant messages, as all three of `CitadelShell`'s are) and
-        // the DIRECT scan reads them. Requiring call sites there would be red
-        // on correct code, which is why the assertion below names the files it
-        // watches instead of quantifying over everything the walk touches.
-        //
-        // `CitadelFileSystem`'s wrapper is `measured<T>`, and it is the reason
-        // the claim this comment used to make — that `TunnelRunner` is the only
-        // file under `Sources/` that wraps the marker — was FALSE.
-        // `TunnelRunner` is the only file whose whole CATEGORY goes through a
-        // wrapper (both of its direct marker sites carry zero interpolations);
-        // `measured` interpolates at the marker itself, so the direct scan was
-        // never blind there.
         let filesYieldingSites = Set(forwarded.filter { !$0.sites.isEmpty }.map(\.file))
         let unreached = Self.filesWithReachableForwardedSites
             .subtracting(filesYieldingSites).sorted()
@@ -1127,28 +1052,6 @@ struct DiagnosticLogSecrecyGuardTests {
         }
     }
 
-    /// The structural fix (diagnostic-log plan, Task 3 fix round 1,
-    /// Critical/Important/Structural findings): a regex over category
-    /// spellings cannot tell a safe `reason=\(DialSupport.reason(for:
-    /// error))` from an unsafe `reason=\(error)` or `reason=\(message)` —
-    /// both are "a call whose category is on the fixed list, with no
-    /// forbidden identifier interpolated," which is everything the two
-    /// checks above ask. So this project no longer writes `reason=` by
-    /// hand at all: `DiagnosticLog.log(_:_:_:reason:)` is the one place
-    /// that key is formatted, and it always builds the value through
-    /// `DialSupport.reason(for:)`. NEGATIVE: no call's arguments contain
-    /// the literal text `reason=` (an equals sign) anywhere — that
-    /// substring can only appear if a caller typed it into the message
-    /// argument by hand, since the label callers DO write is `reason:`
-    /// (a colon, checked separately by `usesReasonOverload`, never
-    /// confused with this one because `=` and `:` are different
-    /// characters). POSITIVE beside it: at least 3 call sites use the
-    /// `reason:` overload — 7 measured 2026-09-05 (`LocalFileSystem.list`,
-    /// `RemoteBrowserViewModel.load`, `ConnectionViewModel.connect`
-    /// (`connect failed`), `CitadelFileSystem`'s `measured` helper,
-    /// `CitadelShell.open`, `TransferEngine.copyFile`,
-    /// `BrowserPane`'s App-layer `error` line) — matching
-    /// `docs/BACKLOG.md`'s row.
     @Test func noHandWrittenMessageSpellsReasonEquals() throws {
         let sites = try Self.collectCallSites()
         let offenders = sites.filter { $0.arguments.contains("reason=") }

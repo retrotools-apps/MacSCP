@@ -297,7 +297,7 @@ struct TabRegistryNoTeardownGuardTests {
     /// Its own control is the lifecycle file below.
     @Test func teardownVocabularyIsRealInTheOneOwner() throws {
         let source = try Self.strictSource(of: Self.tabTeardownFile)
-        for name in ["cancelAll(", "shutdown(", "disconnect(", "TabTeardown"] {
+        for name in ["cancelAll(", "disconnect(", "TabTeardown"] {
             #expect(source.contains(name), """
                 "\(name)" is missing from TabTeardown.swift — the positive half of this suite \
                 has nothing left to stand on if the one teardown owner stops naming it.

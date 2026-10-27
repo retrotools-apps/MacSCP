@@ -7,6 +7,8 @@ enum SidebarIndentation {
 /// A disclosure button independent of List's implicit outline columns. The
 /// label keeps its own drag/drop, rename field, and context menu.
 struct SidebarGroupHeader<Label: View>: View {
+    @Environment(\.highContrast) private var highContrast
+    @Environment(\.groupForeground) private var groupForeground
     @Binding var isExpanded: Bool
     let name: String
     var isSelected = false
@@ -30,6 +32,9 @@ struct SidebarGroupHeader<Label: View>: View {
             label()
         }
         .background(RoundedRectangle(cornerRadius: 6).fill(
-            isSelected ? DesignTokens.remoteBlue.opacity(0.12) : .clear))
+            isSelected && !highContrast ? DesignTokens.remoteBlue.opacity(0.12) : .clear))
+        .overlay(RoundedRectangle(cornerRadius: 6).strokeBorder(
+            isSelected && highContrast ? (groupForeground ?? DesignTokens.remoteBlue).opacity(0.6) : .clear, lineWidth: 1))
+        .accessibilityAddTraits(isSelected ? .isSelected : [])
     }
 }

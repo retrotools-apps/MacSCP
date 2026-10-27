@@ -61,7 +61,7 @@ public enum SessionDuplication {
             ssh: template.ssh,
             s3: template.s3,
             webdav: template.webdav,
-            paneVisibility: template.paneVisibility,
+
             position: template.position,
             appearance: template.appearance)
         // `importSource`/`importID`/`importedAt` (M24) are deliberately NOT

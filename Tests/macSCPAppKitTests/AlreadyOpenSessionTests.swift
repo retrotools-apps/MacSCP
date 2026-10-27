@@ -183,7 +183,7 @@ struct AlreadyOpenSessionTests {
         let stored = storeSession("already-open-active", in: workDir, view: view)
         active.activeStoredSessionID = stored.id
 
-        let request = view.sidebarStart(stored, paneVisibility: nil)
+        let request = view.sidebarStart(stored)
 
         #expect(request?.existingTabID == active.id, """
             the active tab holding the session was treated as no holder at all, so a second \
@@ -212,7 +212,7 @@ struct AlreadyOpenSessionTests {
         view.tabsModel.addTab(secondHolder)
         view.tabsModel.activate(starting.id)
 
-        #expect(view.sidebarStart(stored, paneVisibility: nil)?.existingTabID == firstHolder.id)
+        #expect(view.sidebarStart(stored)?.existingTabID == firstHolder.id)
     }
 
     // MARK: - What the two answers do
@@ -234,7 +234,7 @@ struct AlreadyOpenSessionTests {
         view.tabsModel.addTab(holder)
         view.tabsModel.activate(starting.id)
 
-        guard let request = view.sidebarStart(stored, paneVisibility: nil) else {
+        guard let request = view.sidebarStart(stored) else {
             Issue.record("the start must raise the query when a tab holds the session")
             return
         }
@@ -263,11 +263,11 @@ struct AlreadyOpenSessionTests {
         view.tabsModel.addTab(holder)
         view.tabsModel.activate(starting.id)
 
-        guard let request = view.sidebarStart(stored, paneVisibility: nil) else {
+        guard let request = view.sidebarStart(stored) else {
             Issue.record("the start must raise the query when a tab holds the session")
             return
         }
-        view.startWithoutAsking(request.stored, paneVisibility: request.paneVisibility)
+        view.startWithoutAsking(request.stored)
 
         try await pollUntil("\"Open Anyway\" must actually start the session") {
             await recorder.dialCount == 1
@@ -275,31 +275,6 @@ struct AlreadyOpenSessionTests {
         #expect(view.tabsModel.tabs.map(\.id) == [starting.id, holder.id], """
             the unconnected active tab must still be reused in place — "open anyway" is \
             today's behaviour and nothing else.
-            """)
-    }
-
-    /// The row's pane override travels through the query, so answering an
-    /// "Open Terminal" still opens the terminal rather than quietly turning
-    /// into a plain connect.
-    @Test func theQueryCarriesTheRowsPaneOverride() {
-        let workDir = makeTempDirectory("already-open-pane")
-        defer { try? FileManager.default.removeItem(at: workDir) }
-        let (view, cleanup) = makeContentView(storeDirectory: workDir)
-        defer { cleanup() }
-        let recorder = StartRecorder()
-        let starting = installControlledTab(in: view, recorder: recorder)
-        let stored = storeSession("already-open-pane", in: workDir, view: view)
-
-        let holder = makeTab(recorder: nil)
-        holder.activeStoredSessionID = stored.id
-        view.tabsModel.addTab(holder)
-        view.tabsModel.activate(starting.id)
-
-        #expect(view.sidebarStart(stored, paneVisibility: .terminalOnly)?.paneVisibility
-            == .terminalOnly)
-        #expect(view.sidebarStart(stored, paneVisibility: nil)?.paneVisibility == nil, """
-            an ordinary connect must NOT acquire a pane override on its way through the \
-            query — the pair is what shows the override is carried rather than invented.
             """)
     }
 

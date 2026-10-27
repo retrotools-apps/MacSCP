@@ -6,15 +6,6 @@ import Testing
 /// What a scripted far side did with one line it was handed.
 private struct ScriptedFailure: Error {}
 
-/// A `ChecksumCommandChannel` that records every line it is asked to run and
-/// answers from a closure.
-///
-/// `@unchecked Sendable` for the reason `Shared` in
-/// `CitadelShellIntegrationTests` is: the recorded lines are mutated from
-/// whatever task `BoundedClose` runs the operation on and read from the test
-/// body, and `lock` is what serializes the two. Every access to `recorded`
-/// below sits inside a `withLock`; that argument breaks the moment one does
-/// not.
 private final class ScriptedChannel: ChecksumCommandChannel, @unchecked Sendable {
     private let lock = NSLock()
     private var recorded: [String] = []

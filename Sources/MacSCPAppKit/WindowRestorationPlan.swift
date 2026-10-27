@@ -62,21 +62,6 @@ enum WindowRestorationPlan {
         return stored.filter { $0.id != primary.id }
     }
 
-    /// Which pane visibility a connect actually uses, given the three
-    /// answers that can exist at once.
-    ///
-    /// - `override` is an explicit request from the caller — the sidebar's
-    ///   "Open Terminal" asks for a specific shape and must get it.
-    /// - `restored` and `stored` retain layout information, but neither is
-    ///   permission to start a shell. A normal Connect always opens files.
-    ///   Only a current explicit request may start a terminal, regardless
-    ///   of the terminal application selected in Settings.
-    static func paneVisibility(
-        override: PaneVisibility?, restored: PaneVisibility?, stored: PaneVisibility
-    ) -> PaneVisibility {
-        override ?? .filesOnly
-    }
-
     /// Which stored session a tab's restoration description names (final
     /// review fix, Detachable Tabs plan).
     ///

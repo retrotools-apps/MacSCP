@@ -153,9 +153,6 @@
 /* Contrôle des redirections S3 (2026-08-29) — un refus indique où le point de terminaison voulait envoyer la requête. */
 "core.s3.redirectRefused %@ %@" = "Connexion refusée — le point de terminaison S3 %1$@ a redirigé cette requête vers %2$@, un autre serveur. Rien n’y a été envoyé. Si vous faites confiance à ce serveur, saisissez-le comme point de terminaison.";
 
-/* TerminalPanelViewModel */
-"core.terminal.shellEnded %@" = "Shell terminé : %@";
-"core.terminal.openFailed %@" = "Échec de l'ouverture du shell : %@";
 
 /* SessionListViewModel */
 "core.session.loadFailed %@" = "Échec du chargement des sessions : %@";
@@ -181,9 +178,6 @@
 "core.overview.auth.agent" = "ssh-agent";
 "core.overview.value.yes" = "Oui";
 "core.overview.value.no" = "Non";
-"core.overview.panes.files" = "Fichiers";
-"core.overview.panes.terminal" = "Terminal";
-"core.overview.panes.both" = "Fichiers et terminal";
 "core.overview.s3.bucketList" = "Liste des buckets";
 
 /* File type label (Browser Type Column, 2026-09-04) */

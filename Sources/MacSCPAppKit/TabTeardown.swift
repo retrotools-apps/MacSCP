@@ -1,107 +1,8 @@
 import Foundation
 import macSCPCore
 
-/// The one owner of a tab's teardown order (Quit Teardown plan, Task 1).
-///
-/// **Why this is a type of its own.** The order `cancelAll` →
-/// `editManager.stopAll` → `terminal.shutdown` → `remote.disconnect` is an
-/// architecture invariant (`CLAUDE.md`), and it used to be spelled inside
-/// `ContentView.teardown(_:reason:)` — a method on a SwiftUI view. Every
-/// caller that could reach it therefore had to have a `ContentView`, and the
-/// app's quit does not: `AppDelegate` has no view, and a tab parked for a
-/// window that never appeared belongs to no view either. The alternative was
-/// a second spelling of the four stages on the quit path, which is exactly
-/// the second copy this project's rules exist to prevent, and would be the
-/// copy that goes stale. So the sequence moved out to here, where a view is
-/// not a precondition for running it, and `ContentView.teardown(_:reason:)`
-/// became a call into this function.
-///
-/// `QuitSequenceTests.onlyTheOneOwnerNamesTheTeardownStages` holds that: the
-/// two `TeardownStage` cases are named in exactly two files under `Sources/`
-/// — `TeardownStage.swift`, which declares them, and this one, which runs
-/// them.
-///
-/// **What did NOT move.** `ContentView.teardown(_:reason:)` still calls
-/// `stopDiagnostics(of:)` after this function returns, because that reads
-/// the WINDOW's `DiagnosticsPresenter` (`ContentView.diagnostics`, a
-/// `@State` value) and nothing on the tab can reach it. A parked tab
-/// therefore has no diagnosis to stop — it is in no window, so no window's
-/// panel was ever opened for it.
 @MainActor
 enum TabTeardown {
-    /// Tab-local teardown, in the invariant order: bridge dismiss →
-    /// `cancelAll` → `editManager.stopAll` → `terminal.shutdown` →
-    /// `remote.disconnect`. Other connections stay open; only incoming jobs
-    /// targeting this destination are cancelled on their source queues.
-    ///
-    /// `reason` (connection-liveness plan, Task 8; required — see
-    /// `CancelReason`'s own doc comment for why a `Bool` default was
-    /// rejected) forwards straight into `cancelAll(reason:)`: the ONE call
-    /// site that passes `.connectionLost` is
-    /// `ContentView.handleLivenessGiveUp(_:)`, so the running transfer fails
-    /// with a "connection lost" reason and every queued item is marked and
-    /// kept — every OTHER one passes `.userRequested` (a deliberate
-    /// disconnect, not a drop), which keeps the plain `.cancelled` this
-    /// sequence always produced. The order itself (`cancelAll` first,
-    /// everything else after) is unchanged by this parameter — it only
-    /// changes what `cancelAll` writes onto the queue's own items, not when
-    /// it runs.
-    ///
-    /// **What is bounded here, and what is not.** Three of the four stages
-    /// carry a wall-clock bound; the first one does not.
-    ///
-    /// - `editManager.stopAll()` and `terminal.shutdown()` are bounded HERE,
-    ///   through `TeardownStage.runBounded` — see that type for the
-    ///   measurements behind the five seconds and for which of the two was
-    ///   measured to need it (`terminal.shutdown()`; it did not return
-    ///   inside a 20-second watchdog against a frozen peer, in three runs
-    ///   out of three).
-    /// - `remote.disconnect()` carries its own bound INSIDE
-    ///   `CitadelFileSystem.disconnect()` (`7ac7f7e`) and is deliberately
-    ///   not wrapped again: measured against that same frozen peer it
-    ///   returned in 5.002063 s / 5.304208 s / 5.333977 s.
-    /// - `transferQueue.cancelAll(reason:)` is **not bounded** — neither
-    ///   here nor inside itself. It was wrapped for one commit (`eed1c8a`)
-    ///   and the maintainer removed the wrapper on 2026-08-28, because the
-    ///   bound was measured to catch nothing and to cost something. Against
-    ///   the frozen peer, with an open PTY shell AND an 8 MB download
-    ///   running at the moment of the freeze, `cancelAll` returned in
-    ///   0.004462916 s / 0.004904750 s / 0.005558917 s — three runs out of
-    ///   three, none of them near a bound. What the wrapper cost is
-    ///   visible right below: `BoundedClose` runs its operation in a
-    ///   separate task, so wrapping this call makes this function suspend
-    ///   BEFORE the queue is swept, and a transfer that fails completely
-    ///   inside that one extra main-actor turn then keeps its own error
-    ///   text instead of reading "Connection lost." (one that merely starts
-    ///   is still marked correctly). Swift has no version with both: an
-    ///   async function cannot be run synchronously up to its first
-    ///   suspension point inside another task.
-    ///
-    /// **So the guarantee this function can make is narrower than "it always
-    /// reaches its end".** The incoming-copy cancellation barrier is also
-    /// unbounded. Once both this tab's queue and its incoming copies settle,
-    /// the remaining connection-owning stages reach their end within roughly
-    /// `2 × TeardownStage.boundSeconds + CitadelFileSystem
-    /// .sftpCloseBoundSeconds`. `cancelAll` itself has no such ceiling: it
-    /// awaits every running transfer to unwind (step 3) and is documented as
-    /// able to block on an open decider prompt — which is why
-    /// `conflictBridge.cancelOpenPrompt()` runs first, and why the
-    /// measurement above, not an argument, is what says this is safe today.
-    /// If a teardown is ever seen to hang before the first stage bound can
-    /// fire, this is the stage to measure first. It is also the reason the
-    /// app's quit puts its own `QuitWatchdog.bound` around the whole chain
-    /// rather than trusting this one to end.
-    ///
-    /// A bound around this whole function instead of one per stage was
-    /// considered and rejected by the maintainer: it would abandon the
-    /// invariant order wherever it stood and could not name the stage that
-    /// hung.
-    ///
-    /// **This function does not check `Task.isCancelled`.** A teardown that
-    /// stopped half way would leave a shell open on a connection whose queue
-    /// had already been swept — worse than either end state. The quit's
-    /// watchdog cancels the chain BETWEEN tabs and windows, never inside
-    /// one; see `QuitWatchdog.bound`.
     static func run(_ tab: SessionTab, reason: CancelReason) async {
         if tab.isDisconnecting {
             // Every caller must await the connection owner's cleanup, not merely
@@ -145,16 +46,8 @@ enum TabTeardown {
                     source.conflictBridge.cancelOpenPrompt()
                 })
             }
-            // Binding order (M5e/T4 plan): AFTER `cancelAll` (any in-flight
-            // edit download/upload has already been cancelled/settled by the
-            // queue, so `stopAll` isn't racing a still-running transfer) and
-            // BEFORE `terminal.shutdown`/`disconnect` (teardown proceeds
-            // outward from the queue to the connection).
             await TeardownStage.stopEditWatchers.runBounded { [editManager = session.editManager] in
                 await editManager.stopAll()
-            }
-            await TeardownStage.shutDownTerminal.runBounded { [terminal = session.terminal] in
-                await terminal.shutdown()
             }
             await session.remote.disconnect()
             // The close report ends with the connection it described (fix

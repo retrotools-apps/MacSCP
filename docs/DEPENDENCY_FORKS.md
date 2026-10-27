@@ -1,5 +1,31 @@
 # Vendored SSH dependencies
 
+## Release readiness review — 2026-10-27
+
+Rechecked upstream revisions, release notes and public advisory APIs for 1.2.0.
+No dependency sources or inventory were refreshed.
+
+- Citadel HEAD remains `ae8562f895de06ccb86fdb1cbb65fd99c8976e12` and
+  Joannis NIOSSH HEAD remains `c997b6b12b8ef51a9b50701d98e3fab250d9a044`.
+  Both public advisory APIs returned empty arrays. Native key/agent, keepalive
+  and TLS-gateway adaptations still prevent retiring these local forks.
+- BigInt HEAD is `96fb3b174cb919b57de3edbb6ab7bb4a775137af`; the change
+  since the previous review modifies only its package manifest. Its latest
+  release is 6.0.1 and its public advisory API returned an empty array. Retain
+  the reviewed 5.7.0 base and deployment-floor adaptation for this release.
+- Sparkle 2.10.1 is available. Reviewed its release notes and intervening commit
+  summaries; retain the reviewed 2.9.6 source snapshot and local Argument Parser
+  integration. All five published advisory ranges end before 2.9.6; their
+  patched versions are 2.9.2, 2.9.5 or 2.9.6. A source upgrade and its update
+  qualification remain separate work. Public listings cannot rule out
+  unpublished vulnerabilities.
+
+Sources: [Citadel](https://github.com/orlandos-nl/Citadel),
+[NIOSSH](https://github.com/Joannis/swift-nio-ssh),
+[BigInt](https://github.com/attaswift/BigInt),
+[Sparkle release notes](https://github.com/sparkle-project/Sparkle/releases/tag/2.10.1)
+and [advisories](https://github.com/sparkle-project/Sparkle/security/advisories).
+
 ## Release readiness review — 2026-10-25
 
 Upstream source and public advisory checks were repeated for the 1.0 candidate.

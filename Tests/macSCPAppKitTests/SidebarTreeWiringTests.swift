@@ -189,11 +189,6 @@ struct SidebarTreeWiringTests {
         let marker: String
     }
 
-    /// Every line carrying a token that can only exist to name a PLACE in a
-    /// list. Comments are not stripped — the same deliberate choice
-    /// `PaneVisibilityOwnershipGuardTests` makes for its own scanner: the
-    /// wrong shape should not be modelled anywhere in the file, prose
-    /// included.
     private static func positionalViolations(in lines: [String]) -> [PositionalViolation] {
         let markers = [
             "enumerated(", ".indices", "firstIndex(", "lastIndex(", ".offset",
