@@ -157,73 +157,89 @@ struct SessionCardView: View {
     }
 
 
+    private var cardHeader: some View {
+        HStack(spacing: 9) {
+            AppearanceIcon(icon: appearance.icon, applicationLogo: appearance.applicationLogo, kind: card.session.kind, size: 19)
+                .font(.system(size: 19, weight: .medium))
+                .foregroundStyle(highContrast ? .white : appearance.displayColor)
+                .frame(width: 28, height: 28)
+                .background(appearance.displayColor.opacity(highContrast ? 1 : 0.09), in: RoundedRectangle(cornerRadius: highContrast ? 14 : 7))
+                .help(L10n.string(descriptor.badgeLabelKey, descriptor.badgeLabelDefault))
+                .accessibilityHidden(true)
+            Text(card.overview.name).font(.system(size: 14, weight: .semibold)).lineLimit(1)
+                .help(card.overview.name)
+                .layoutPriority(1)
+            Spacer(minLength: 0)
+            Text(L10n.string(descriptor.badgeLabelKey, descriptor.badgeLabelDefault))
+                .font(.system(size: 9, weight: .medium)).foregroundStyle(.tertiary)
+        }
+    }
+
+    private var cardEndpoint: some View {
+        Text(card.overview.endpointText)
+            .font(.system(size: 11, design: .monospaced))
+            .foregroundStyle(.secondary)
+            .lineLimit(1).truncationMode(.middle)
+            .help(card.overview.endpointText)
+    }
+
+    private var cardFacts: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 4) {
+                ForEach(card.facts.filter { $0.id != "authentication" }) { fact in
+                    HStack(spacing: 6) {
+                        Image(systemName: symbol(for: fact.id)).frame(width: 13)
+                        Text(fact.text).lineLimit(1).truncationMode(.middle)
+                    }
+                    .font(.system(size: 11, design: fact.isMonospaced ? .monospaced : .default))
+                    .foregroundStyle(.secondary)
+                    .help("\(L10n.string(fact.labelKey, fact.id)): \(fact.text)")
+                    .accessibilityLabel("\(L10n.string(fact.labelKey, fact.id)): \(fact.text)")
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+        }
+        .frame(maxHeight: .infinity)
+    }
+
+    private var cardActions: some View {
+        HStack(spacing: 6) {
+            Button(L10n.string("connection.connect", "Connect")) { connect(.contextMenuEntry) }
+                .buttonStyle(SessionCardButtonStyle(prominent: true))
+            Spacer(minLength: 4)
+            if let auth = card.facts.first(where: { $0.id == "authentication" }) {
+                Image(systemName: card.authenticationSymbol)
+                    .help(auth.text).accessibilityLabel(auth.text)
+            }
+            if let stored = card.overview.hasStoredSecret {
+                let hint = stored
+                    ? L10n.string("overview.secret.stored", "Saved in the keychain")
+                    : L10n.string("overview.secret.missing", "Not saved — asked at connect")
+                Image(systemName: stored ? "lock.shield" : "lock.open")
+                    .help(hint).accessibilityLabel(hint)
+            }
+            Button { onEdit(card.session) } label: {
+                Image(systemName: "pencil")
+            }
+            .help(L10n.string("sidebar.edit", "Edit…"))
+            .accessibilityLabel(L10n.string("sidebar.edit", "Edit…"))
+            Button { onDiagnose(card.session) } label: {
+                Image(systemName: "stethoscope")
+            }
+            .help(L10n.string("diagnostics.menu", "Diagnose…"))
+            .accessibilityLabel(L10n.string("diagnostics.menu", "Diagnose…"))
+        }
+        .font(.system(size: 11)).foregroundStyle(.secondary)
+        .controlSize(.small)
+        .buttonStyle(SessionCardButtonStyle())
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
-            HStack(spacing: 9) {
-                AppearanceIcon(icon: appearance.icon, applicationLogo: appearance.applicationLogo, kind: card.session.kind, size: 19)
-                    .font(.system(size: 19, weight: .medium))
-                    .foregroundStyle(highContrast ? .white : appearance.displayColor)
-                    .frame(width: 28, height: 28)
-                    .background(appearance.displayColor.opacity(highContrast ? 1 : 0.09), in: RoundedRectangle(cornerRadius: highContrast ? 14 : 7))
-                    .help(L10n.string(descriptor.badgeLabelKey, descriptor.badgeLabelDefault))
-                    .accessibilityHidden(true)
-                Text(card.overview.name).font(.system(size: 14, weight: .semibold)).lineLimit(1)
-                    .help(card.overview.name)
-                    .layoutPriority(1)
-                Spacer(minLength: 0)
-                Text(L10n.string(descriptor.badgeLabelKey, descriptor.badgeLabelDefault))
-                    .font(.system(size: 9, weight: .medium)).foregroundStyle(.tertiary)
-            }
-            Text(card.overview.endpointText)
-                .font(.system(size: 11, design: .monospaced))
-                .foregroundStyle(.secondary)
-                .lineLimit(1).truncationMode(.middle)
-                .help(card.overview.endpointText)
-            ScrollView {
-                VStack(alignment: .leading, spacing: 4) {
-                    ForEach(card.facts.filter { $0.id != "authentication" }) { fact in
-                        HStack(spacing: 6) {
-                            Image(systemName: symbol(for: fact.id)).frame(width: 13)
-                            Text(fact.text).lineLimit(1).truncationMode(.middle)
-                        }
-                        .font(.system(size: 11, design: fact.isMonospaced ? .monospaced : .default))
-                        .foregroundStyle(.secondary)
-                        .help("\(L10n.string(fact.labelKey, fact.id)): \(fact.text)")
-                        .accessibilityLabel("\(L10n.string(fact.labelKey, fact.id)): \(fact.text)")
-                    }
-                }
-                .frame(maxWidth: .infinity, alignment: .leading)
-            }
-            .frame(maxHeight: .infinity)
-            HStack(spacing: 6) {
-                Button(L10n.string("connection.connect", "Connect")) { connect(.contextMenuEntry) }
-                    .buttonStyle(SessionCardButtonStyle(prominent: true))
-                Spacer(minLength: 4)
-                if let auth = card.facts.first(where: { $0.id == "authentication" }) {
-                    Image(systemName: card.authenticationSymbol)
-                        .help(auth.text).accessibilityLabel(auth.text)
-                }
-                if let stored = card.overview.hasStoredSecret {
-                    let hint = stored
-                        ? L10n.string("overview.secret.stored", "Saved in the keychain")
-                        : L10n.string("overview.secret.missing", "Not saved — asked at connect")
-                    Image(systemName: stored ? "lock.shield" : "lock.open")
-                        .help(hint).accessibilityLabel(hint)
-                }
-                Button { onEdit(card.session) } label: {
-                    Image(systemName: "pencil")
-                }
-                .help(L10n.string("sidebar.edit", "Edit…"))
-                .accessibilityLabel(L10n.string("sidebar.edit", "Edit…"))
-                Button { onDiagnose(card.session) } label: {
-                    Image(systemName: "stethoscope")
-                }
-                .help(L10n.string("diagnostics.menu", "Diagnose…"))
-                .accessibilityLabel(L10n.string("diagnostics.menu", "Diagnose…"))
-            }
-            .font(.system(size: 11)).foregroundStyle(.secondary)
-            .controlSize(.small)
-            .buttonStyle(SessionCardButtonStyle())
+            cardHeader
+            cardEndpoint
+            cardFacts
+            cardActions
         }
         .foregroundStyle(groupInk ?? .primary, groupInk?.opacity(0.85) ?? .secondary,
                          groupInk?.opacity(0.75) ?? .secondary)
