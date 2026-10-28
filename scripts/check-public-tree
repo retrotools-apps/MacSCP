@@ -19,6 +19,10 @@ def inspect(root):
     result = subprocess.run(["git", "ls-files", "--cached", "--others", "--exclude-standard", "-z"],
                             cwd=root, check=True, capture_output=True)
     names = sorted(set(p.decode("utf-8", "surrogateescape") for p in result.stdout.split(b"\0") if p))
+    deleted = subprocess.run(["git", "ls-files", "--deleted", "-z"], cwd=root,
+                             check=True, capture_output=True)
+    deleted_names = {p.decode("utf-8", "surrogateescape") for p in deleted.stdout.split(b"\0") if p}
+    names = [name for name in names if name not in deleted_names]
     ignored = subprocess.run(["git", "check-ignore", "--no-index", "--stdin", "-z"], cwd=root,
                              input=b"\0".join(name.encode("utf-8", "surrogateescape") for name in names) + b"\0",
                              capture_output=True, check=False)

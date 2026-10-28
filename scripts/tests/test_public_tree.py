@@ -46,9 +46,9 @@ class PublicTreeTests(unittest.TestCase):
         private = ["website/index.html", "website/assets/screenshots/workspace-light.png",
                    "scripts/local/screenshots/capture.swift", "output/screenshots/release/demo.png",
                    "docs/images/private.png", "docs/web/.env", "docs/web/assets/.DS_Store"]
-        public = ["docs/images/workspace-light.png", "docs/USER_GUIDE.md", "Sources/App.swift",
+        public = ["docs/images/readme-header.svg", "docs/USER_GUIDE.md", "Sources/App.swift",
                   "docs/index.html", "docs/.nojekyll",
-                  "docs/web/index.html", "docs/web/assets/screenshots/workspace-light.png",
+                  "docs/web/index.html", "docs/web/assets/screenshots/workspace-light.webp",
                   "scripts/prepare-website", "scripts/website_documents.py",
                   "scripts/tests/test_website.py", "scripts/tests/test_website_documents.py"]
         for name in private + public:
@@ -71,9 +71,20 @@ class PublicTreeTests(unittest.TestCase):
         for name in images:
             path = ROOT / name
             self.assertTrue(path.is_file(), name)
-            self.assertTrue(path.resolve().is_relative_to(ROOT / "docs/images"), name)
+            self.assertTrue(path.resolve().is_relative_to(ROOT / "docs/images") or
+                            path.resolve().is_relative_to(ROOT / "docs/web/assets/screenshots"), name)
             result = subprocess.run(["git", "check-ignore", "--no-index", "--quiet", name], cwd=ROOT)
             self.assertEqual(result.returncode, 1, name)
+
+    def test_deleted_tracked_files_are_not_publication_candidates(self):
+        path = self.root / "Sources/obsolete.webp"
+        path.parent.mkdir(parents=True)
+        path.write_text("obsolete")
+        subprocess.run(["git", "add", "Sources/obsolete.webp"], cwd=self.root, check=True)
+        path.unlink()
+        code, report = self.scan()
+        self.assertEqual(code, 0)
+        self.assertEqual(report["issues"], [])
 
     def test_matching_values_are_never_printed(self):
         path = self.root / "Sources/Config.swift"

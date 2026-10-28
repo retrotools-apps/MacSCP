@@ -8,14 +8,16 @@ names of buttons and menus.
 ## Connect to a server
 
 1. Choose **New connection**.
-2. Select **SSH/SFTP**, **S3** or **WebDAV**, then enter the server address
-   and the authentication details for your account.
-3. Save the connection so you can find it again in the sidebar or
+2. Select **SSH/SFTP**, **S3** or **WebDAV**, then enter the server address.
+3. Choose a reusable **Login set**, or enter credentials manually.
+4. Save the connection so you can find it again in the sidebar or
    **All connections**.
-4. Double-click its card to connect.
+5. Double-click its card to connect.
 
-For SSH, you can use a password, a private key or your local SSH agent.
-Passwords and key passphrases are saved in macOS Keychain.
+Login sets keep an account reusable across several connections. They can use a
+password, private key or local SSH agent; passwords and key passphrases remain
+in macOS Keychain. A connection can still use its own credentials when sharing
+is not appropriate.
 
 The first time you connect to an SSH server, MacSCP asks you to confirm its
 host key. Check the fingerprint with the server administrator before accepting.
@@ -59,8 +61,10 @@ available only for supported protocols and operations.
 Select a file, then choose **File → View** (**F3**) or **File → Edit** (**F4**).
 Depending on your keyboard settings, you may need to hold **Fn** as well.
 
-The viewer lets you inspect text or hexadecimal data, including parts of large
-remote files. The editor is intended for UTF-8 text. Both open in separate
+The viewer reads bounded windows rather than downloading the complete remote
+file. It detects binary content, offers a hexadecimal view and can search
+supported remote files. The editor is intentionally limited to UTF-8 text up
+to 8 MiB; use the viewer for larger files or binary data. Both open in separate
 windows, so you can keep a document open while switching tabs.
 
 - Press **⌘S** to save changes in the editor.
@@ -111,6 +115,8 @@ SSH tunnels forward traffic through a saved SSH connection. Switch to
    - **Remote forwarding** opens a listening port on the SSH server.
    - **SOCKS5** provides a local proxy for applications configured to use it.
 2. Select the saved SSH connection and enter the required ports and destination.
+   The tunnel reuses that connection's login set, host-key trust and supported
+   route settings; it does not store a second copy of the credentials.
 3. Save the tunnel, then choose **Start**.
 
 For local and SOCKS tunnels, use `127.0.0.1` as the listening address to keep
@@ -118,8 +124,9 @@ access limited to your Mac. Use another address only if you intend other
 machines to reach the port.
 
 Tunnels run independently of file tabs: disconnecting a file session does not
-stop its tunnels. Use **Stop** when you no longer need a tunnel. Active local
-HTTP and HTTPS tunnels can be opened in your browser.
+stop its tunnels. Use **Stop** when you no longer need a tunnel. For an active
+local HTTP or HTTPS tunnel, select the compass button to open its local URL in
+your browser. Remote, SOCKS5 and generic TCP tunnels do not show this shortcut.
 
 ### Find and change a tunnel
 

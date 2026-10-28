@@ -17,7 +17,7 @@
   <a href="#build-from-source">Build from source</a>
 </p>
 
-![MacSCP local and remote file panes with fictional demonstration data](docs/images/workspace-light.png)
+![MacSCP local and remote file panes with fictional demonstration data](docs/web/assets/screenshots/workspace-light.webp)
 
 ## Two panes. Your next move.
 
@@ -39,12 +39,12 @@ Keep connections in nested groups, give them recognizable icons and reuse saved
 logins, SSH keys or your local SSH agent. Import OpenSSH configuration, supported
 Cyberduck bookmarks and WinSCP INI files, or exchange MacSCP session exports.
 
-![MacSCP connections overview with grouped fictional servers](docs/images/connections-light.png)
+![MacSCP connections overview with grouped fictional servers](docs/web/assets/screenshots/connections-light.webp)
 
 <details>
 <summary><strong>A closer look at connection setup</strong></summary>
 
-![MacSCP new connection form using a fictional endpoint](docs/images/new-connection-light.png)
+![MacSCP new connection form using a fictional endpoint](docs/web/assets/screenshots/new-connection-light.webp)
 
 </details>
 
@@ -56,7 +56,7 @@ Local and remote forwarding, SOCKS5, an optional jump host and TLS gateways —
 in a dedicated workspace. Start one tunnel or a group, configure automatic
 startup and reconnection, and keep tunnels running independently of file tabs.
 
-![MacSCP tunnels workspace with an active demonstration HTTPS tunnel and browser-access button](docs/images/tunnels-light.png)
+![MacSCP tunnels workspace with an active demonstration HTTPS tunnel and browser-access button](docs/web/assets/screenshots/tunnels-light.webp)
 
 Check the configured connection route, inspect server information, or run an
 on-demand upload/download test. Need a shell? Open the session in your preferred

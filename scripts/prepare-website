@@ -2,7 +2,6 @@
 """Prepare the static website's public documents without publishing anything."""
 import argparse
 from pathlib import Path
-import re
 import shutil
 from website_documents import generated_pages
 
@@ -37,17 +36,6 @@ def main():
             else:
                 path.parent.mkdir(parents=True, exist_ok=True)
                 path.write_bytes(content)
-    index = SITE / "index.html"
-    version = (ROOT / "VERSION").read_text().strip()
-    original = index.read_text()
-    updated, count = re.subn(r'(?P<prefix>\bdata-version>)[^<]+', lambda match: match["prefix"] + version, original)
-    if count == 0:
-        raise SystemExit("Missing website version anchors")
-    if updated != original:
-        if args.check:
-            stale.append("index.html version")
-        else:
-            index.write_text(updated)
     if stale:
         raise SystemExit("Stale website files: " + ", ".join(stale))
     if args.output:
@@ -56,10 +44,12 @@ def main():
         if output == ROOT or output.is_relative_to(site) or output.exists() and any(output.iterdir()):
             raise SystemExit("Website export requires a new empty directory outside the source website")
         files = ["index.html", "guide.html", "style.css", "macscp.css", "script.js", *pages, *documents,
-                 "assets/screenshots/connections-light.png", "assets/screenshots/connections-dark.png",
-                 "assets/screenshots/workspace-light.png", "assets/screenshots/workspace-dark.png",
-                 "assets/screenshots/new-connection-light.png", "assets/screenshots/new-connection-dark.png",
-                 "assets/screenshots/tunnels-light.png", "assets/screenshots/tunnels-dark.png"]
+                 "assets/screenshots/connections-light.webp", "assets/screenshots/connections-dark.webp",
+                 "assets/screenshots/workspace-light.webp", "assets/screenshots/workspace-dark.webp",
+                 "assets/screenshots/new-connection-light.webp", "assets/screenshots/new-connection-dark.webp",
+                 "assets/screenshots/tunnels-light.webp", "assets/screenshots/tunnels-dark.webp",
+                 "assets/screenshots/connections-high-contrast-light.webp", "assets/screenshots/connections-high-contrast-dark.webp",
+                 "assets/screenshots/large-binary-viewer-light.webp", "assets/screenshots/large-binary-viewer-dark.webp"]
         for name in files:
             source = site / name
             if not source.resolve().is_relative_to(site) or not source.is_file():

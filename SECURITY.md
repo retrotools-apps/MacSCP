@@ -50,6 +50,16 @@ or updates, including:
   Protection of that account and its Keychain is a macOS security boundary.
 - Automated scanner results without a reproducible issue.
 
+## Security reviews
+
+Maintainers periodically review the public source for credential handling,
+transport trust, update integrity, unexpected network activity and dependency
+risk. Reviews may use static analysis and AI-assisted code review.
+
+These reviews must not be interpreted as an independent certification or as a
+substitute for independent penetration testing, runtime testing or review of a
+specific deployment.
+
 ## Disclosure
 
 Coordinate public disclosure and any requested attribution through the private

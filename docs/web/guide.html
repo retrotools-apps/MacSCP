@@ -17,10 +17,12 @@
 
 <section id="connections">
 <h2>Connect to a server</h2>
-<ol><li>Choose <strong>New connection</strong>.</li><li>Select <strong>SSH/SFTP</strong>, <strong>S3</strong> or <strong>WebDAV</strong>, then enter the server address and your authentication details.</li><li>Save the connection to find it again in the sidebar or <strong>All connections</strong>.</li><li>Double-click its card to connect.</li></ol>
-<p>For SSH, use a password, a private key or your local SSH agent. Passwords and key passphrases are saved in macOS Keychain.</p>
+<div class="guide-feature">
+<div><ol><li>Choose <strong>New connection</strong>.</li><li>Select <strong>SSH/SFTP</strong>, <strong>S3</strong> or <strong>WebDAV</strong>, then enter the server address.</li><li>Choose a reusable <strong>Login set</strong>, or enter credentials manually.</li><li>Save the connection to find it again in the sidebar or <strong>All connections</strong>.</li><li>Double-click its card to connect.</li></ol>
+<p>Login sets reuse a password, private key or local SSH agent across connections. Passwords and passphrases remain in macOS Keychain; a connection can still keep separate credentials.</p></div>
+<figure class="product-shot guide-context-shot form-shot"><a href="assets/screenshots/new-connection-light.webp" aria-label="Open the full-size new connection screenshot"><img src="assets/screenshots/new-connection-light.webp" width="1250" height="712" loading="lazy" alt="MacSCP new connection form using the fictional Production SSH login set"></a><figcaption>Select a named login once, then reuse it across saved connections.</figcaption></figure>
+</div>
 <p>On your first SSH connection, check the host-key fingerprint with the server administrator before accepting it. If a saved key has changed, MacSCP stops the connection. Verify why it changed before updating the saved key.</p>
-<figure class="product-shot wide-shot"><img src="assets/screenshots/new-connection-light.png" width="1250" height="712" loading="lazy" alt="MacSCP new connection form with a fictional example.com endpoint"><figcaption>Enter your server address and account details, then save the connection.</figcaption></figure>
 <h3>Organize and import connections</h3>
 <p>Use groups and subgroups to keep related connections together. Click a group's chevron to expand or collapse it, and use its color dot to choose a color. Dissolving a group keeps its connections.</p>
 <p>To import connections, open the <strong>Sessions</strong> menu and choose the appropriate import action. Supported formats include OpenSSH configuration entries, Cyberduck SFTP/S3 bookmarks, WinSCP INI files and MacSCP exports. Review the imported settings before connecting; some options from other clients are not supported.</p>
@@ -29,12 +31,20 @@
 
 <section id="files">
 <h2>Browse and transfer files</h2>
-<p>The file workspace shows your Mac on the left and the remote server on the right. Open folders or use the path bar to navigate. <strong>Home</strong>, <strong>Root</strong> and <strong>Up</strong> take you to common locations.</p>
-<p>To upload, drag files or folders from the local pane to the remote pane. To download, drag them in the opposite direction. You can also select items and press <strong>Space</strong>, or use the context menu. Drag remote files to a Finder folder to download directly into it.</p>
+<div class="guide-feature">
+<div><p>The file workspace shows your Mac on the left and the remote server on the right. Open folders or use the path bar to navigate. <strong>Home</strong>, <strong>Root</strong> and <strong>Up</strong> take you to common locations.</p>
+<p>To upload, drag files or folders from the local pane to the remote pane. To download, drag them in the opposite direction. You can also select items and press <strong>Space</strong>, or use the context menu. Drag remote files to a Finder folder to download directly into it.</p></div>
+<figure class="product-shot guide-context-shot workspace-shot"><a href="assets/screenshots/workspace-light.webp" aria-label="Open the full-size file workspace screenshot"><img src="assets/screenshots/workspace-light.webp" width="1250" height="712" loading="lazy" alt="MacSCP file workspace with local and remote panes and colorful connection icons"></a><figcaption>Keep local and remote locations visible together.</figcaption></figure>
+</div>
 <p>Follow progress in the source tab's transfer queue. If a file already exists, choose whether to overwrite it, skip it or use another name. You can cancel transfers and set bandwidth limits. Resume is available only for supported protocols and operations.</p>
 <h3>View or edit a file</h3>
 <p>Select a file and choose <strong>File → View</strong> (<strong>F3</strong>) or <strong>File → Edit</strong> (<strong>F4</strong>). Depending on your keyboard settings, you may need to hold <strong>Fn</strong>.</p>
-<p>The viewer displays text or hexadecimal data, including parts of large remote files. The editor is intended for UTF-8 text. Both open in separate windows that stay open when you switch tabs.</p>
+<div class="guide-feature reverse">
+<figure class="product-shot guide-context-shot binary-shot"><a href="assets/screenshots/large-binary-viewer-light.webp" aria-label="Open the full-size binary file viewer screenshot"><img src="assets/screenshots/large-binary-viewer-light.webp" width="900" height="520" loading="lazy" alt="MacSCP windowed viewer showing a fictional 24 MiB remote binary file in hexadecimal"></a><figcaption>Inspect a bounded window of a large or binary remote file.</figcaption></figure>
+<div><h3>Inspect large and binary files</h3><p>The viewer reads bounded windows instead of the complete file. It detects binary content, offers hexadecimal display and searches supported remote files while keeping memory use bounded.</p>
+<p>The editor is intentionally limited to UTF-8 text up to 8 MiB. Use the viewer for larger files or binary data; viewing does not make the file editable.</p></div>
+</div>
+<p>The viewer and editor open in separate windows that stay open when you switch tabs.</p>
 <ul><li>Press <strong>⌘S</strong> to save in the editor.</li><li>In the viewer, use <strong>⌘F</strong> to search and <strong>⌘G</strong> / <strong>⇧⌘G</strong> to move between matches.</li><li>Press <strong>⌘W</strong> to close the document window. MacSCP asks before discarding unsaved edits.</li></ul>
 <p>Save before disconnecting: disconnecting a session closes its viewer and editor windows. External-editor saves can upload changes back to the server.</p>
 <p>For SSH connections, directory search can find files by name or look for literal text in their contents. You can also request a checksum to compare files; check its displayed type before comparing values.</p>
@@ -55,10 +65,13 @@
 
 <section id="tunnels">
 <h2>Create and manage tunnels</h2>
-<p>Switch to <strong>Tunnels</strong> and choose <strong>New tunnel</strong>. Select the forwarding type, choose a saved SSH connection and enter the required ports and destination. Save the tunnel, then choose <strong>Start</strong>.</p>
-<ul><li><strong>Local forwarding</strong> makes a service reachable through a port on your Mac.</li><li><strong>Remote forwarding</strong> opens a listening port on the SSH server.</li><li><strong>SOCKS5</strong> provides a local proxy for applications configured to use it.</li></ul>
+<div class="guide-feature">
+<div><p>Switch to <strong>Tunnels</strong> and choose <strong>New tunnel</strong>. Select the forwarding type, choose a saved SSH connection and enter the required ports and destination. The tunnel reuses that connection's login set, host-key trust and supported route settings; it does not store a second copy of the credentials.</p>
+<ul><li><strong>Local forwarding</strong> makes a service reachable through a port on your Mac.</li><li><strong>Remote forwarding</strong> opens a listening port on the SSH server.</li><li><strong>SOCKS5</strong> provides a local proxy for applications configured to use it.</li></ul></div>
+<figure class="product-shot guide-context-shot tunnel-shot"><a href="assets/screenshots/tunnels-light.webp" aria-label="Open the full-size tunnel workspace screenshot"><img src="assets/screenshots/tunnels-light.webp" width="1180" height="440" loading="lazy" alt="MacSCP tunnel workspace with an active fictional HTTPS web console and its Open in browser button"></a><figcaption>An active local HTTP or HTTPS tunnel gains an Open in browser button.</figcaption></figure>
+</div>
 <p>For local and SOCKS tunnels, use <code>127.0.0.1</code> as the listening address to keep access limited to your Mac. Use another address only if other machines should reach the port.</p>
-<p>Tunnels run independently of file tabs. Disconnecting a file session does not stop them; use <strong>Stop</strong> when you no longer need a tunnel. Active local HTTP and HTTPS tunnels can be opened in your browser.</p>
+<p>Tunnels run independently of file tabs. Use <strong>Stop</strong> when finished. An active local HTTP or HTTPS tunnel gains a compass button that opens its local URL; other tunnel types do not.</p>
 <h3>Find and change a tunnel</h3>
 <p>In <strong>All tunnels</strong>, enable <strong>Active only</strong> to show established tunnels, including degraded connections. Turn it off to see stopped, connecting and reconnecting tunnels too. <strong>Start all</strong> and <strong>Stop all</strong> apply to all tunnels even when the filter is enabled. Use groups to start or stop related tunnels together.</p>
 <p>Right-click a tunnel, or open its <strong>…</strong> menu, to rename, duplicate, edit, move or delete it. Renaming leaves it running. Saving an edit stops the tunnel; start it again to apply the changes. Deleting asks for confirmation and stops it.</p>
@@ -72,8 +85,11 @@
 
 <section id="appearance">
 <h2>Customize the display</h2>
-<p>Open <strong>Settings → View</strong> to adjust contrast and the sidebar.</p>
-<ul><li>Choose <strong>Low contrast</strong> for subtle group backgrounds or <strong>High contrast</strong> for stronger colors and more distinct text and icons.</li><li>Use <strong>Color group backgrounds</strong> to show or hide group colors. Your saved colors remain available.</li><li>Enable <strong>Compact sidebar</strong> to hide status dots, connection protocol labels, tunnel indicators and generated tunnel port suffixes. Group color dots are also hidden; your chosen identity icons remain visible.</li></ul>
+<div class="guide-feature reverse">
+<figure class="product-shot guide-context-shot contrast-shot"><div class="contrast-pair"><div><span>Low contrast</span><img src="assets/screenshots/connections-light.webp" width="1250" height="712" loading="lazy" alt="The same fictional connection groups in low contrast mode"></div><div><span>High contrast</span><img src="assets/screenshots/connections-high-contrast-light.webp" width="1250" height="712" loading="lazy" alt="The same fictional connection groups in high contrast mode"></div></div><figcaption>The data and selected colors are identical; only the rendering mode changes.</figcaption></figure>
+<div><p>Open <strong>Settings → View</strong> to adjust contrast and the sidebar.</p>
+<ul><li>Choose <strong>Low contrast</strong> for subtle group backgrounds or <strong>High contrast</strong> for solid colors and stronger text and icon separation.</li><li>Use <strong>Color group backgrounds</strong> to show or hide group colors. Your saved colors remain available.</li><li>Enable <strong>Compact sidebar</strong> to hide status dots, connection protocol labels, tunnel indicators and generated tunnel port suffixes. Group color dots are also hidden; your chosen identity icons remain visible.</li></ul></div>
+</div>
 <p>Drag the divider to resize the sidebar. Hiding and showing it keeps the width you chose in that window.</p>
 <p>To personalize a connection or tunnel, open its editor and choose a color and icon. Use the circular palette or the color picker for a custom color. Search the icon grid by name or keyword, or choose a <strong>Family</strong> to narrow the selection. The grid combines system symbols, Tabler Outline icons and application logos.</p>
 </section>

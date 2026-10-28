@@ -3,8 +3,8 @@
 <head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="theme-color" content="#0d1117">
-<meta name="description" content="MacSCP 1.2: native SFTP, S3 and WebDAV transfers for macOS, remote-to-remote copying, SSH tunnels and connection diagnostics.">
-<title>MacSCP 1.2 — Files. Sessions. Tunnels. · retroTools</title>
+<meta name="description" content="Native remote file operations and managed SSH tunnels for macOS, built for sysadmins, platform teams and integration developers.">
+<title>MacSCP — Remote files and SSH tunnels for macOS · retroTools</title>
 <link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
 <link rel="stylesheet" href="style.css"><link rel="stylesheet" href="macscp.css">
 </head>
@@ -12,58 +12,70 @@
 <a class="skip" href="#main">Skip to content</a>
 <header><div class="header-inner wrap">
 <a class="brand" href="#" aria-label="retroTools home"><span class="wordmark"><span class="chevron" aria-hidden="true"></span><span class="word">retroTools</span><span class="underscore" aria-hidden="true"></span></span><span class="tagline">Old ideas. Better tools.</span></a>
-<nav aria-label="Main navigation"><a href="#features">Features</a><a href="#tunnels">Tunnels</a><a href="#documentation">Documentation</a><a class="nav-download" href="#download">Get MacSCP ↓</a></nav>
+<nav aria-label="Main navigation"><a href="#workflows">Workflows</a><a href="#tunnels">Tunnels</a><a href="#trust">Trust</a><a class="nav-download" href="#download">Get MacSCP ↓</a></nav>
 </div></header>
-<div class="platform-strip"><div class="wrap"><span>RETROTOOLS / MACSCP</span><p>macOS 15+ <i>/</i> Apple Silicon + Intel <i>/</i> GPLv3+</p><span class="strip-end">VERSION <span data-version>1.2.1</span></span></div></div>
+<div class="platform-strip"><div class="wrap"><span>RETROTOOLS / MACSCP</span><p>macOS 15+ <i>/</i> Apple Silicon + Intel <i>/</i> GPLv3+</p><span class="strip-end">OPEN SOURCE</span></div></div>
 <main id="main">
 <section class="product-hero" aria-labelledby="hero-title"><div class="hero-inner wrap">
-<div class="hero-copy"><div class="product-heading"><img src="assets/macscp.svg" width="48" height="48" alt=""><p class="eyebrow">NATIVE TO YOUR MAC</p></div>
-<h1 id="hero-title">MacSCP.<br>Files. Sessions.<br><span>Tunnels.</span></h1>
-<p class="intro">SFTP, S3 and WebDAV in two panes. Your servers in tabs. SSH tunnels in their own workspace.</p>
-<div class="hero-actions"><a class="button green" href="#download">Get MacSCP <span aria-hidden="true">↓</span></a><a class="text-link" href="guide.html">Read the guide ↗</a></div>
-<p class="availability">Version <span data-version>1.2.1</span> · macOS 15 or later<br>For Apple Silicon and Intel Macs.</p></div>
-<figure class="hero-visual product-shot"><img src="assets/screenshots/workspace-light.png" width="1250" height="712" alt="Complete MacSCP window with a session sidebar and local and remote file panes using demonstration data" fetchpriority="high"><figcaption>Local and remote files · MacSCP 1.0 · Demonstration data</figcaption></figure>
+<div class="hero-copy"><div class="product-heading"><img src="assets/macscp.svg" width="48" height="48" alt=""><p class="eyebrow">FOR SYSADMINS, PLATFORM TEAMS &amp; INTEGRATORS</p></div>
+<h1 id="hero-title">MacSCP.<br>Remote operations.<br><span>One workspace.</span></h1>
+<p class="intro">Browse, edit and transfer files between your Mac and remote systems. Pair two servers side by side, and manage SSH tunnels independently.</p>
+<div class="hero-actions"><a class="button green" href="#download">Get MacSCP <span aria-hidden="true">↓</span></a><a class="text-link" href="guide.html">Explore the workflows ↗</a></div>
+<p class="availability">Native for macOS 15 or later.<br>Apple Silicon and Intel.</p></div>
+<figure class="hero-visual product-shot"><img src="assets/screenshots/workspace-light.webp" width="1250" height="712" alt="MacSCP workspace with a session sidebar and local and remote file panes using demonstration data" fetchpriority="high"><figcaption>Local and remote operations in one native workspace · Demonstration data</figcaption></figure>
 </div></section>
 
-<section id="features" class="features wrap">
-<div class="section-heading reveal"><div><p class="eyebrow">01 / FILES &amp; CONNECTIONS</p><h2>Two panes.<br>Your next move.</h2></div><p class="side-note">Built for everyday file work.<br>Native macOS controls throughout.</p></div>
-<div class="feature-grid">
-<article class="reveal"><p class="small-label">TRANSFER</p><h3>SFTP, S3 &amp; WebDAV.</h3><p>Copy files and folders with queues, overwrite/skip/rename choices, cancellation, bandwidth limits and checksums.</p></article>
-<article class="reveal"><p class="small-label">PAIR TWO REMOTES</p><h3>Server to server.</h3><p>Drop one SCP tab onto another. Copy through the Mac without delegating credentials, or on the server when both panes share the same SSH endpoint and account.</p></article>
-<article class="reveal"><p class="small-label">EDIT &amp; INSPECT</p><h3>Stay with the file.</h3><p>Edit UTF-8 documents, preview text or hexadecimal data in bounded windows, search SSH folders, or save through your external editor.</p></article>
+<section id="workflows" class="features wrap">
+<div class="section-heading reveal"><div><p class="eyebrow">01 / DAILY REMOTE WORK</p><h2>Work directly<br>where systems live.</h2></div><p class="side-note">Files, configuration and deployment artifacts.<br>Without breaking your operational flow.</p></div>
+<div class="feature-grid workflow-grid">
+<article class="reveal"><p class="small-label">BROWSE &amp; TRANSFER</p><h3>Move data with control.</h3><p>Use SFTP, S3-compatible storage or WebDAV. Queue transfers, resolve conflicts, limit bandwidth and verify checksums.</p></article>
+<article class="reveal"><p class="small-label">EDIT REMOTELY</p><h3>Change the file in place.</h3><p>Edit UTF-8 configuration files, search SSH folders and inspect bounded text or hexadecimal previews. Save through the built-in editor or your external editor.</p></article>
+<article class="reveal"><p class="small-label">TWO REMOTES</p><h3>Put two servers side by side.</h3><p>Pair two SSH/SFTP sessions. Data passes through your Mac without sharing credentials, or copies directly when both panes use the same server and account.</p></article>
 </div>
-<figure class="product-shot wide-shot reveal"><img src="assets/screenshots/connections-dark.png" width="1250" height="712" loading="lazy" alt="Complete MacSCP connections overview with grouped fictional servers in the sidebar and connection cards"><figcaption>All connections · Fictional servers and accounts</figcaption></figure>
-<p class="feature-footnote">Nested groups, searchable icons, reusable logins and custom colors. Interface available in English, French, German, Spanish, Italian, Romanian and Polish.</p>
+<figure class="product-shot wide-shot reveal"><img src="assets/screenshots/connections-dark.webp" width="1250" height="712" loading="lazy" alt="MacSCP connections overview with grouped fictional servers in the sidebar and connection cards"><figcaption>Saved environments, reusable logins and nested groups · Fictional servers and accounts</figcaption></figure>
+<p class="feature-footnote">Organize endpoints with nested groups, reusable logins, icons and custom colors. Import selected OpenSSH, Cyberduck and WinSCP configurations for review. The interface is available in seven languages.</p>
 </section>
 
 <section id="tunnels" class="tunnels-section"><div class="wrap">
-<div class="section-heading reveal"><div><p class="eyebrow">02 / SSH TUNNELS</p><h2>Keep the route.<br>Lose the shell script.</h2></div><a class="text-link" href="guide.html#tunnels">Configure a tunnel ↗</a></div>
-<figure class="product-shot reveal"><img src="assets/screenshots/tunnels-light.png" width="1180" height="440" loading="lazy" alt="MacSCP tunnels workspace showing a demonstration HTTPS tunnel marked active with its Open in browser button"><figcaption>HTTPS tunnel and browser access · Demonstration configuration</figcaption></figure>
-<div class="tunnel-details"><p><strong>Local, remote and SOCKS5 forwarding.</strong> Reuse saved SSH connections, one optional jump host and supported TLS-gateway settings.</p><p><strong>Start one mapping or a group.</strong> Configure automatic startup and reconnection. Keep tunnels active independently of file tabs.</p></div>
+<div class="section-heading reveal"><div><p class="eyebrow">02 / MANAGED SSH TUNNELS</p><h2>Treat tunnels<br>as infrastructure.</h2></div><a class="text-link" href="guide.html#tunnels">See tunnel workflows ↗</a></div>
+<figure class="product-shot reveal"><img src="assets/screenshots/tunnels-light.webp" width="1180" height="440" loading="lazy" alt="MacSCP tunnels workspace showing a demonstration HTTPS tunnel marked active with its Open in browser button"><figcaption>Dedicated tunnel workspace with status and browser access · Demonstration configuration</figcaption></figure>
+<div class="tunnel-details tunnel-capabilities">
+<p><strong>Route what the job requires.</strong> Configure local and remote forwarding or SOCKS5. Reuse saved SSH connections, one optional jump host and supported TLS-gateway settings.</p>
+<p><strong>Operate one tunnel or a group.</strong> Start related mappings together, filter active tunnels and control them from the menu bar.</p>
+<p><strong>Keep services reachable.</strong> Tunnels use separate SSH connections, start automatically if configured and reconnect independently. Inspect an occupied local port before freeing it and restarting.</p>
+</div>
 </div></section>
 
-<section id="trust" class="about section-light"><div class="wrap about-grid reveal">
-<div><p class="eyebrow">03 / CONNECTIONS YOU UNDERSTAND</p><h2>Check the route.<br><span>Keep control.</span></h2></div>
-<div class="about-copy"><p class="lead">Keychain storage. Explicit host-key trust. Readable diagnostics.</p><p>Unknown SSH host keys require confirmation. Changed keys stop the connection. Diagnostics check the configured endpoint and jump, and trace failed connections when useful.</p><p>Connected sessions can show server information and run an on-demand upload/download test in Mbit/s. Open an external SSH terminal whenever you need a shell.</p><p>MacSCP is an independent RetroTools application, not a macOS edition of WinSCP. FTP and SMB are not included.</p></div>
+<section id="trust" class="about section-light"><div class="wrap trust-grid reveal">
+<div><p class="eyebrow">03 / OPERATIONAL TRUST</p><h2>Know what connects.<br><span>Know what is stored.</span></h2><p class="trust-intro">Security is expressed as observable behavior, not a badge.</p></div>
+<div class="trust-list">
+<article><h3>Credentials stay out of session files.</h3><p>Saved passwords and passphrases use macOS Keychain. Unknown SSH host keys require explicit confirmation; a changed key stops the connection.</p></article>
+<article><h3>No analytics or background telemetry.</h3><p>Network access is limited to configured connections, signed update checks and optional public-IP discovery on your server.</p></article>
+<article><h3>Diagnostics and local audit trails.</h3><p>Check endpoints and jump routes, trace failures, inspect server information and measure throughput. Optional audit logs exclude passwords, keys and file contents.</p></article>
+<article><h3>Reviewed code, visible limits.</h3><p>The public codebase is subject to repeated source-level security review. These reviews must not be interpreted as an independent certification. GitHub releases include provenance attestations; direct updates use signed Sparkle feeds and archives.</p></article>
+<div class="trust-actions"><a class="text-link" href="https://github.com/retrotools-apps/MacSCP">Inspect the source ↗</a><a class="text-link" href="https://github.com/retrotools-apps/MacSCP/security/policy">Read the security policy ↗</a></div>
+</div>
 </div></section>
 
 <section id="download" class="download-section"><div class="wrap download-grid reveal">
-<div><p class="eyebrow">04 / GET MACSCP</p><h2>MacSCP 1.2.<br><span>Built for the Mac.</span></h2><p>Official installers and release notes are distributed through GitHub Releases, with GitHub provenance attestations and signed Sparkle updates.</p><p class="download-note">The GitHub build is not Apple-notarized. macOS may block the first launch. Check the release page for installation instructions and available downloads.</p><div class="hero-actions"><a class="button green" href="https://github.com/retrotools-apps/MacSCP/releases">GitHub Releases ↗</a></div></div>
-<div class="release-panel"><div class="release-title"><div><span class="small-label">RETROTOOLS / MACSCP</span><h3>MacSCP<span>_</span></h3></div><span class="platform-badge">macOS 15+</span></div><dl><div><dt>Version</dt><dd data-version>1.2.1</dd></div><div><dt>Architectures</dt><dd>Apple Silicon + Intel</dd></div><div><dt>Application license</dt><dd><a href="license.html">GPLv3 or later</a></dd></div></dl><a class="text-link" href="https://github.com/retrotools-apps/MacSCP">Source on GitHub ↗</a></div>
+<div><p class="eyebrow">04 / GET MACSCP</p><h2>Install the latest<br><span>stable release.</span></h2><p>Official installers and release notes are distributed through GitHub Releases, with provenance attestations and signed Sparkle updates.</p><p class="download-note">The GitHub build is not Apple-notarized, so macOS may block the first launch. The release page provides the current download and installation instructions.</p><div class="hero-actions"><a class="button green" href="https://github.com/retrotools-apps/MacSCP/releases/latest">Download the latest release ↗</a></div></div>
+<div class="release-panel"><div class="release-title"><div><span class="small-label">RETROTOOLS / MACSCP</span><h3>MacSCP<span>_</span></h3></div><span class="platform-badge">macOS 15+</span></div><dl><div><dt>Release channel</dt><dd>GitHub + Sparkle</dd></div><div><dt>Architectures</dt><dd>Apple Silicon + Intel</dd></div><div><dt>Application license</dt><dd><a href="license.html">GPLv3 or later</a></dd></div></dl><a class="text-link" href="https://github.com/retrotools-apps/MacSCP/releases">Release history ↗</a></div>
 </div></section>
 
 <section id="documentation" class="documentation wrap reveal">
-<div><p class="eyebrow">05 / DOCUMENTATION</p><h2>Know your tools.</h2><p class="section-intro">Setup, workflows and the limits worth knowing before you connect.</p></div>
+<div><p class="eyebrow">05 / DOCUMENTATION</p><h2>Know the tool<br>before you connect.</h2><p class="section-intro">Setup, operational workflows, security boundaries and practical limits.</p></div>
 <div class="docs-list">
-<article><span>01</span><div><h3><a href="guide.html">User guide ↗</a></h3><p>Connections, paired remotes, files, tunnels and diagnostics.</p></div><small>GUIDE</small></article>
-<article><span>02</span><div><h3><a href="changelog.html">What's new in 1.0 ↗</a></h3><p>The features included in this release.</p></div><small>RELEASE NOTES</small></article>
-<article><span>03</span><div><h3><a href="notices.html">Third-party notices ↗</a></h3><p>Dependency and artwork licenses.</p></div><small>LEGAL</small></article>
+<article><span>01</span><div><h3><a href="guide.html">User guide ↗</a></h3><p>Connections, remote editing, paired remotes, tunnels and diagnostics.</p></div><small>GUIDE</small></article>
+<article><span>02</span><div><h3><a href="changelog.html">Release notes ↗</a></h3><p>Features, fixes and maintenance changes by release.</p></div><small>CHANGELOG</small></article>
+<article><span>03</span><div><h3><a href="https://github.com/retrotools-apps/MacSCP/security/policy">Security policy ↗</a></h3><p>Supported releases, security boundaries and private reporting.</p></div><small>SECURITY</small></article>
+<article><span>04</span><div><h3><a href="notices.html">Third-party notices ↗</a></h3><p>Versioned dependencies, artwork and license notices.</p></div><small>SUPPLY CHAIN</small></article>
 </div></section>
+
 <section id="support" class="support-section"><div class="wrap support-grid reveal">
-<div><p class="eyebrow">06 / OPEN SOURCE</p><h2>Read the code.<br>Make it better<span>_</span></h2><p>Consult, compile, modify and publish audit findings under the GPLv3 or later license.</p></div>
-<div><details><summary>How do updates work?<span aria-hidden="true">+</span></summary><p>Packaged direct-distribution releases use signed Sparkle feeds and archives. Installation and relaunch require confirmation. Source builds can be rebuilt locally.</p></details>
-<details><summary>Private by design. No telemetry.<span aria-hidden="true">+</span></summary><p>No usage analytics or background telemetry. Saved credentials stay in macOS Keychain. The source has undergone static security review and is open for independent audit. Network access serves your configured connections, update checks and optional public-IP discovery on your server. <a href="https://github.com/retrotools-apps/MacSCP">Inspect the source ↗</a></p></details>
-<details><summary>Where should I report a problem?<span aria-hidden="true">+</span></summary><p>Use <a href="https://github.com/retrotools-apps/MacSCP/issues">GitHub Issues</a> for ordinary bugs. Include the app version and reproduction steps, and remove credentials and private infrastructure data. For vulnerabilities, follow <a href="https://github.com/retrotools-apps/MacSCP/security/policy">the security policy</a> rather than posting exploit details publicly.</p></details>
+<div><p class="eyebrow">06 / CLEAR BOUNDARIES</p><h2>Useful limits.<br>Stated plainly<span>_</span></h2><p>Choose the tool with the constraints visible, not hidden in fine print.</p></div>
+<div><details><summary>Which protocols and routes are supported?<span aria-hidden="true">+</span></summary><p>MacSCP supports SFTP over SSH, S3-compatible storage and WebDAV. FTP, SMB and AFP are not included. SSH connections support one jump host and supported TLS-gateway settings; multi-hop jump chains are not supported.</p></details>
+<details><summary>How are direct releases updated?<span aria-hidden="true">+</span></summary><p>Packaged GitHub releases use signed Sparkle feeds and archives. Installation and relaunch require confirmation. Source builds can be inspected and rebuilt locally.</p></details>
+<details><summary>Where should I report a problem?<span aria-hidden="true">+</span></summary><p>Use <a href="https://github.com/retrotools-apps/MacSCP/issues">GitHub Issues</a> for ordinary bugs, after removing credentials and private infrastructure data. For vulnerabilities, follow <a href="https://github.com/retrotools-apps/MacSCP/security/policy">the security policy</a> rather than posting exploit details publicly.</p></details>
 </div></div></section>
 </main>
 <footer><div class="wrap"><div class="footer-main"><a class="brand brand-large" href="#" aria-label="retroTools home"><span class="wordmark"><span class="chevron" aria-hidden="true"></span><span class="word">retroTools</span><span class="underscore" aria-hidden="true"></span></span><span class="tagline">Old ideas. Better tools.</span></a><a class="text-link" href="#">Back to top ↑</a></div><div class="footer-bottom"><span>© <span id="year">2026</span> retroTools</span><a href="license.html">GPLv3+</a><span>macOS 15 and later</span></div></div></footer>

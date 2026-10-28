@@ -30,10 +30,6 @@
 !/docs/USER_GUIDE.md
 !/docs/images/
 /docs/images/*
-!/docs/images/workspace-light.png
-!/docs/images/connections-light.png
-!/docs/images/new-connection-light.png
-!/docs/images/tunnels-light.png
 !/docs/images/readme-header.svg
 
 # Workflows are inputs to the source regression tests; templates are not.
