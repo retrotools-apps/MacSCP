@@ -109,6 +109,24 @@ class WebsiteTests(unittest.TestCase):
             with self.subTest(statement=statement):
                 self.assertIn(statement, index)
 
+    def test_readme_matches_the_site_without_a_frozen_release_version(self):
+        readme = (ROOT / "README.md").read_text()
+        header = (ROOT / "docs/images/readme-header.svg").read_text()
+        for statement in [
+            "Remote file operations and managed SSH tunnels for macOS.",
+            "For sysadmins, platform teams and integration developers.",
+            "Treat tunnels as infrastructure.",
+            "No analytics or background telemetry.",
+            "These reviews must not be interpreted as an",
+            "https://github.com/retrotools-apps/MacSCP/releases/latest",
+        ]:
+            with self.subTest(statement=statement):
+                self.assertIn(statement, readme)
+        self.assertNotIn("Version 1.0.0", readme)
+        self.assertNotIn("MacSCP-1.0.0", readme)
+        self.assertIn("MacSCP. Remote operations. One workspace.", header)
+        self.assertNotIn("Files. Sessions. Tunnels.", header)
+
     def test_animations_are_optional_and_no_runtime_network_client_is_added(self):
         script = (SITE / "script.js").read_text()
         self.assertIn("document.querySelector('#year')", script)

@@ -1,14 +1,14 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="1280" height="320" viewBox="0 0 1280 320" role="img" aria-labelledby="title description">
-  <title id="title">MacSCP. Files. Sessions. Tunnels.</title>
-  <desc id="description">Native file transfers and SSH tunnels for macOS, by RetroTools.</desc>
+  <title id="title">MacSCP. Remote operations. One workspace.</title>
+  <desc id="description">Remote file operations and managed SSH tunnels for macOS, by RetroTools.</desc>
   <rect width="1280" height="320" fill="#0d1117"/>
   <path d="m52 26 10 10-10 10" fill="none" stroke="#70d333" stroke-width="4"/>
   <text x="77" y="43" fill="#f5eedc" font-family="Consolas, Liberation Mono, monospace" font-size="22" font-weight="700" letter-spacing="-1">retroTools<tspan fill="#70d333">_</tspan></text>
-  <text x="1228" y="40" text-anchor="end" fill="#9fa9b1" font-family="Consolas, Liberation Mono, monospace" font-size="12" letter-spacing="2">NATIVE TO YOUR MAC</text>
+  <text x="1228" y="40" text-anchor="end" fill="#9fa9b1" font-family="Consolas, Liberation Mono, monospace" font-size="12" letter-spacing="2">FOR SYSADMINS &amp; INTEGRATORS</text>
   <path d="M52 66H1228" stroke="#30393e"/>
   <text x="49" y="163" fill="#f5eedc" font-family="Arial, Helvetica, sans-serif" font-size="86" font-weight="700" letter-spacing="-4">MacSCP.</text>
-  <text x="53" y="217" fill="#f5eedc" font-family="Arial, Helvetica, sans-serif" font-size="37" font-weight="600" letter-spacing="-1">Files. Sessions. <tspan fill="#70d333">Tunnels.</tspan></text>
-  <text x="54" y="258" fill="#9fa9b1" font-family="Arial, Helvetica, sans-serif" font-size="20">SFTP, S3 and WebDAV. Two panes. Your servers in tabs.</text>
+  <text x="53" y="217" fill="#f5eedc" font-family="Arial, Helvetica, sans-serif" font-size="37" font-weight="600" letter-spacing="-1">Remote operations. <tspan fill="#70d333">One workspace.</tspan></text>
+  <text x="54" y="258" fill="#9fa9b1" font-family="Arial, Helvetica, sans-serif" font-size="20">Browse, edit and transfer. Pair two servers. Manage SSH tunnels.</text>
   <g transform="translate(1002 95) scale(1.8)">
     <rect x="4" y="4" width="88" height="88" rx="20" fill="#151c22" stroke="#30393e"/>
     <g fill="none" stroke="#70d333" stroke-width="5.5" stroke-linecap="round" stroke-linejoin="round">
