@@ -17,6 +17,14 @@ import macSCPCore
     private static let degradedKey = "tunnel.state.degraded %lld"
     private static let lastFailureKey = "tunnel.state.lastFailure %@"
 
+    @Test func healthyActiveCountIsSeparatedOnlyWhileTheStatusRemainsPlain() {
+        #expect(TunnelProfilesSheet.healthyActiveConnectionCount(.active(connections: 0)) == 0)
+        #expect(TunnelProfilesSheet.healthyActiveConnectionCount(.active(connections: 12)) == 12)
+        #expect(TunnelProfilesSheet.healthyActiveConnectionCount(
+            .active(connections: 2, failedConnections: 1, lastFailure: .channelOpenFailed)) == nil)
+        #expect(TunnelProfilesSheet.healthyActiveConnectionCount(.connecting) == nil)
+    }
+
     @Test(arguments: [1, TunnelState.failuresBeforeDegraded])
     func anUnreachableDestinationIsVisibleWithoutWaitingForDegradation(_ count: Int) {
         let state = TunnelState.active(connections: 0, failedConnections: count,

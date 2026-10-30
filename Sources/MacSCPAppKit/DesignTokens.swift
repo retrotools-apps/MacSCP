@@ -5,6 +5,9 @@ import SwiftUI
 /// Dynamic for light/dark. Use only semantically (pane badges, later transfer
 /// direction) — the rest of the app stays on system colors.
 enum DesignTokens {
+    /// Shared optical size for session and tunnel status dots in sidebars.
+    static let sidebarStatusDotSize: CGFloat = 6
+
     static let localAmber = Color(nsColor: NSColor(name: nil) { appearance in
         appearance.bestMatch(from: [.aqua, .darkAqua]) == .darkAqua
             ? NSColor(srgbRed: 232 / 255, green: 166 / 255, blue: 60 / 255, alpha: 1) // #E8A63C

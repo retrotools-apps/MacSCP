@@ -43,7 +43,7 @@ struct SessionSidebarCompactRowGuardTests {
         #expect(tunnelDetails.contains("GroupColorControl("))
     }
 
-    @Test func compactPreferenceReachesBothWorkspaces() throws {
+    @MainActor @Test func compactPreferenceReachesBothWorkspaces() throws {
         let layout = try code("ContentView+Detail.swift")
         #expect(layout.contains("TunnelWorkspaceSidebar(manager:"))
         #expect(layout.contains("decider: tunnelHostKeyDecider, sidebarCompact: settingsStore.sidebarCompact"))
@@ -57,6 +57,7 @@ struct SessionSidebarCompactRowGuardTests {
         #expect(tunnels.contains("TunnelServiceIcon("))
         let status = try TransferQueueBarCancelGuardTests.declarationBody(of: "if !sidebarCompact", in: tunnels)
         #expect(status.contains("Circle().fill(tint(state))"))
+        #expect(DesignTokens.sidebarStatusDotSize == 6)
         #expect(tunnels.contains("TunnelCatalog.sidebarName(profile, compact: sidebarCompact)"))
     }
 

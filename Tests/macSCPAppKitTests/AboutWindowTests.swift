@@ -21,6 +21,8 @@ struct AboutWindowTests {
         #expect(content.version == version)
         #expect(content.licenseURL == root.appendingPathComponent("LICENSE"))
         #expect(content.noticesURL == root.appendingPathComponent("output/pdf/THIRD_PARTY_NOTICES.pdf"))
+        #expect(AboutContent.privacyURL.absoluteString == "https://retrotools-apps.github.io/MacSCP/privacy.html")
+        #expect(AboutContent.supportURL.absoluteString == "https://retrotools-apps.github.io/MacSCP/support.html")
     }
 
     @Test func packagedVersionAndDocumentsTakePrecedence() throws {

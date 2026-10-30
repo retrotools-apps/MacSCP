@@ -159,6 +159,10 @@ MacSCP version, macOS version and reproduction steps, after removing credentials
 and private infrastructure data. For suspected vulnerabilities, follow the
 [security policy](SECURITY.md).
 
+The public [privacy policy](https://retrotools-apps.github.io/MacSCP/privacy.html)
+describes local storage, user-directed network connections and the absence of
+analytics or advertising tracking.
+
 Contributions should include relevant behavioral tests and localized interface
 text. Do not add real credentials, private configuration or personal screenshots.
 

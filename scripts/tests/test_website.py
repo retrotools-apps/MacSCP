@@ -2,6 +2,7 @@
 import hashlib
 from html.parser import HTMLParser
 from pathlib import Path
+import struct
 import subprocess
 import tempfile
 import unittest
@@ -94,6 +95,19 @@ class WebsiteTests(unittest.TestCase):
             self.assertEqual(content[:4], b"RIFF")
             self.assertEqual(content[8:12], b"WEBP")
 
+    def test_product_screenshots_have_the_accepted_opaque_mac_size(self):
+        directory = ROOT / "docs/product/screenshots"
+        expected = {
+            "01-workspace.png", "02-connections.png", "03-new-connection.png",
+            "04-tunnels.png", "05-binary-viewer.png",
+        }
+        self.assertEqual({path.name for path in directory.glob("*.png")}, expected)
+        for path in directory.glob("*.png"):
+            content = path.read_bytes()
+            self.assertEqual(content[:8], b"\x89PNG\r\n\x1a\n", path.name)
+            self.assertEqual(struct.unpack(">II", content[16:24]), (1440, 900), path.name)
+            self.assertNotIn(content[25], {4, 6}, path.name)
+
     def test_homepage_exposes_target_workflows_and_trust_boundaries(self):
         index = (SITE / "index.html").read_text()
         for statement in [
@@ -166,6 +180,17 @@ class WebsiteTests(unittest.TestCase):
             self.assertIn("https://github.com/retrotools-apps/MacSCP",
                           Document((SITE / page).read_text()).links)
 
+    def test_privacy_and_support_are_public_and_exported(self):
+        privacy = (SITE / "privacy.html").read_text()
+        support = (SITE / "support.html").read_text()
+        self.assertIn("RetroTools does not operate a MacSCP account service", privacy)
+        self.assertIn("macOS Keychain", privacy)
+        self.assertIn("https://github.com/retrotools-apps/MacSCP/issues", Document(privacy).links)
+        self.assertIn("https://github.com/retrotools-apps/MacSCP/issues", Document(support).links)
+        for page in ["index.html", "guide.html", "changelog.html", "license.html", "notices.html"]:
+            self.assertIn("privacy.html", Document((SITE / page).read_text()).links)
+            self.assertIn("support.html", Document((SITE / page).read_text()).links)
+
     def test_deployment_export_contains_public_assets_but_not_local_notes(self):
         with tempfile.TemporaryDirectory(prefix="macscp-site-export-") as directory:
             output = Path(directory) / "site"
@@ -173,6 +198,8 @@ class WebsiteTests(unittest.TestCase):
                                     capture_output=True, text=True, timeout=10)
             self.assertEqual(result.returncode, 0, result.stderr)
             self.assertTrue((output / "index.html").is_file())
+            self.assertTrue((output / "privacy.html").is_file())
+            self.assertTrue((output / "support.html").is_file())
             self.assertFalse((output / "README.txt").exists())
             self.assertFalse(list(output.rglob(".DS_Store")))
             for page in output.glob("*.html"):

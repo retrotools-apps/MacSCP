@@ -559,6 +559,11 @@ struct TunnelProfilesSheet: View {
     /// gone by the time it got here (the BACKLOG row "A forwarding's failure
     /// reason is English on four localized surfaces"). The English sentence
     /// is still what the diagnostic log writes; it is never shown here.
+    static func healthyActiveConnectionCount(_ state: TunnelState) -> Int? {
+        guard case .active(let connections, let failed, _) = state, failed == 0 else { return nil }
+        return connections
+    }
+
     static func stateLabel(_ state: TunnelState) -> String {
         switch state {
         case .stopped: return L10n.string("tunnel.state.stopped", "Stopped")

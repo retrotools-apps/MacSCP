@@ -218,7 +218,7 @@ struct TunnelWorkspaceView: View {
             }
             .frame(maxWidth: .infinity, alignment: .leading)
             VStack(alignment: .trailing, spacing: 5) {
-                Text(TunnelProfilesSheet.stateLabel(state))
+                tunnelStateText(state)
                     .font(.caption).foregroundStyle(stateColor(state))
                     .multilineTextAlignment(.trailing).frame(maxWidth: 210, alignment: .trailing)
                     .help(TunnelProfilesSheet.stateTooltip(state))
@@ -263,6 +263,27 @@ struct TunnelWorkspaceView: View {
         .contentShape(Rectangle())
         .onTapGesture(count: 2) { toggleTunnel(profile) }
         .modifier(TunnelProfileActions(profile: profile, sessions: sessions, manager: manager, decider: decider))
+    }
+
+    /// Keeps the healthy `Active` label stationary while short-lived
+    /// forwarded connections update beside it. The count column remains
+    /// present at zero so its appearance cannot re-centre the label.
+    @ViewBuilder
+    private func tunnelStateText(_ state: TunnelState) -> some View {
+        if let connections = TunnelProfilesSheet.healthyActiveConnectionCount(state) {
+            HStack(spacing: 4) {
+                L10n.text("tunnel.state.active", "Active")
+                Text(connections == 0 ? "" : String(
+                    format: L10n.string("tunnel.state.activeCount %lld", "(%lld)"),
+                    connections))
+                    .monospacedDigit()
+                    .frame(width: 44, alignment: .leading)
+            }
+            .accessibilityElement(children: .ignore)
+            .accessibilityLabel(TunnelProfilesSheet.stateLabel(state))
+        } else {
+            Text(TunnelProfilesSheet.stateLabel(state))
+        }
     }
 
     private func toggleTunnel(_ profile: TunnelProfile) {

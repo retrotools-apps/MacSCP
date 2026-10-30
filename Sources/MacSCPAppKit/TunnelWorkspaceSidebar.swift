@@ -248,7 +248,9 @@ struct TunnelWorkspaceSidebar: View {
                 TunnelServiceIcon(appearance: profile.appearance, size: 14)
                     .overlay(alignment: .bottomTrailing) {
                         if !sidebarCompact {
-                            Circle().fill(tint(state)).frame(width: 5, height: 5)
+                            Circle().fill(tint(state))
+                                .frame(width: DesignTokens.sidebarStatusDotSize,
+                                       height: DesignTokens.sidebarStatusDotSize)
                                 .overlay { Circle().stroke(DesignTokens.sidebarSurface, lineWidth: 1) }
                                 .offset(x: 2, y: 2)
                         }

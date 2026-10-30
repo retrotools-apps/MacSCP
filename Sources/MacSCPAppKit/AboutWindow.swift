@@ -15,6 +15,9 @@ struct AboutContent {
     let licenseURL: URL?
     let noticesURL: URL?
 
+    static let privacyURL = URL(string: "https://retrotools-apps.github.io/MacSCP/privacy.html")!
+    static let supportURL = URL(string: "https://retrotools-apps.github.io/MacSCP/support.html")!
+
     init(bundle: Bundle = .main, sourceRoot: URL = ReleaseMetadata.sourceRoot) {
         version = ReleaseMetadata(bundle: bundle, sourceRoot: sourceRoot).version
         func resource(_ name: String, extension ext: String?, sourceSubdirectory: String? = nil) -> URL? {
@@ -35,7 +38,7 @@ enum AboutWindow {
 
     static func show() {
         if controller == nil {
-            let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 420, height: 360),
+            let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 420, height: 382),
                 styleMask: [.titled, .closable], backing: .buffered, defer: false)
             window.title = L10n.string("about.title", "About MacSCP")
             window.titleVisibility = .hidden
@@ -90,9 +93,15 @@ struct AboutView: View {
             .foregroundStyle(.secondary)
             .accessibilityElement(children: .ignore)
             .accessibilityLabel(AboutContent.copyright)
-            HStack(spacing: 20) {
-                documentButton("about.license", "MacSCP License", url: content.licenseURL)
-                documentButton("about.thirdParty", "Third-party licenses", url: content.noticesURL)
+            VStack(spacing: 7) {
+                HStack(spacing: 20) {
+                    documentButton("about.license", "MacSCP License", url: content.licenseURL)
+                    documentButton("about.thirdParty", "Third-party licenses", url: content.noticesURL)
+                }
+                HStack(spacing: 20) {
+                    documentButton("about.privacy", "Privacy", url: AboutContent.privacyURL)
+                    documentButton("about.support", "Support", url: AboutContent.supportURL)
+                }
             }
             .font(.system(size: 11))
             .padding(.top, 12)
@@ -100,7 +109,7 @@ struct AboutView: View {
         .padding(.horizontal, 32)
         .padding(.top, 20)
         .padding(.bottom, 28)
-        .frame(width: 420, height: 360)
+        .frame(width: 420, height: 382)
         .background(Color(nsColor: .windowBackgroundColor))
     }
 

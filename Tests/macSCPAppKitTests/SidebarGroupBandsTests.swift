@@ -6,6 +6,32 @@ import macSCPCore
 
 @Suite("Hierarchical sidebar group regions")
 @MainActor struct SidebarGroupBandsTests {
+    @Test func compactCustomColorComponentsRoundTripSRGB() {
+        let colors = GroupColorPalette.defaults + [
+            GroupColor(rgb: 0x000000), GroupColor(rgb: 0xFFFFFF),
+            GroupColor(rgb: 0x808080), GroupColor(rgb: 0x123456),
+        ]
+        for color in colors {
+            #expect(GroupColorHSB(color: color).color == color)
+        }
+    }
+
+    @Test func graphicalColorPickerMapsAndClampsPointerPositions() {
+        let size = CGSize(width: 200, height: 100)
+        let topLeft = GroupColorPickerGeometry.saturationBrightness(
+            at: CGPoint(x: 0, y: 0), in: size)
+        #expect(topLeft.saturation == 0 && topLeft.brightness == 1)
+        let bottomRight = GroupColorPickerGeometry.saturationBrightness(
+            at: CGPoint(x: 200, y: 100), in: size)
+        #expect(bottomRight.saturation == 1 && bottomRight.brightness == 0)
+        let clamped = GroupColorPickerGeometry.saturationBrightness(
+            at: CGPoint(x: 500, y: -20), in: size)
+        #expect(clamped.saturation == 1 && clamped.brightness == 1)
+        #expect(GroupColorPickerGeometry.hue(at: -10, width: 200) == 0)
+        #expect(GroupColorPickerGeometry.hue(at: 100, width: 200) == 0.5)
+        #expect(GroupColorPickerGeometry.hue(at: 500, width: 200) == 1)
+    }
+
     @Test func theLastEntryReservesSeparateSpaceForItsGroupAndEveryClosingAncestor() throws {
         let root = StoredGroup(name: "Root")
         let child = StoredGroup(name: "Child", parentID: root.id)
@@ -75,12 +101,17 @@ import macSCPCore
     func compactPickerOffersQuickSwatchesAndCustomColorWithoutCredentialAccess(scheme: ColorScheme) async throws {
         #expect(!GroupColorPicker.swatches.isEmpty)
         #expect(Set(GroupColorPicker.swatches).count == GroupColorPicker.swatches.count)
-        let view = GroupColorPicker(hue: 0.76, onChange: { _ in })
-            .background(DesignTokens.sidebarSurface).environment(\.colorScheme, scheme)
-        let renderer = ImageRenderer(content: view)
-        renderer.scale = 2
-        let image = try #require(renderer.nsImage)
-        #expect(image.isValid)
+        var sizes: [CGSize] = []
+        for custom in [false, true] {
+            let view = GroupColorPicker(hue: 0.76, initiallyChoosingCustom: custom, onChange: { _ in })
+                .background(DesignTokens.sidebarSurface).environment(\.colorScheme, scheme)
+            let renderer = ImageRenderer(content: view)
+            renderer.scale = 2
+            let image = try #require(renderer.nsImage)
+            #expect(image.isValid)
+            sizes.append(image.size)
+        }
+        #expect(sizes[0] == sizes[1])
     }
 
     @Test func customGroupColorsOverrideAutomaticHuesAndResetWithoutAffectingSiblings() throws {

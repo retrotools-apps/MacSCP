@@ -18,5 +18,12 @@ struct GroupContextMenuTests {
         let control = try SourceCorpus.commentFree(of: root.appendingPathComponent("Sources/MacSCPAppKit/SidebarGroupBands.swift"))
         #expect(control.contains(".popover(isPresented:"))
         #expect(control.contains(".help(L10n.string(\"group.color\""))
+        #expect(control.contains(".onExitCommand { isPresented = false }"))
+        #expect(control.contains("GroupSaturationBrightnessField("))
+        #expect(control.contains("GroupHueStrip("))
+        #expect(!control.contains("Slider(value:"))
+        #expect(!control.contains("ColorPicker(L10n.string"))
+        #expect(!control.contains("NSColorPanel"))
+        #expect(!control.contains(".sheet(isPresented:"))
     }
 }

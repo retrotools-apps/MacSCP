@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="description" content="How MacSCP handles connection data, credentials, files, diagnostics and support information.">
+<title>Privacy policy — MacSCP</title>
+<link rel="icon" href="assets/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="style.css"><link rel="stylesheet" href="macscp.css">
+</head>
+<body class="document-page">
+<a class="skip" href="#main">Skip to content</a>
+<header><div class="header-inner wrap"><a class="document-brand" href="index.html">retroTools / MacSCP</a>
+<nav aria-label="Documentation"><a href="guide.html">User guide</a><a href="changelog.html">Release notes</a><a href="notices.html">Third-party notices</a></nav></div></header>
+<main id="main" class="wrap document-main">
+<div class="document-heading"><p class="eyebrow">MACSCP / PRIVACY</p><h1>Privacy policy</h1>
+<p>Effective 29 October 2026. This policy covers MacSCP distributed by RetroTools.</p></div>
+<div class="document-layout"><aside><nav aria-label="On this page">
+<a href="#collection">Data collection</a><a href="#connections">User-directed connections</a>
+<a href="#local-storage">Local storage</a><a href="#updates">Updates</a>
+<a href="#support">Support</a><a href="#control">Your control</a><a href="#changes">Changes</a>
+</nav></aside><article class="document-body">
+<h2 id="collection">Data collection by RetroTools</h2>
+<p>RetroTools does not operate a MacSCP account service and does not collect analytics, advertising identifiers, usage history, connection details, credentials, file contents or diagnostic logs from the application. MacSCP contains no advertising or behavioral tracking.</p>
+<h2 id="connections">User-directed network connections</h2>
+<p>MacSCP connects only when needed for features selected or configured by the user. Host names, account names, credentials, commands and file data may be sent directly to SSH, SFTP, S3-compatible or WebDAV services chosen by the user. RetroTools does not receive or control that traffic. The operators of those services may process data under their own policies.</p>
+<p>Opening an external terminal asks macOS to launch the user's selected terminal and the system OpenSSH client. The resulting SSH connection is separate from MacSCP's native file connection and goes directly to the configured server.</p>
+<h2 id="local-storage">Data stored on the Mac</h2>
+<p>Saved connections, preferences and local audit settings are stored on the Mac. Passwords and private-key passphrases are stored in the macOS Keychain rather than in MacSCP's JSON files.</p>
+<p>Diagnostic and audit logs are local. They are designed to exclude passwords, private keys and file contents. RetroTools receives a log only when the user deliberately includes it in a support report.</p>
+<h2 id="updates">Updates and external services</h2>
+<p>MacSCP can contact GitHub to check for signed application updates. Requests to GitHub are governed by GitHub's privacy policy.</p>
+<h2 id="support">Support and GitHub</h2>
+<p>Support is provided through <a href="https://github.com/retrotools-apps/MacSCP/issues">GitHub Issues</a>. Information posted there is supplied voluntarily and may be public. Users should remove credentials, private host names, addresses and confidential file data before submitting an issue. GitHub processes account and service data under its own privacy statement.</p>
+<h2 id="control">Retention, deletion and user control</h2>
+<p>MacSCP does not retain user data on RetroTools servers. Users can remove saved sessions and credentials from MacSCP, remove remaining MacSCP entries with Keychain Access, delete local logs and application data, and uninstall the application. Data deliberately posted to GitHub is retained and deleted according to GitHub's controls and policies.</p>
+<h2 id="changes">Policy changes and contact</h2>
+<p>Material changes will be published on this page with an updated effective date. Privacy questions can be submitted through <a href="https://github.com/retrotools-apps/MacSCP/issues">the MacSCP issue tracker</a> without including secrets or private infrastructure details.</p>
+</article></div></main>
+<footer><div class="wrap footer-bottom"><span>© 2026 retroTools</span><a href="index.html">MacSCP overview</a><a href="privacy.html">Privacy</a><a href="support.html">Support</a></div></footer>
+</body></html>

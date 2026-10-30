@@ -7,6 +7,10 @@ import macSCPCore
 @Suite("Compact sidebar session identity")
 @MainActor
 struct SessionSidebarIdentityTests {
+    @Test func overlaidSessionStatusDotIsSlightlyLargerWithoutChangingTheIconFootprint() {
+        #expect(DesignTokens.sidebarStatusDotSize == 6)
+    }
+
     @Test func onlyConfiguredAndAvailableIconsReplaceTheStatusDot() {
         let cases: [(SessionAppearance, Bool)] = [
             (.init(), false), (.init(tint: .orange), false),

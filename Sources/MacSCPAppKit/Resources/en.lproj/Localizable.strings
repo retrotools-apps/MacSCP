@@ -1263,6 +1263,7 @@
 "tunnel.state.connecting" = "Connecting…";
 "tunnel.state.active" = "Active";
 "tunnel.state.activeConnections %lld" = "Active (%lld)";
+"tunnel.state.activeCount %lld" = "(%lld)";
 "tunnel.state.activeWithFailures %lld" = "Active · %lld connections failed";
 "tunnel.state.degraded %lld" = "Degraded · %lld connections failed in a row";
 "tunnel.state.lastFailure %@" = "Last failure: %@";
@@ -1394,6 +1395,8 @@
 "about.version %@" = "Version %@";
 "about.license" = "MacSCP License";
 "about.thirdParty" = "Third-party licenses";
+"about.privacy" = "Privacy";
+"about.support" = "Support";
 /* Shared credential vault */
 "vault.startup.title" = "Credential vault locked";
 "vault.startup.failure" = "MacSCP could not open the credential vault. You can retry macOS authorization without restarting the application.";
@@ -1600,6 +1603,8 @@
 "settings.navigation.protocols" = "Protocols";
 "settings.navigation.maintenance" = "Maintenance";
 "group.color.custom" = "Custom color…";
+"group.color.hue" = "Hue";
+"group.color.saturationBrightness" = "Saturation and brightness";
 "sidebar.groups.collapseAll" = "Collapse group contents";
 "sidebar.groups.expandAll" = "Expand all groups";
 "group.color.use" = "Use color";

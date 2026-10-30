@@ -25,7 +25,8 @@ struct SessionSidebarIdentity: View {
                     .overlay(alignment: .bottomTrailing) {
                         if isConnected && !isCompact {
                             Circle().fill(DesignTokens.statusPhosphor)
-                                .frame(width: 4, height: 4)
+                                .frame(width: DesignTokens.sidebarStatusDotSize,
+                                       height: DesignTokens.sidebarStatusDotSize)
                                 .background(Circle().fill(.background).padding(-1))
                                 .offset(x: 2, y: 1)
                         }

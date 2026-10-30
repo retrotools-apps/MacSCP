@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.2.2] (2026-10-30)
+
+### Highlights
+
+* **interface:** Improved group colors, sidebar status visibility and tunnel connection-count stability.
+* **documentation:** Added public privacy and support pages.
+
 ## [1.2.1] (2026-10-28)
 
 ### Highlights

@@ -28,6 +28,8 @@
 !/docs/WINSCP_FORMAT.md
 !/docs/SPARKLE.md
 !/docs/USER_GUIDE.md
+!/docs/product/
+!/docs/product/**
 !/docs/images/
 /docs/images/*
 !/docs/images/readme-header.svg
@@ -55,6 +57,7 @@
 !/scripts/verify-appcast.swift
 !/scripts/verify-sparkle-key.swift
 !/scripts/prepare-website
+!/scripts/prepare-product-screenshots
 !/scripts/website_documents.py
 !/scripts/tests/
 

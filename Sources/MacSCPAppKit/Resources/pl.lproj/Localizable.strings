@@ -1262,6 +1262,7 @@
 "tunnel.state.connecting" = "Łączenie…";
 "tunnel.state.active" = "Aktywne";
 "tunnel.state.activeConnections %lld" = "Aktywne (%lld)";
+"tunnel.state.activeCount %lld" = "(%lld)";
 "tunnel.state.activeWithFailures %lld" = "Aktywne · nieudane połączenia: %lld";
 "tunnel.state.degraded %lld" = "Pogorszone · nieudane połączenia z rzędu: %lld";
 "tunnel.state.lastFailure %@" = "Ostatni błąd: %@";
@@ -1393,6 +1394,8 @@
 "about.version %@" = "Wersja %@";
 "about.license" = "Licencja MacSCP";
 "about.thirdParty" = "Licencje innych firm";
+"about.privacy" = "Prywatność";
+"about.support" = "Pomoc";
 /* Shared credential vault */
 "vault.startup.title" = "Sejf danych logowania zablokowany";
 "vault.startup.failure" = "MacSCP nie mógł otworzyć sejfu. Możesz ponowić autoryzację macOS bez ponownego uruchamiania aplikacji.";
@@ -1599,6 +1602,8 @@
 "settings.navigation.protocols" = "Protokoły";
 "settings.navigation.maintenance" = "Konserwacja";
 "group.color.custom" = "Własny kolor…";
+"group.color.hue" = "Odcień";
+"group.color.saturationBrightness" = "Nasycenie i jasność";
 "sidebar.groups.collapseAll" = "Zwiń zawartość grup";
 "sidebar.groups.expandAll" = "Rozwiń wszystkie grupy";
 "group.color.use" = "Użyj koloru";

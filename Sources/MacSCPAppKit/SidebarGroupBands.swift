@@ -333,18 +333,146 @@ struct GroupColorControl: View {
         .disabled(!colorsEnabled)
         .help(L10n.string("group.color", "Group color"))
         .accessibilityLabel(L10n.string("group.color", "Group color"))
-        .popover(isPresented: $isPresented) { GroupColorPicker(hue: hue, color: color, onChange: onChange) }
+        .popover(isPresented: $isPresented) {
+            GroupColorPicker(hue: hue, color: color, isPresented: $isPresented, onChange: onChange)
+        }
+    }
+}
+
+/// Compact HSB editing without opening the shared system color panel.
+struct GroupColorHSB: Equatable {
+    var hue: Double
+    var saturation: Double
+    var brightness: Double
+
+    init(hue: Double, saturation: Double, brightness: Double) {
+        self.hue = hue
+        self.saturation = saturation
+        self.brightness = brightness
+    }
+
+    init(color: GroupColor) {
+        let maximum = max(color.red, color.green, color.blue)
+        let minimum = min(color.red, color.green, color.blue)
+        brightness = maximum
+        saturation = maximum == 0 ? 0 : (maximum - minimum) / maximum
+        hue = color.hue ?? 0
+    }
+
+    var color: GroupColor {
+        let h = min(1, max(0, hue)) * 6
+        let s = min(1, max(0, saturation))
+        let v = min(1, max(0, brightness))
+        let sector = Int(floor(h)) % 6
+        let fraction = h - floor(h)
+        let p = v * (1 - s), q = v * (1 - fraction * s), t = v * (1 - (1 - fraction) * s)
+        let components: (Double, Double, Double) = switch sector {
+        case 0: (v, t, p)
+        case 1: (q, v, p)
+        case 2: (p, v, t)
+        case 3: (p, q, v)
+        case 4: (t, p, v)
+        default: (v, p, q)
+        }
+        func byte(_ value: Double) -> UInt32 { UInt32((value * 255).rounded()) }
+        return GroupColor(rgb: byte(components.0) << 16 | byte(components.1) << 8 | byte(components.2))
+    }
+}
+
+enum GroupColorPickerGeometry {
+    static func saturationBrightness(at point: CGPoint, in size: CGSize) -> (saturation: Double, brightness: Double) {
+        guard size.width > 0, size.height > 0 else { return (0, 0) }
+        let saturation = min(1, max(0, point.x / size.width))
+        let brightness = 1 - min(1, max(0, point.y / size.height))
+        return (saturation, brightness)
+    }
+
+    static func hue(at x: CGFloat, width: CGFloat) -> Double {
+        guard width > 0 else { return 0 }
+        return min(1, max(0, x / width))
+    }
+}
+
+struct GroupSaturationBrightnessField: View {
+    @Binding var color: GroupColorHSB
+
+    var body: some View {
+        GeometryReader { geometry in
+            ZStack {
+                RoundedRectangle(cornerRadius: 7)
+                    .fill(Color(hue: color.hue, saturation: 1, brightness: 1))
+                    .overlay {
+                        RoundedRectangle(cornerRadius: 7).fill(LinearGradient(
+                            colors: [.white, .clear], startPoint: .leading, endPoint: .trailing))
+                    }
+                    .overlay {
+                        RoundedRectangle(cornerRadius: 7).fill(LinearGradient(
+                            colors: [.clear, .black], startPoint: .top, endPoint: .bottom))
+                    }
+                    .overlay { RoundedRectangle(cornerRadius: 7).strokeBorder(.black.opacity(0.12)) }
+                Circle()
+                    .fill(color.color.swiftUIColor)
+                    .frame(width: 15, height: 15)
+                    .overlay { Circle().stroke(.white, lineWidth: 2) }
+                    .shadow(color: .black.opacity(0.35), radius: 1)
+                    .position(
+                        x: min(geometry.size.width - 7.5, max(7.5, color.saturation * geometry.size.width)),
+                        y: min(geometry.size.height - 7.5, max(7.5, (1 - color.brightness) * geometry.size.height)))
+            }
+            .contentShape(Rectangle())
+            .gesture(DragGesture(minimumDistance: 0).onChanged { gesture in
+                let values = GroupColorPickerGeometry.saturationBrightness(
+                    at: gesture.location, in: geometry.size)
+                color.saturation = values.saturation
+                color.brightness = values.brightness
+            })
+        }
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(L10n.string(
+            "group.color.saturationBrightness", "Saturation and brightness"))
+        .accessibilityValue(color.color.hex)
+    }
+}
+
+struct GroupHueStrip: View {
+    @Binding var hue: Double
+
+    private static let colors = stride(from: 0.0, through: 1.0, by: 1.0 / 6.0)
+        .map { Color(hue: $0, saturation: 1, brightness: 1) }
+
+    var body: some View {
+        GeometryReader { geometry in
+            ZStack {
+                RoundedRectangle(cornerRadius: 6)
+                    .fill(LinearGradient(colors: Self.colors, startPoint: .leading, endPoint: .trailing))
+                    .overlay { RoundedRectangle(cornerRadius: 6).strokeBorder(.black.opacity(0.12)) }
+                Circle()
+                    .fill(Color(hue: hue, saturation: 1, brightness: 1))
+                    .frame(width: 15, height: 15)
+                    .overlay { Circle().stroke(.white, lineWidth: 2) }
+                    .shadow(color: .black.opacity(0.35), radius: 1)
+                    .position(x: min(geometry.size.width - 7.5, max(7.5, hue * geometry.size.width)),
+                              y: geometry.size.height / 2)
+            }
+            .contentShape(Rectangle())
+            .gesture(DragGesture(minimumDistance: 0).onChanged { gesture in
+                hue = GroupColorPickerGeometry.hue(at: gesture.location.x, width: geometry.size.width)
+            })
+        }
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(L10n.string("group.color.hue", "Hue"))
     }
 }
 
 struct GroupColorPicker: View {
     let hue: Double?
     let color: GroupColor?
+    @Binding var isPresented: Bool
     let onChange: (GroupColor?) -> Void
     @Environment(\.usedGroupColors) private var usedColors
     @AppStorage("groupColorSwatches") private var storedSwatches = ""
     @State private var choosingCustom = false
-    @State private var customColor: Color
+    @State private var customColor: GroupColorHSB
     @State private var selected: GroupColor?
 
     static let swatches = GroupColorPalette.defaults
@@ -357,15 +485,43 @@ struct GroupColorPicker: View {
         return values
     }
 
-    init(hue: Double?, color: GroupColor? = nil, onChange: @escaping (GroupColor?) -> Void) {
+    init(hue: Double?, color: GroupColor? = nil, isPresented: Binding<Bool> = .constant(true),
+         initiallyChoosingCustom: Bool = false,
+         onChange: @escaping (GroupColor?) -> Void) {
         self.hue = hue; self.color = color; self.onChange = onChange
+        _isPresented = isPresented
+        _choosingCustom = State(initialValue: initiallyChoosingCustom)
         _selected = State(initialValue: color)
-        _customColor = State(initialValue: color?.swiftUIColor ?? Color(hue: hue ?? 0.3, saturation: 0.4, brightness: 0.8))
+        _customColor = State(initialValue: color.map(GroupColorHSB.init(color:))
+            ?? GroupColorHSB(hue: hue ?? 0.3, saturation: 0.4, brightness: 0.8))
     }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             Text(L10n.string("group.color", "Group color")).font(.headline)
+            // AppKit sizes a SwiftUI popover when it opens and does not
+            // reliably grow it later. Both pages therefore participate in
+            // the initial layout; switching only changes visibility.
+            ZStack(alignment: .topLeading) {
+                paletteEditor
+                    .opacity(choosingCustom ? 0 : 1)
+                    .disabled(choosingCustom)
+                    .allowsHitTesting(!choosingCustom)
+                    .accessibilityHidden(choosingCustom)
+                customEditor
+                    .opacity(choosingCustom ? 1 : 0)
+                    .disabled(!choosingCustom)
+                    .allowsHitTesting(choosingCustom)
+                    .accessibilityHidden(!choosingCustom)
+            }
+            .frame(maxWidth: .infinity, alignment: .topLeading)
+        }
+        .padding(14).frame(width: 252)
+        .onExitCommand { isPresented = false }
+    }
+
+    private var paletteEditor: some View {
+        VStack(alignment: .leading, spacing: 12) {
             ScrollView(.vertical) {
                 LazyVGrid(columns: Array(repeating: GridItem(.fixed(22), spacing: 6), count: 8), spacing: 6) {
                     ForEach(palette, id: \.self) { value in swatch(value) }
@@ -373,7 +529,7 @@ struct GroupColorPicker: View {
             }
             .frame(height: min(160, CGFloat((palette.count + 7) / 8) * 28 - 6))
             Button {
-                customColor = selected?.swiftUIColor ?? customColor
+                if let selected { customColor = GroupColorHSB(color: selected) }
                 choosingCustom = true
             } label: {
                 Label(L10n.string("group.color.custom", "Custom color…"), systemImage: "paintpalette")
@@ -387,27 +543,38 @@ struct GroupColorPicker: View {
             }
             .frame(maxWidth: .infinity)
         }
-        .padding(14).frame(width: 252)
-        .sheet(isPresented: $choosingCustom) {
-            VStack(alignment: .leading, spacing: 16) {
-                ColorPicker(L10n.string("group.color", "Group color"), selection: $customColor, supportsOpacity: false)
-                HStack {
-                    Button(L10n.string("common.cancel", "Cancel")) { choosingCustom = false }
-                        .keyboardShortcut(.cancelAction)
-                    Spacer()
-                    Button(L10n.string("group.color.use", "Use color")) {
-                        guard let value = GroupColor(color: customColor) else { return }
-                        let values = GroupColorPalette.adding(value, to: palette, used: usedColors)
-                        storedSwatches = values.map(\.hex).joined(separator: ",")
-                        selected = value
-                        onChange(value)
-                        choosingCustom = false
-                    }
-                    .keyboardShortcut(.defaultAction)
-                }
+    }
+
+    private var customEditor: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(spacing: 8) {
+                Circle().fill(customColor.color.swiftUIColor).frame(width: 22, height: 22)
+                    .overlay { Circle().strokeBorder(Color.primary.opacity(0.2), lineWidth: 1) }
+                Text(customColor.color.hex).font(.system(.caption, design: .monospaced))
+                    .foregroundStyle(.secondary)
             }
-            .padding(20).frame(width: 300)
+            GroupSaturationBrightnessField(color: $customColor)
+                .frame(height: 126)
+            GroupHueStrip(hue: $customColor.hue)
+                .frame(height: 18)
+            HStack {
+                Button(L10n.string("common.cancel", "Cancel")) {
+                    choosingCustom = false
+                }
+                Spacer()
+                Button(L10n.string("group.color.use", "Use color")) { useCustomColor() }
+                    .keyboardShortcut(.defaultAction)
+            }
         }
+    }
+
+    private func useCustomColor() {
+        let value = customColor.color
+        let values = GroupColorPalette.adding(value, to: palette, used: usedColors)
+        storedSwatches = values.map(\.hex).joined(separator: ",")
+        selected = value
+        onChange(value)
+        choosingCustom = false
     }
 
     private func swatch(_ value: GroupColor) -> some View {

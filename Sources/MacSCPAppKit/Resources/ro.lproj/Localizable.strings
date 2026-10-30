@@ -1040,6 +1040,7 @@
 "tunnel.state.connecting" = "Conectare…";
 "tunnel.state.active" = "Activ";
 "tunnel.state.activeConnections %lld" = "Activ (%lld)";
+"tunnel.state.activeCount %lld" = "(%lld)";
 "tunnel.state.activeWithFailures %lld" = "Conexiuni active · %lld eșuate";
 "tunnel.state.degraded %lld" = "Conexiuni degradate · %lld au eșuat la rând";
 "tunnel.state.lastFailure %@" = "Ultimul eșec: %@";
@@ -1167,6 +1168,8 @@
 "about.version %@" = "Versiunea %@";
 "about.license" = "Licență MacSCP";
 "about.thirdParty" = "Licențe ale terților";
+"about.privacy" = "Confidențialitate";
+"about.support" = "Asistență";
 "vault.startup.title" = "Seiful de acreditare blocat";
 "vault.startup.failure" = "MacSCP nu a putut deschide seiful credibil. Puteți retrimite autorizația MacOS fără a reporni cererea.";
 "vault.startup.quit" = "Renunță la MacSCP";
@@ -1368,6 +1371,8 @@
 "settings.navigation.protocols" = "Protocoale";
 "settings.navigation.maintenance" = "Întreținere";
 "group.color.custom" = "Culoare personalizată…";
+"group.color.hue" = "Nuanță";
+"group.color.saturationBrightness" = "Saturație și luminozitate";
 "sidebar.groups.collapseAll" = "Restrânge conținutul grupurilor";
 "sidebar.groups.expandAll" = "Extinde toate grupurile";
 "group.color.use" = "Folosește culoarea";

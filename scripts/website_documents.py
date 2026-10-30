@@ -125,7 +125,7 @@ def page(title, description, source_name, body, toc):
 <h1>{escape(title)}</h1><p>{escape(description)}</p><div class="document-tools"><a class="document-source" href="{source_name}" download>Download the original source</a>{controls}</div></div>
 <div class="document-layout"><aside><nav aria-label="On this page">{navigation}<a href="license.html">Application license</a></nav></aside>
 <article class="document-body">{body}</article></div></main>
-<footer><div class="wrap footer-bottom"><span>© 2026 retroTools</span><a href="index.html">MacSCP overview</a><a href="license.html">GPLv3 or later</a></div></footer></body></html>
+<footer><div class="wrap footer-bottom"><span>© 2026 retroTools</span><a href="index.html">MacSCP overview</a><a href="license.html">GPLv3 or later</a><a href="privacy.html">Privacy</a><a href="support.html">Support</a></div></footer></body></html>
 '''
 
 

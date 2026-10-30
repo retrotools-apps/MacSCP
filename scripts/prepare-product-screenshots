@@ -1,0 +1,34 @@
+#!/bin/bash
+# Produce deterministic, opaque 16:10 product screenshots from reviewed demo assets.
+set -euo pipefail
+cd "$(dirname "$0")/.."
+
+MAGICK="${MAGICK:-$(command -v magick || true)}"
+[[ -n "$MAGICK" ]] || {
+    echo "error: ImageMagick's magick executable is required" >&2
+    exit 1
+}
+
+SOURCE="docs/web/assets/screenshots"
+OUTPUT="docs/product/screenshots"
+mkdir -p "$OUTPUT"
+
+crop_to_product_size() {
+    local input="$1" output="$2"
+    "$MAGICK" "$input" -resize '1440x900^' -gravity center -extent 1440x900 \
+        -alpha off -colorspace sRGB -strip "$output"
+}
+
+letterbox_to_product_size() {
+    local input="$1" output="$2" background="$3"
+    "$MAGICK" "$input" -resize '1360x820>' -background "$background" -gravity center \
+        -extent 1440x900 -alpha off -colorspace sRGB -strip "$output"
+}
+
+crop_to_product_size "$SOURCE/workspace-light.webp" "$OUTPUT/01-workspace.png"
+crop_to_product_size "$SOURCE/connections-dark.webp" "$OUTPUT/02-connections.png"
+crop_to_product_size "$SOURCE/new-connection-light.webp" "$OUTPUT/03-new-connection.png"
+letterbox_to_product_size "$SOURCE/tunnels-dark.webp" "$OUTPUT/04-tunnels.png" '#0d1117'
+crop_to_product_size "$SOURCE/large-binary-viewer-dark.webp" "$OUTPUT/05-binary-viewer.png"
+
+echo "Prepared five product screenshots at 1440 x 900 pixels"

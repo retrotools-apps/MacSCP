@@ -43,7 +43,7 @@ def main():
         site = SITE
         if output == ROOT or output.is_relative_to(site) or output.exists() and any(output.iterdir()):
             raise SystemExit("Website export requires a new empty directory outside the source website")
-        files = ["index.html", "guide.html", "style.css", "macscp.css", "script.js", *pages, *documents,
+        files = ["index.html", "guide.html", "privacy.html", "support.html", "style.css", "macscp.css", "script.js", *pages, *documents,
                  "assets/screenshots/connections-light.webp", "assets/screenshots/connections-dark.webp",
                  "assets/screenshots/workspace-light.webp", "assets/screenshots/workspace-dark.webp",
                  "assets/screenshots/new-connection-light.webp", "assets/screenshots/new-connection-dark.webp",

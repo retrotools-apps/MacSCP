@@ -1040,6 +1040,7 @@
 "tunnel.state.connecting" = "Conectando…";
 "tunnel.state.active" = "Activo";
 "tunnel.state.activeConnections %lld" = "Activo (%lld)";
+"tunnel.state.activeCount %lld" = "(%lld)";
 "tunnel.state.activeWithFailures %lld" = "Activa · %lld falló las conexiones";
 "tunnel.state.degraded %lld" = "Degradado · Las conexiones %lld fallaron en una fila";
 "tunnel.state.lastFailure %@" = "Último fallo: %@";
@@ -1167,6 +1168,8 @@
 "about.version %@" = "Versión %@";
 "about.license" = "Licencia MacSCP";
 "about.thirdParty" = "Licencias de terceros";
+"about.privacy" = "Privacidad";
+"about.support" = "Soporte";
 "vault.startup.title" = "Bóveda credencial bloqueada";
 "vault.startup.failure" = "MacSCP no podía abrir la bóveda credencial. Puedes volver a introducir la autorización de macOS sin reiniciar la aplicación.";
 "vault.startup.quit" = "Quit MacSCP";
@@ -1368,6 +1371,8 @@
 "settings.navigation.protocols" = "Protocolos";
 "settings.navigation.maintenance" = "Mantenimiento";
 "group.color.custom" = "Color personalizado…";
+"group.color.hue" = "Matiz";
+"group.color.saturationBrightness" = "Saturación y brillo";
 "sidebar.groups.collapseAll" = "Contraer el contenido de los grupos";
 "sidebar.groups.expandAll" = "Expandir todos los grupos";
 "group.color.use" = "Usar color";
