@@ -6,7 +6,7 @@ demonstration screenshots. No real sessions or desktop captures are used.
 Regenerate documents and check local links:
   python3 scripts/prepare-website
   python3 scripts/prepare-website --check
-  python3 -m unittest discover -s scripts/tests -p test_website.py
+  python3 -m unittest discover -s scripts/tests -p test_website_integrity.py
 
 Preview on loopback:
   python3 -m http.server 8765 --bind 127.0.0.1 --directory docs/web

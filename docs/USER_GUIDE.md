@@ -49,7 +49,10 @@ you to common locations.
 To upload, drag files or folders from the local pane to the remote pane.
 To download, drag them in the opposite direction. You can also select items
 and press **Space**, or choose a transfer action from the context menu.
-To download directly into a Finder folder, drag remote files to Finder.
+To download directly into a Finder folder or the Desktop, drag remote files
+there. Remote folders do not currently provide a Finder file promise; transfer
+them to the local pane first. Finder drops also remain unavailable wherever the
+current remote location is not writable.
 
 Follow progress in the source tab's transfer queue. If a file already exists,
 choose whether to overwrite it, skip it or use another name. You can cancel
@@ -73,8 +76,12 @@ windows, so you can keep a document open while switching tabs.
   MacSCP asks before discarding them.
 
 Save your edits before disconnecting: disconnecting a session closes its viewer
-and editor windows. If you use an external editor, saving can upload the modified
-file back to the server.
+and editor windows. In **Settings → Open With**, choose a default external
+application or associate file extensions with different applications. This path
+is not limited to text: any regular remote file can be opened in the configured
+Mac application, including documents, spreadsheets and presentations. MacSCP
+downloads a temporary copy and uploads saved changes back to the original remote
+path.
 
 For SSH connections, directory search can find files by name or look for literal
 text in their contents. You can also request a checksum to help compare files;
@@ -103,7 +110,11 @@ being sent to it. You cannot copy a file onto itself or a folder into itself.
 
 With an SSH connection selected, click **SSH** or press **⌘T**.
 MacSCP opens the terminal application configured in Settings, such as Terminal
-or iTerm. The terminal has its own SSH session, separate from the file browser.
+or iTerm. It builds the system OpenSSH command from the selected saved
+connection, including the endpoint, supported jump or gateway route, key or
+agent choice, and available password or key-passphrase credentials. The terminal
+keeps its own profiles, shell and tools, and its SSH session remains separate
+from the native file connection.
 
 ## Create and manage tunnels
 

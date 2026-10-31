@@ -123,6 +123,9 @@
 .document-body .license-text[open] summary::after{content:'−'}
 .document-body pre{padding:20px;background:var(--surface);white-space:pre-wrap;overflow-wrap:anywhere;margin:0 0 20px;border:1px solid var(--line);border-radius:4px}
 .document-body .legal-copy{margin-top:24px}
+.workflow-grid{grid-template-columns:repeat(4,minmax(0,1fr));gap:32px}
 @media(max-width:850px){.document-layout{grid-template-columns:155px minmax(0,1fr);gap:28px}}
+@media(max-width:1000px) and (min-width:651px){.workflow-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:650px){.workflow-grid{grid-template-columns:1fr}}
 @media(max-width:650px){.guide-main h2,.document-body h2{font-size:21px}.guide-main section{padding-top:32px}.document-main{padding-top:30px}.document-heading{margin-bottom:26px}.document-layout{display:block}.document-layout aside{position:static;max-height:none;overflow:visible;margin-bottom:30px;border-bottom:1px solid var(--line);padding-bottom:16px}.document-layout aside nav{display:flex;flex-direction:row;flex-wrap:wrap;gap:4px 18px}.document-page .header-inner{align-items:flex-start;flex-direction:column;gap:16px}.document-page header nav{justify-content:flex-start;gap:16px}.document-body pre{padding:14px}}
 @media(max-width:650px){.document-table table,.document-table tbody{display:block;width:100%}.document-table thead{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%)}.document-table tr{display:block;padding:14px 0;border-bottom:1px solid var(--line)}.document-table td,.document-table td:last-child{display:grid;grid-template-columns:70px minmax(0,1fr);gap:14px;padding:5px 0;border:0;min-width:0}.document-table td::before{content:attr(data-label);color:var(--muted);font-weight:500}}

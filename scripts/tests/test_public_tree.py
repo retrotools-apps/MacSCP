@@ -50,7 +50,7 @@ class PublicTreeTests(unittest.TestCase):
                   "docs/index.html", "docs/.nojekyll",
                   "docs/web/index.html", "docs/web/assets/screenshots/workspace-light.webp",
                   "scripts/prepare-website", "scripts/website_documents.py",
-                  "scripts/tests/test_website.py", "scripts/tests/test_website_documents.py"]
+                  "scripts/tests/test_website_integrity.py", "scripts/tests/test_website_documents.py"]
         for name in private + public:
             path = self.root / name
             path.parent.mkdir(parents=True, exist_ok=True)

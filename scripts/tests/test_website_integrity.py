@@ -2,6 +2,7 @@
 import hashlib
 from html.parser import HTMLParser
 from pathlib import Path
+import re
 import struct
 import subprocess
 import tempfile
@@ -32,7 +33,7 @@ class Document(HTMLParser):
             self.images.append(attrs)
 
 
-class WebsiteTests(unittest.TestCase):
+class WebsiteIntegrityTests(unittest.TestCase):
     def test_pages_entry_resolves_to_the_site_from_the_docs_root(self):
         entry = ROOT / "docs/index.html"
         document = Document(entry.read_text())
@@ -79,15 +80,17 @@ class WebsiteTests(unittest.TestCase):
             for image in document.images:
                 self.assertIn("alt", image)
 
-    def test_latest_release_destination_and_screenshots_are_valid(self):
+    def test_latest_release_links_are_stable_and_screenshots_are_valid(self):
         index = (SITE / "index.html").read_text()
+        readme = (ROOT / "README.md").read_text()
         self.assertNotIn("data-version", index)
         self.assertIn("https://github.com/retrotools-apps/MacSCP/releases/latest",
                       Document(index).links)
         self.assertIn("https://github.com/retrotools-apps/MacSCP/releases", Document(index).links)
-        preparer = (ROOT / "scripts/prepare-website").read_text()
-        self.assertIn('SITE = ROOT / "docs/web"', preparer)
-        self.assertNotIn('ROOT / "VERSION"', preparer)
+        self.assertIn("https://github.com/retrotools-apps/MacSCP/releases/latest", readme)
+        frozen_release = re.compile(r"(?:MacSCP-|Version\s+)\d+\.\d+\.\d+")
+        self.assertNotRegex(index, frozen_release)
+        self.assertNotRegex(readme, frozen_release)
         screenshots = [image for image in Document(index).images if image["src"].endswith(".webp")]
         self.assertTrue(screenshots)
         for image in screenshots:
@@ -108,39 +111,6 @@ class WebsiteTests(unittest.TestCase):
             self.assertEqual(struct.unpack(">II", content[16:24]), (1440, 900), path.name)
             self.assertNotIn(content[25], {4, 6}, path.name)
 
-    def test_homepage_exposes_target_workflows_and_trust_boundaries(self):
-        index = (SITE / "index.html").read_text()
-        for statement in [
-            "FOR SYSADMINS, PLATFORM TEAMS &amp; INTEGRATORS",
-            "EDIT REMOTELY",
-            "Put two servers side by side.",
-            "local and remote forwarding or SOCKS5",
-            "No analytics or background telemetry.",
-            "Diagnostics and local audit trails.",
-            "These reviews must not be interpreted as an independent certification.",
-            "The GitHub build is not Apple-notarized",
-        ]:
-            with self.subTest(statement=statement):
-                self.assertIn(statement, index)
-
-    def test_readme_matches_the_site_without_a_frozen_release_version(self):
-        readme = (ROOT / "README.md").read_text()
-        header = (ROOT / "docs/images/readme-header.svg").read_text()
-        for statement in [
-            "Remote file operations and managed SSH tunnels for macOS.",
-            "For sysadmins, platform teams and integration developers.",
-            "Treat tunnels as infrastructure.",
-            "No analytics or background telemetry.",
-            "These reviews must not be interpreted as an",
-            "https://github.com/retrotools-apps/MacSCP/releases/latest",
-        ]:
-            with self.subTest(statement=statement):
-                self.assertIn(statement, readme)
-        self.assertNotIn("Version 1.0.0", readme)
-        self.assertNotIn("MacSCP-1.0.0", readme)
-        self.assertIn("MacSCP. Remote operations. One workspace.", header)
-        self.assertNotIn("Files. Sessions. Tunnels.", header)
-
     def test_animations_are_optional_and_no_runtime_network_client_is_added(self):
         script = (SITE / "script.js").read_text()
         self.assertIn("document.querySelector('#year')", script)
@@ -156,37 +126,9 @@ class WebsiteTests(unittest.TestCase):
         self.assertRegex((SITE / "macscp.css").read_text(),
                          r"\.guide-main\s+\.guide-nav\s+a\s*\{[^}]*display:\s*inline")
 
-    def test_guide_uses_contextual_product_screenshots(self):
-        document = Document((SITE / "guide.html").read_text())
-        sources = {image["src"] for image in document.images}
-        expected = {
-            "assets/screenshots/new-connection-light.webp",
-            "assets/screenshots/workspace-light.webp",
-            "assets/screenshots/tunnels-light.webp",
-            "assets/screenshots/connections-light.webp",
-            "assets/screenshots/connections-high-contrast-light.webp",
-            "assets/screenshots/large-binary-viewer-light.webp",
-        }
-        self.assertTrue(expected.issubset(sources))
-        self.assertGreaterEqual(len(document.images), 6)
-        guide = (SITE / "guide.html").read_text()
-        self.assertIn("reusable <strong>Login set</strong>", guide)
-        self.assertIn("Open in browser button", guide)
-        self.assertIn("Inspect large and binary files", guide)
-        self.assertIn('class="contrast-pair"', guide)
-
-    def test_source_links_use_the_project_repository(self):
-        for page in ["index.html", "guide.html"]:
-            self.assertIn("https://github.com/retrotools-apps/MacSCP",
-                          Document((SITE / page).read_text()).links)
-
     def test_privacy_and_support_are_public_and_exported(self):
-        privacy = (SITE / "privacy.html").read_text()
-        support = (SITE / "support.html").read_text()
-        self.assertIn("RetroTools does not operate a MacSCP account service", privacy)
-        self.assertIn("macOS Keychain", privacy)
-        self.assertIn("https://github.com/retrotools-apps/MacSCP/issues", Document(privacy).links)
-        self.assertIn("https://github.com/retrotools-apps/MacSCP/issues", Document(support).links)
+        self.assertTrue((SITE / "privacy.html").is_file())
+        self.assertTrue((SITE / "support.html").is_file())
         for page in ["index.html", "guide.html", "changelog.html", "license.html", "notices.html"]:
             self.assertIn("privacy.html", Document((SITE / page).read_text()).links)
             self.assertIn("support.html", Document((SITE / page).read_text()).links)

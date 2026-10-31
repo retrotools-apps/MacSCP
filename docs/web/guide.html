@@ -33,7 +33,7 @@
 <h2>Browse and transfer files</h2>
 <div class="guide-feature">
 <div><p>The file workspace shows your Mac on the left and the remote server on the right. Open folders or use the path bar to navigate. <strong>Home</strong>, <strong>Root</strong> and <strong>Up</strong> take you to common locations.</p>
-<p>To upload, drag files or folders from the local pane to the remote pane. To download, drag them in the opposite direction. You can also select items and press <strong>Space</strong>, or use the context menu. Drag remote files to a Finder folder to download directly into it.</p></div>
+<p>To upload, drag files or folders from the local pane to the remote pane. To download, drag them in the opposite direction. You can also select items and press <strong>Space</strong>, or use the context menu. Drag individual remote files to a Finder folder or the Desktop to download directly into it. For remote folders, transfer to the local pane first.</p></div>
 <figure class="product-shot guide-context-shot workspace-shot"><a href="assets/screenshots/workspace-light.webp" aria-label="Open the full-size file workspace screenshot"><img src="assets/screenshots/workspace-light.webp" width="1250" height="712" loading="lazy" alt="MacSCP file workspace with local and remote panes and colorful connection icons"></a><figcaption>Keep local and remote locations visible together.</figcaption></figure>
 </div>
 <p>Follow progress in the source tab's transfer queue. If a file already exists, choose whether to overwrite it, skip it or use another name. You can cancel transfers and set bandwidth limits. Resume is available only for supported protocols and operations.</p>
@@ -46,7 +46,7 @@
 </div>
 <p>The viewer and editor open in separate windows that stay open when you switch tabs.</p>
 <ul><li>Press <strong>⌘S</strong> to save in the editor.</li><li>In the viewer, use <strong>⌘F</strong> to search and <strong>⌘G</strong> / <strong>⇧⌘G</strong> to move between matches.</li><li>Press <strong>⌘W</strong> to close the document window. MacSCP asks before discarding unsaved edits.</li></ul>
-<p>Save before disconnecting: disconnecting a session closes its viewer and editor windows. External-editor saves can upload changes back to the server.</p>
+<p>Save before disconnecting: disconnecting a session closes its viewer and editor windows. In <strong>Settings → Open With</strong>, choose a default external application or associate extensions with different applications. Any regular remote file can use this path—including documents, spreadsheets and presentations—and saving uploads the changed file back to its original remote path.</p>
 <p>For SSH connections, directory search can find files by name or look for literal text in their contents. You can also request a checksum to compare files; check its displayed type before comparing values.</p>
 </section>
 
@@ -60,7 +60,7 @@
 
 <section id="terminal">
 <h2>Open an SSH terminal</h2>
-<p>With an SSH connection selected, click <strong>SSH</strong> or press <strong>⌘T</strong>. MacSCP opens the terminal application configured in Settings, such as Terminal or iTerm. It has its own SSH session, separate from the file browser.</p>
+<p>With an SSH connection selected, click <strong>SSH</strong> or press <strong>⌘T</strong>. MacSCP opens Terminal, iTerm or another configured terminal and builds the system OpenSSH command from the saved endpoint, supported route and available credentials. Your terminal keeps its own profiles, shell and tools; its SSH session is separate from the native file connection.</p>
 </section>
 
 <section id="tunnels">

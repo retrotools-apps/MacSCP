@@ -3,7 +3,7 @@
 [![CI](https://github.com/retrotools-apps/MacSCP/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/retrotools-apps/MacSCP/actions/workflows/ci.yml)
 
 <p align="center">
-  <strong>Remote file operations and managed SSH tunnels for macOS.</strong><br>
+  <strong>Remote files, your Mac apps and ready-to-use SSH terminals.</strong><br>
   For sysadmins, platform teams and integration developers.<br>
   macOS 15+ · Apple Silicon &amp; Intel · GPLv3+
 </p>
@@ -23,13 +23,20 @@
 ## Work directly where systems live.
 
 Browse, edit and transfer files between your Mac and remote systems in a native
-workspace. MacSCP supports SFTP over SSH, S3-compatible storage and WebDAV.
+workspace. Continue in the Mac applications and terminal you already use.
+MacSCP supports SFTP over SSH, S3-compatible storage and WebDAV.
 
-- **Move data with control.** Queue files and folders, resolve conflicts, cancel
-  work, limit bandwidth and verify checksums.
-- **Change the file in place.** Edit UTF-8 configuration files, search SSH
-  folders and inspect bounded text or hexadecimal windows without loading an
-  entire large or binary file.
+- **Move data with control.** Queue files and folders, resolve conflicts, limit
+  bandwidth and verify checksums. Drag between panes or Finder when that is the
+  fastest path.
+- **Edit with the right Mac application.** Associate extensions such as
+  `.txt`, `.docx` or `.pptx` with the application you prefer. MacSCP downloads
+  the remote file, opens it locally and uploads saved changes back to the same
+  server path. Its built-in editor remains available for UTF-8 text.
+- **Open a shell without rebuilding the connection.** Launch the selected SSH
+  session in Terminal, iTerm or another terminal application. MacSCP carries
+  over the saved endpoint, supported route and available credentials to a
+  separate system OpenSSH connection.
 - **Put two servers side by side.** Pair two SSH/SFTP sessions and transfer
   between them without sharing credentials. Compatible sessions on the same
   endpoint and account can copy directly on the server.
@@ -83,8 +90,9 @@ saved SSH connections, an optional jump host and supported TLS-gateway settings.
   source-level security review. These reviews must not be interpreted as an
   independent certification or a substitute for penetration and runtime testing.
 
-Need a shell? Open the selected SSH connection in your preferred external
-terminal. MacSCP does not include an integrated terminal emulator.
+The external terminal remains your terminal: its profiles, fonts, colors,
+shell and tools stay unchanged. MacSCP does not include an integrated terminal
+emulator.
 
 ## Install the latest stable release.
 
