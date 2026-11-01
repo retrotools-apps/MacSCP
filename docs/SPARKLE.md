@@ -90,6 +90,50 @@ do not demonstrate a successful installation or preserve Keychain access across
 an update. Initial installation may require macOS's per-app approval; GitHub
 attestations do not bypass Gatekeeper.
 
+## Local Developer ID distribution
+
+The existing GitHub workflow remains ad-hoc signed. For a local direct build,
+install a Developer ID Application certificate with its private key in Keychain
+Access, then configure `MACSCP_SIGN_IDENTITY` (certificate name or SHA-1) and
+`MACSCP_TEAM_ID` in the shell. These identifiers are public certificate metadata;
+never export a private key into the repository.
+
+```sh
+MACSCP_DISTRIBUTION=direct scripts/package-app
+bash scripts/sign-app --developer-id dist/MacSCP.app
+```
+
+This explicit mode requires a Developer ID Application identity, enables hardened
+runtime and secure timestamps, and signs nested Sparkle components first. It
+uses standard Keychain storage without restricted access-group entitlements.
+Biometric protection requires a separately qualified profile-backed build;
+previously protected credentials are not migrated or downgraded by signing.
+
+Store notarization credentials interactively with
+`xcrun notarytool store-credentials macscp-notary`, outside CI. Apple supports
+an app-specific password or an App Store Connect team API key. For a team key,
+download its `.p8` file outside the repository and register it with:
+
+```sh
+xcrun notarytool store-credentials macscp-notary \
+  --key /private/path/AuthKey_KEYID.p8 --key-id KEYID --issuer ISSUER_UUID
+```
+
+Key ID and Issuer ID are identifiers; the `.p8` contents are secret. Team keys
+can access all apps allowed by their role, so use only the permissions required
+for notarization. Never paste key contents into chat, source files or logs.
+Use the Keychain
+profile with `notarytool submit`; never pass passwords in source files or export
+the Keychain. After Apple accepts the submission, staple and validate its ticket
+and verify Gatekeeper acceptance. A valid code signature alone is not proof of
+notarization. Keep archives and diagnostic logs in ignored local directories.
+
+Do not run `scripts/release` after Developer ID signing: it rebuilds and applies
+an ad-hoc signature. Package the signed app separately, notarize the final DMG,
+and generate any Sparkle feed only from its final stapled bytes. No Developer ID
+credentials are needed by the current GitHub workflow, and this local procedure
+does not upload credentials or publish a release.
+
 ## Separate Store build
 
 `MACSCP_DISTRIBUTION=app-store scripts/package-app` excludes Sparkle at compile,

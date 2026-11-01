@@ -3,8 +3,10 @@
 set -euo pipefail
 MODE=app
 AD_HOC=0
+DEVELOPER_ID=0
 case "${1:-}" in
     --ad-hoc) AD_HOC=1; shift ;;
+    --developer-id) DEVELOPER_ID=1; shift ;;
     --check) MODE=check; shift ;;
     --executable) MODE=executable; shift ;;
 esac
@@ -24,6 +26,12 @@ else
     grep -Fq -- "$IDENTITY" <<< "$IDENTITIES" || {
         echo "error: signing identity is not installed" >&2; exit 1;
     }
+    if [[ "$DEVELOPER_ID" == 1 ]]; then
+        SELECTED_IDENTITY="$(grep -F -- "$IDENTITY" <<< "$IDENTITIES")"
+        [[ "$SELECTED_IDENTITY" == *"Developer ID Application:"* ]] || {
+            echo "error: Developer ID Application certificate required" >&2; exit 1;
+        }
+    fi
     if [[ "$MODE" == check ]]; then exit 0; fi
 fi
 if [[ "$MODE" == app ]]; then
@@ -33,6 +41,11 @@ if [[ "$MODE" == app ]]; then
     [[ "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "$TARGET/Contents/Info.plist")" == "retroTools.MacSCP" ]] || {
         echo "error: unexpected application identifier" >&2; exit 1;
     }
+    if [[ "$DEVELOPER_ID" == 1 ]]; then
+        [[ "$(/usr/libexec/PlistBuddy -c 'Print :MacSCPDistribution' "$TARGET/Contents/Info.plist")" == direct ]] || {
+            echo "error: Developer ID signing requires a direct-distribution app package" >&2; exit 1;
+        }
+    fi
 else
     [[ -f "$TARGET" && -x "$TARGET" ]] || {
         echo "error: expected an executable development binary" >&2; exit 1;
@@ -48,11 +61,13 @@ write_entitlements() {
     /usr/libexec/PlistBuddy -c 'Add :keychain-access-groups array' "$destination"
     /usr/libexec/PlistBuddy -c "Add :keychain-access-groups:0 string $TEAM.retroTools.MacSCP.credentials" "$destination"
 }
-if [[ "$MODE" == app && "$AD_HOC" == 0 ]]; then
+# Restricted Keychain groups require a matching provisioning profile. Direct
+# Developer ID builds use standard Keychain storage without claiming them.
+if [[ "$MODE" == app && "$AD_HOC" == 0 && "$DEVELOPER_ID" == 0 ]]; then
     write_entitlements "$APP_ENTITLEMENTS" retroTools.MacSCP
 fi
 TIMESTAMP=(--timestamp=none)
-if [[ "$AD_HOC" == 0 && "${MACSCP_SIGN_TIMESTAMP:-none}" == "secure" ]]; then TIMESTAMP=(--timestamp); fi
+if [[ "$AD_HOC" == 0 && ( "$DEVELOPER_ID" == 1 || "${MACSCP_SIGN_TIMESTAMP:-none}" == "secure" ) ]]; then TIMESTAMP=(--timestamp); fi
 BASE_ARGS=(--force "${TIMESTAMP[@]}" --sign "$IDENTITY")
 EXEC_ARGS=("${BASE_ARGS[@]}")
 # Ad-hoc signatures have no Apple Team ID. Hardened-runtime library validation
@@ -80,8 +95,8 @@ if [[ -n "$SPARKLE" && -d "$SPARKLE" ]]; then
         codesign "${EXEC_ARGS[@]}" "$SPARKLE"
         codesign --verify --deep --strict "$SPARKLE"
 fi
-# Sign resource bundles first. Only Apple-identity mode grants the app's
-# credential access group; ad-hoc packages remain on the standard Keychain.
+# Sign resource bundles first. Developer ID and ad-hoc packages use standard
+# Keychain storage; the profile-backed mode claims the credential access group.
 if [[ "$MODE" == app ]]; then
     codesign "${BASE_ARGS[@]}" \
         "$TARGET/Contents/Resources/macSCP_MacSCPAppKit.bundle" \
@@ -90,7 +105,7 @@ fi
 # Bash 3.2 treats an empty array as unset under nounset. Keep this array
 # nonempty in executable mode so signing cannot be skipped before invocation.
 SIGN_ARGS=("${EXEC_ARGS[@]}" --identifier retroTools.MacSCP)
-if [[ "$MODE" == app && "$AD_HOC" == 0 ]]; then SIGN_ARGS+=(--entitlements "$APP_ENTITLEMENTS"); fi
+if [[ "$MODE" == app && "$AD_HOC" == 0 && "$DEVELOPER_ID" == 0 ]]; then SIGN_ARGS+=(--entitlements "$APP_ENTITLEMENTS"); fi
 codesign "${SIGN_ARGS[@]}" "$TARGET"
 codesign --verify --deep --strict --test-requirement '=identifier "retroTools.MacSCP"' "$TARGET"
 # Read the complete output before matching: grep -q in a pipe can close it
@@ -106,7 +121,9 @@ fi
 grep -Fxq -- "TeamIdentifier=$TEAM" <<< "$SIGNATURE_INFO" || {
     echo "error: signing identity does not match MACSCP_TEAM_ID" >&2; exit 1;
 }
-if [[ "$MODE" == app ]]; then
+if [[ "$DEVELOPER_ID" == 1 ]]; then
+    echo "Developer ID signed MacSCP with hardened runtime and secure timestamps (standard Keychain). Notarization is a separate step."
+elif [[ "$MODE" == app ]]; then
     echo "Signed MacSCP with shared Keychain entitlements. No credentials were read or migrated."
 else
     echo "Signed MacSCP development executable with a stable identity (standard Keychain, no restricted Touch ID entitlements)."

@@ -229,7 +229,9 @@ For GitHub installations, open **Settings → General → Updates** or choose
 **Check for Updates** from the application menu. MacSCP asks before installing
 an update and relaunching. If automatic updates are unavailable, download a
 package from [GitHub Releases](https://github.com/retrotools-apps/MacSCP/releases).
-GitHub packages are not Apple-notarized.
+Choose the installer marked **notarized** for Developer ID signing and Apple
+notarization. Legacy ad-hoc packages may require per-application approval on
+first launch; the release notes identify each package's signing status.
 
 Mac App Store installations are updated through the Store. If you built MacSCP
 from source, rebuild it to update, or install a GitHub package.

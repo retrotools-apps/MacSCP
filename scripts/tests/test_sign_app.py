@@ -100,6 +100,42 @@ if '--force' in args:
         self.assertEqual(self.run_script("--check").returncode, 0)
         self.assertFalse(self.log.exists())
 
+    def test_developer_id_uses_secure_timestamps_and_standard_keychain(self):
+        self.env['MACSCP_SIGN_IDENTITY'] = 'Developer ID Application: Fixture'
+        (self.root / 'tools/security').write_text(
+            "#!/bin/sh\nprintf '%s\\n' '1) fixture Developer ID Application: Fixture'\n")
+        for relative in ('Autoupdate', 'Updater.app'):
+            (self.app / 'Contents/Frameworks/Sparkle.framework/Versions/B' / relative).mkdir(parents=True)
+        result = self.run_script('--developer-id', str(self.app))
+        self.assertEqual(result.returncode, 0, result.stderr)
+        records = [json.loads(line) for line in self.log.read_text().splitlines()]
+        self.assertEqual(records[-1]['arguments'][-1], str(self.app))
+        for record in records:
+            self.assertIn('--timestamp', record['arguments'])
+            self.assertNotIn('--entitlements', record['arguments'])
+            self.assertEqual(record['entitlements'], {})
+        executable_records = [r for r in records if 'Resources' not in r['arguments'][-1]]
+        self.assertTrue(executable_records)
+        for record in executable_records:
+            self.assertIn('runtime', record['arguments'])
+
+    def test_developer_id_rejects_a_development_certificate_before_signing(self):
+        result = self.run_script('--developer-id', str(self.app))
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn('Developer ID Application', result.stderr)
+        self.assertFalse(self.log.exists())
+
+    def test_developer_id_rejects_store_packages_before_signing(self):
+        self.env['MACSCP_SIGN_IDENTITY'] = 'Developer ID Application: Fixture'
+        (self.root / 'tools/security').write_text(
+            "#!/bin/sh\nprintf '%s\\n' '1) fixture Developer ID Application: Fixture'\n")
+        with (self.app / 'Contents/Info.plist').open('wb') as stream:
+            plistlib.dump({'CFBundleIdentifier': 'retroTools.MacSCP', 'MacSCPDistribution': 'app-store'}, stream)
+        result = self.run_script('--developer-id', str(self.app))
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn('direct-distribution', result.stderr)
+        self.assertFalse(self.log.exists())
+
     def test_verbose_signing_output_cannot_cause_a_false_team_mismatch(self):
         self.env['SIGN_TEST_VERBOSE_TAIL'] = '1'
         result = self.run_script()

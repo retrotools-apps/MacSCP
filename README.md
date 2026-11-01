@@ -1,6 +1,16 @@
 ![MacSCP. Remote operations. One workspace. For macOS, by RetroTools.](docs/images/readme-header.svg)
 
+# MacSCP — Native macOS SFTP, S3 and WebDAV client
+
 [![CI](https://github.com/retrotools-apps/MacSCP/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/retrotools-apps/MacSCP/actions/workflows/ci.yml)
+[![Latest release](https://img.shields.io/github/v/release/retrotools-apps/MacSCP)](https://github.com/retrotools-apps/MacSCP/releases/latest)
+[![macOS 15+](https://img.shields.io/badge/macOS-15%2B-blue)](https://github.com/retrotools-apps/MacSCP#install-the-latest-stable-release)
+[![License: GPLv3+](https://img.shields.io/badge/license-GPLv3%2B-blue)](LICENSE)
+
+MacSCP is an open-source WinSCP alternative for Mac, with a dual-pane file
+manager for SFTP, S3-compatible storage and WebDAV. Edit remote files in your
+Mac applications, open saved SSH sessions in your preferred terminal and manage
+SSH tunnels from a dedicated workspace.
 
 <p align="center">
   <strong>Remote files, your Mac apps and ready-to-use SSH terminals.</strong><br>
@@ -10,6 +20,8 @@
 
 <p align="center">
   <a href="https://github.com/retrotools-apps/MacSCP/releases/latest"><strong>Get MacSCP ↗</strong></a>
+  &nbsp; · &nbsp;
+  <a href="https://retrotools-apps.github.io/MacSCP/web/">Website</a>
   &nbsp; · &nbsp;
   <a href="docs/USER_GUIDE.md">User guide</a>
   &nbsp; · &nbsp;
@@ -100,14 +112,16 @@ Download the current package from
 [GitHub Releases](https://github.com/retrotools-apps/MacSCP/releases/latest),
 open the DMG and drag MacSCP into Applications.
 
-GitHub builds use an ad-hoc code signature and are **not Apple-notarized**.
-macOS may block the first launch; follow the per-application instructions on the
-release page or in System Settings → Privacy & Security. Do not disable
+Choose the installer marked **notarized** on the release page for a Developer
+ID-signed package checked by Apple. Legacy ad-hoc packages remain available;
+macOS may block their first launch. Follow the per-application instructions on
+the release page or in System Settings → Privacy & Security. Do not disable
 Gatekeeper globally.
 
 Direct-distribution updates use signed Sparkle feeds and require confirmation
-before installation. Release archives and update feeds carry GitHub
-build-provenance attestations. In a directory containing the downloaded DMG:
+before installation. CI-built release assets carry GitHub build-provenance
+attestations; locally packaged notarized installers are identified separately
+in the release notes. For an attested CI-built DMG:
 
 ```sh
 gh attestation verify MacSCP-*.dmg --repo retrotools-apps/MacSCP
