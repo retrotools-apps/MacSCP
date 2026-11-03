@@ -1,12 +1,31 @@
 #!/bin/bash
-# GitHub distribution requires only the Sparkle update-signing secret.
-# Signature verification after packaging validates its matching public key.
+# The protected GitHub release environment carries the minimum signing inputs
+# needed for Developer ID, Apple notarization and Sparkle. This script checks
+# presence and public identifier shape without printing secret contents.
 set -euo pipefail
 missing=0
-for name in MACSCP_SPARKLE_PRIVATE_KEY; do
+for name in MACSCP_DEVELOPER_ID_P12_BASE64 MACSCP_DEVELOPER_ID_P12_PASSWORD \
+    MACSCP_NOTARY_PRIVATE_KEY MACSCP_NOTARY_KEY_ID MACSCP_NOTARY_ISSUER_ID \
+    MACSCP_SIGN_IDENTITY MACSCP_TEAM_ID MACSCP_SPARKLE_PRIVATE_KEY; do
     if [ -z "${!name:-}" ]; then
         echo "::error::Missing release configuration: $name. Check GitHub Actions secrets and variables."
         missing=1
     fi
 done
+if [[ -n "${MACSCP_TEAM_ID:-}" && ! "$MACSCP_TEAM_ID" =~ ^[A-Z0-9]{10}$ ]]; then
+    echo "::error::Invalid MACSCP_TEAM_ID release variable."
+    missing=1
+fi
+if [[ -n "${MACSCP_NOTARY_KEY_ID:-}" && ! "$MACSCP_NOTARY_KEY_ID" =~ ^[A-Z0-9]{10,}$ ]]; then
+    echo "::error::Invalid MACSCP_NOTARY_KEY_ID release variable."
+    missing=1
+fi
+if [[ -n "${MACSCP_NOTARY_ISSUER_ID:-}" && ! "$MACSCP_NOTARY_ISSUER_ID" =~ ^[0-9A-Fa-f-]{36}$ ]]; then
+    echo "::error::Invalid MACSCP_NOTARY_ISSUER_ID release variable."
+    missing=1
+fi
+if [[ -n "${MACSCP_SIGN_IDENTITY:-}" && "$MACSCP_SIGN_IDENTITY" != "Developer ID Application:"* ]]; then
+    echo "::error::MACSCP_SIGN_IDENTITY must name a Developer ID Application certificate."
+    missing=1
+fi
 exit "$missing"

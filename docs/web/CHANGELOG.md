@@ -1,5 +1,11 @@
 # Changelog
 
+## [1.4.1] (2026-11-03)
+
+### Highlights
+
+* **distribution:** Developer ID signing, Apple notarization and GitHub provenance now run in one protected release workflow.
+
 ## [1.4.0] (2026-11-03)
 
 ### Highlights

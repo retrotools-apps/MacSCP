@@ -57,7 +57,10 @@ class SparkleUpdatesTests(unittest.TestCase):
         self.assertIn("secrets.MACSCP_SPARKLE_PRIVATE_KEY", workflow)
         self.assertIn("dist/appcast.xml", workflow)
         self.assertIn("github.run_number", workflow)
-        build_step = workflow.split("- name: Build ad-hoc signed GitHub DMG\n", 1)[1].split("\n      - name:", 1)[0]
+        build_step = workflow.split("- name: Build, Developer ID sign and notarize GitHub DMG\n", 1)[1].split("\n      - name:", 1)[0]
         sign_step = workflow.split("- name: Sign Sparkle appcast\n", 1)[1].split("\n      - name:", 1)[0]
         self.assertNotIn("MACSCP_SPARKLE_PRIVATE_KEY", build_step)
         self.assertIn("MACSCP_SPARKLE_PRIVATE_KEY", sign_step)
+        self.assertIn("scripts/sign-app --developer-id", build_step)
+        self.assertIn("xcrun notarytool submit", build_step)
+        self.assertIn("xcrun stapler staple", build_step)

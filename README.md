@@ -118,24 +118,23 @@ Download the current package from
 [GitHub Releases](https://github.com/retrotools-apps/MacSCP/releases/latest),
 open the DMG and drag MacSCP into Applications.
 
-Choose the installer marked **notarized** on the release page for a Developer
-ID-signed package checked by Apple. Legacy ad-hoc packages remain available;
+Current installers are Developer ID signed and checked by Apple notarization.
+Legacy ad-hoc packages remain available on their original release pages;
 macOS may block their first launch. Follow the per-application instructions on
 the release page or in System Settings → Privacy & Security. Do not disable
 Gatekeeper globally.
 
 Direct-distribution updates use signed Sparkle feeds and require confirmation
-before installation. CI-built release assets carry GitHub build-provenance
-attestations; locally packaged notarized installers are identified separately
-in the release notes. For an attested CI-built DMG:
+before installation. Starting with 1.4.1, the protected release workflow signs,
+notarizes and attests the same final DMG. To verify its GitHub build provenance:
 
 ```sh
 gh attestation verify MacSCP-*.dmg --repo retrotools-apps/MacSCP
 ```
 
 The CI badge reports test status, the attestation establishes build provenance,
-and Sparkle signatures authenticate updates. None of these is an Apple Developer
-ID signature or notarization.
+and Sparkle signatures authenticate updates. Apple Developer ID and notarization
+are separately verified by the protected release workflow and by Gatekeeper.
 
 ## Documentation
 

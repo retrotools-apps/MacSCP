@@ -41,11 +41,27 @@ class ReleaseWorkflowSecurityTests(unittest.TestCase):
             self.assertIn("    environment: release\n", section)
             self.assertIn("secrets.MACSCP_SPARKLE_PRIVATE_KEY", section)
 
+        build = workflow.split("  build:\n", 1)[1].split("  publish:\n", 1)[0]
+        for secret in [
+            "secrets.MACSCP_DEVELOPER_ID_P12_BASE64",
+            "secrets.MACSCP_DEVELOPER_ID_P12_PASSWORD",
+            "secrets.MACSCP_NOTARY_PRIVATE_KEY",
+        ]:
+            self.assertIn(secret, build)
+        self.assertIn("security create-keychain", build)
+        self.assertIn("security delete-keychain", build)
+        self.assertIn("scripts/sign-app --developer-id", build)
+        self.assertIn("xcrun notarytool submit", build)
+        self.assertIn("xcrun stapler validate", build)
+        self.assertNotIn("security export", build)
+        self.assertNotIn(" -A ", build)
+
         publish = workflow.split("  publish:\n", 1)[1]
         self.assertIn("    environment: release\n", publish)
         self.assertIn("      contents: write\n", publish)
         self.assertIn('CURRENT_TAG_OBJECT="$(gh api ', publish)
         self.assertIn('EXPECTED_TAG_OBJECT: ${{ needs.resolve.outputs.tag_object }}', publish)
+        self.assertIn("actions/attest@", publish)
 
     def test_resolver_accepts_an_annotated_release_tag_and_rejects_other_ref_forms(self):
         script = self.resolver_script()

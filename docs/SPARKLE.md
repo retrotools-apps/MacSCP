@@ -59,9 +59,15 @@ are never cached. The DMG is retained as a short-lived workflow artifact before
 feed generation, so a signing failure does not discard the expensive build.
 No already published release or update-signing public key is replaced.
 
-The GitHub distribution is free: `bash scripts/release` creates a DMG with an
-ad-hoc signed application and no Apple notarization. This path does not require
-Developer ID credentials. The explicit `--ad-hoc` signing mode grants no
+The protected GitHub release workflow imports a Developer ID identity into an
+ephemeral keychain, signs the universal application, notarizes and staples the
+DMG, then generates the Sparkle feed and attests the final bytes before
+publication. The `release` environment requires manual approval and holds the
+certificate, notarization and Sparkle secrets; none are cached or committed.
+
+`bash scripts/release` remains an offline fallback that creates a DMG with an
+ad-hoc signed application and no Apple notarization. The explicit `--ad-hoc`
+signing mode grants no
 restricted Keychain entitlements and does not enable hardened-runtime library
 validation, which would reject ad-hoc signed frameworks. Standard Keychain
 storage remains available; the existing biometric-protection eligibility check
@@ -84,17 +90,17 @@ Automatic checks default on; silent installation and system profiling are
 disabled. Signed feeds and archive verification before extraction are
 mandatory, with no unsigned-feed timeout fallback. Installation uses
 Sparkle's standard confirmation and relaunch flow, which must be tested
-against two real ad-hoc signed packaged versions before claiming end-to-end
-qualification of the free GitHub channel. Unit tests and valid signatures alone
+across two real Developer ID releases before claiming end-to-end qualification
+of the GitHub channel. Unit tests and valid signatures alone
 do not demonstrate a successful installation or preserve Keychain access across
 an update. Initial installation may require macOS's per-app approval; GitHub
 attestations do not bypass Gatekeeper.
 
-## Local Developer ID distribution
+## Local Developer ID fallback
 
-The existing GitHub workflow remains ad-hoc signed. For a local direct build,
-install a Developer ID Application certificate with its private key in Keychain
-Access, then configure `MACSCP_SIGN_IDENTITY` (certificate name or SHA-1) and
+For a local direct build outside the protected GitHub workflow, install a
+Developer ID Application certificate with its private key in Keychain Access,
+then configure `MACSCP_SIGN_IDENTITY` (certificate name or SHA-1) and
 `MACSCP_TEAM_ID` in the shell. These identifiers are public certificate metadata;
 never export a private key into the repository.
 
@@ -128,11 +134,10 @@ the Keychain. After Apple accepts the submission, staple and validate its ticket
 and verify Gatekeeper acceptance. A valid code signature alone is not proof of
 notarization. Keep archives and diagnostic logs in ignored local directories.
 
-Do not run `scripts/release` after Developer ID signing: it rebuilds and applies
+Do not run `scripts/release` after a local Developer ID signing pass: it rebuilds and applies
 an ad-hoc signature. Package the signed app separately, notarize the final DMG,
-and generate any Sparkle feed only from its final stapled bytes. No Developer ID
-credentials are needed by the current GitHub workflow, and this local procedure
-does not upload credentials or publish a release.
+and generate any Sparkle feed only from its final stapled bytes. This local
+procedure does not publish a release.
 
 ## Separate Store build
 
