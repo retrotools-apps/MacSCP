@@ -193,6 +193,15 @@ public struct SessionStore: Sendable {
         try persist(file)
     }
 
+    /// Appends a fully re-keyed portable import in one atomic store write.
+    /// The caller has already removed every credential-bearing field.
+    func appendPortable(groups: [StoredGroup], sessions: [StoredSession]) throws {
+        var file = try load()
+        file.groups.append(contentsOf: groups)
+        file.sessions.append(contentsOf: sessions)
+        try persist(file)
+    }
+
     /// Dissolves a group. Its sessions AND its sub-folders move to the
     /// group's own parent — see `SidebarOrdering.dissolving` for why that is
     /// the flat rule continued rather than a new one. Nothing is deleted but

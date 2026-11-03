@@ -3,57 +3,31 @@ import SwiftUI
 import UniformTypeIdentifiers
 import macSCPCore
 
-/// Custom exported type for `.macscpsessions` files (M9a/T3). Declared
+/// The single public type for all `.macscp` archives. Declared
 /// dynamically via `exportedAs` so `swift run` development builds work
 /// without an `Info.plist` (there is no bundle to read one from); the
 /// packaged `.app` ALSO declares this identifier in `Info.plist`
 /// (`UTExportedTypeDeclarations`, see `scripts/package-app`) so Launch
-/// Services associates the `.macscpsessions` extension with it for
+/// Services associates the `.macscp` extension with it for
 /// double-click/Quick Look outside this app's own file panels. The ad hoc
 /// declaration here has no filename-extension tag of its own — the actual
 /// extension is carried by `defaultFilename` in the `fileExporter` call
 /// below, which is sufficient for this app's own save/open panels.
 extension UTType {
-    static let macscpSessions = UTType(exportedAs: "retroTools.MacSCP.sessions", conformingTo: .json)
-    /// `.macscplogins` (M19/T8) — same declaration story as
-    /// `macscpSessions` above, including the matching `Info.plist` entry in
-    /// `scripts/package-app`.
-    static let macscpLogins = UTType(exportedAs: "retroTools.MacSCP.logins", conformingTo: .json)
+    static let macscpConfiguration = UTType(
+        exportedAs: "retroTools.MacSCP.configuration", conformingTo: .json)
 }
 
 /// Write-only `FileDocument` wrapper around already-encoded export bytes.
-/// `SessionExportCodec.encode` has already run by the time `ContentView`
+/// `MacSCPArchiveCodec.encode` has already run by the time `ContentView`
 /// constructs this — it only carries the result to `fileExporter`. Reading
-/// is never exercised: import goes through `SessionExportCodec.decode`
+/// is never exercised: import goes through `MacSCPArchiveCodec.decode`
 /// directly on `Data` read from the chosen URL, never through this type's
 /// read path — hence the empty `readableContentTypes` and the throwing
 /// `init(configuration:)`.
 struct SessionExportDocument: FileDocument {
     static var readableContentTypes: [UTType] { [] }
-    static var writableContentTypes: [UTType] { [.macscpSessions] }
-
-    let data: Data
-
-    init(data: Data) {
-        self.data = data
-    }
-
-    init(configuration: ReadConfiguration) throws {
-        throw CocoaError(.fileReadUnsupportedScheme)
-    }
-
-    func fileWrapper(configuration: WriteConfiguration) throws -> FileWrapper {
-        FileWrapper(regularFileWithContents: data)
-    }
-}
-
-/// Write-only `FileDocument` for `.macscplogins` bytes — the login-set twin
-/// of `SessionExportDocument` above, with the same read path deliberately
-/// left unimplemented (import reads `Data` from the chosen URL and hands it
-/// to `LoginSetExportCodec.decode`).
-struct LoginSetExportDocument: FileDocument {
-    static var readableContentTypes: [UTType] { [] }
-    static var writableContentTypes: [UTType] { [.macscpLogins] }
+    static var writableContentTypes: [UTType] { [.macscpConfiguration] }
 
     let data: Data
 
@@ -71,11 +45,14 @@ struct LoginSetExportDocument: FileDocument {
 }
 
 /// Finalized choices from `SessionExportSheet`, handed to `ContentView` to
-/// actually run `exportPayload` + `SessionExportCodec.encode` (spec M9a
+/// actually run `exportPayload` + `MacSCPArchiveCodec.encode` (spec M9a
 /// §3.3). `password` is `nil` for an unencrypted export.
 struct SessionExportOptions {
     var includeGroups: Bool
     var includePasswords: Bool
+    var includeTunnels: Bool
+    var includeLoginSets: Bool
+    var includeKeyFiles: Bool
     var password: String?
 }
 
@@ -97,6 +74,9 @@ struct SessionExportSheet: View {
 
     @State private var includeGroups = true
     @State private var includePasswords = false
+    @State private var includeTunnels = true
+    @State private var includeLoginSets = true
+    @State private var includeKeyFiles = false
     @State private var encryptionMode: EncryptionMode = .encrypted
     @State private var password = ""
     @State private var passwordRepeat = ""
@@ -130,7 +110,12 @@ struct SessionExportSheet: View {
     }
 
     private var showsPlaintextWarning: Bool {
-        encryptionMode == .unencrypted && includePasswords
+        encryptionMode == .unencrypted && (includePasswords || includeKeyFiles)
+    }
+
+    private var isGlobalScope: Bool {
+        if case .all = scope { return true }
+        return false
     }
 
     private var passwordsMatchAndPresent: Bool {
@@ -161,6 +146,25 @@ struct SessionExportSheet: View {
             Toggle(L10n.string("export.includePasswords", "Include passwords"), isOn: $includePasswords)
                 .disabled(isWorking)
                 .onChange(of: includePasswords) { _, _ in isConfirmingPlaintext = false }
+            Toggle(L10n.string("export.includeTunnels", "Include tunnels"), isOn: $includeTunnels)
+                .disabled(isWorking)
+            if isGlobalScope {
+                Toggle(
+                    L10n.string("export.includeLoginSets", "Include login sets"),
+                    isOn: $includeLoginSets
+                )
+                .disabled(isWorking)
+                .onChange(of: includeLoginSets) { _, enabled in
+                    if !enabled { includeKeyFiles = false }
+                    isConfirmingPlaintext = false
+                }
+                Toggle(
+                    L10n.string("export.includeKeyFiles", "Embed managed private key files"),
+                    isOn: $includeKeyFiles
+                )
+                .disabled(isWorking || !includeLoginSets)
+                .onChange(of: includeKeyFiles) { _, _ in isConfirmingPlaintext = false }
+            }
 
             Picker("", selection: $encryptionMode) {
                 Text(L10n.string("export.encrypted", "Encrypted")).tag(EncryptionMode.encrypted)
@@ -191,14 +195,20 @@ struct SessionExportSheet: View {
             if showsPlaintextWarning {
                 Text(L10n.string(
                     "export.plaintextWarning",
-                    "Passwords will be stored in plain text in this file. "
-                        + "Anyone who obtains it can read them."))
+                    "Passwords or private key files will be stored without archive encryption. "
+                        + "Anyone who obtains the file may read them."))
                     .font(.caption)
                     .foregroundStyle(.red)
                     .padding(8)
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .background(RoundedRectangle(cornerRadius: 6).fill(Color.red.opacity(0.1)))
             }
+
+            Text(L10n.string(
+                "export.shareHint",
+                "For a credential-free file to send to someone else, use Share… from the connection or group menu."))
+                .font(.caption)
+                .foregroundStyle(.secondary)
 
             if let errorMessage {
                 Text(errorMessage).font(.caption).foregroundStyle(.red).lineLimit(2)
@@ -240,6 +250,9 @@ struct SessionExportSheet: View {
         let options = SessionExportOptions(
             includeGroups: includeGroups,
             includePasswords: includePasswords,
+            includeTunnels: includeTunnels,
+            includeLoginSets: isGlobalScope && includeLoginSets,
+            includeKeyFiles: isGlobalScope && includeLoginSets && includeKeyFiles,
             password: encryptionMode == .encrypted ? password : nil)
         let error = onExport(options)
         isWorking = false
@@ -260,8 +273,8 @@ struct LoginSetExportOptions {
     var password: String?
 }
 
-/// Export sheet for login sets — the `.macscplogins` sibling of
-/// `SessionExportSheet` above, and deliberately its twin in shape: same
+/// Export sheet for the login-set section of a `.macscp` archive. It is
+/// deliberately the twin of `SessionExportSheet` above: same
 /// layout, same encrypted/unencrypted picker, same two-stage plaintext
 /// confirmation.
 ///
@@ -419,11 +432,11 @@ struct LoginSetExportSheet: View {
     }
 }
 
-/// Password prompt shown when `SessionExportCodec.probe` reports the chosen
+/// Password prompt shown when `MacSCPArchiveCodec.probe` reports the chosen
 /// import file is encrypted (spec M9a §3.4). Any number of attempts are
 /// allowed; Cancel aborts the whole import.
 struct ImportPasswordSheet: View {
-    /// Attempts `SessionExportCodec.decode` + the planner + `applyImport`
+    /// Attempts `MacSCPArchiveCodec.decode` + the planner + `applyImport`
     /// with the given password. Returns an inline error message (stays open)
     /// or `nil` (dismiss — `ContentView` has already shown the result alert).
     let onSubmit: (String) async -> String?

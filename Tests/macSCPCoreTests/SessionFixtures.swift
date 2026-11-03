@@ -109,12 +109,9 @@ func s3ExportFields(
     bucket: String = "bucket",
     usePathStyle: Bool = false,
     /// OPTIONAL, and absent by default, because a bag without this key is a
-    /// real shape and one this file's callers rely on: `SessionExportCodec
-    /// .upgradeV1Columns` folds five S3 columns out of a v1 file and writes
-    /// no toggle at all, so `ExportEnvelopeCodecTests`' golden-file
-    /// expectation must not carry one either. Writing "false"
-    /// unconditionally here made both of those tests red — which is the
-    /// fixture doing its job.
+    /// real shape and one this file's callers rely on: older decoded payloads
+    /// may omit this toggle. Writing "false" unconditionally would make the
+    /// fixture claim a field was present when it was not.
     startsAtBucketList: Bool? = nil
 ) -> [String: String] {
     var values = FieldValues()

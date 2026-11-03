@@ -156,6 +156,19 @@ struct ConnectAttemptHandoffTests {
         #expect(fixture.view.detailSurface(for: tab) == .form)
     }
 
+    @Test func anEmptyOrStaleRestoredTabShowsAllConnections() {
+        let directory = makeTempDirectory("restored-all-connections")
+        let fixture = makeContentView(secrets: RecordingSecretStore(), storeDirectory: directory)
+        defer { fixture.cleanup(); try? FileManager.default.removeItem(at: directory) }
+
+        for seed in [TabSeed(sessionID: nil), TabSeed(sessionID: UUID())] {
+            let tab = fixture.view.makeRestoredTab(from: seed)
+            #expect(tab.restoredSessionID == nil)
+            #expect(tab.overviewGroupID == SessionGroupCatalog.allConnectionsID)
+            #expect(fixture.view.detailSurface(for: tab) == .groupOverview(SessionGroupCatalog.allConnections))
+        }
+    }
+
     /// Same shape as `LivenessGiveUpOrderingTests.makeTab()`, parameterized
     /// on the connector so each test can hand back its own `HangingHome
     /// DirectoryFileSystem`.

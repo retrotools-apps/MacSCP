@@ -378,6 +378,7 @@
 "export.password" = "Parolă";
 "export.passwordRepeat" = "Repetă parola";
 "export.passwordHint" = "O parolă lungă face exportul mai greu de spart dacă fişierul este interceptat.";
+"export.shareHint" = "Pentru a trimite altcuiva un fișier fără date de autentificare, folosește Partajează… din meniul conexiunii sau al grupului.";
 "export.plaintextWarning" = "Parolele vor fi stocate în text simplu în acest fișier. Oricine le obţine le poate citi.";
 "export.confirmAnyway" = "Exportă oricum…";
 "export.action" = "Exportă…";
@@ -1097,6 +1098,7 @@
 "tunnel.action.delete" = "Șterge";
 "tunnel.action.save" = "Salvează";
 "tunnel.action.start" = "Pornește";
+"tunnel.action.restart" = "Repornește";
 "tunnel.action.stop" = "Oprește";
 "tunnel.error.name" = "Introdu un nume pentru tunel.";
 "tunnel.error.listenPort" = "Portul de ascultare trebuie să fie între 1 și 65535.";
@@ -1197,11 +1199,19 @@
 "sidebar.settings" = "Configurări";
 "transfer.import" = "Importă…";
 "transfer.import.prompt" = "Importă";
-"transfer.import.invalid" = "Alegeți un fișier de semn de carte MacSCP, WinSCP.ini sau Cyberduck (maximum 16 MiB).";
+"transfer.import.invalid" = "Alege un fișier MacSCP, un fișier portabil .macscp, WinSCP.ini sau un marcaj Cyberduck (maximum 16 MiB).";
 "transfer.format" = "Format";
 "transfer.macscp" = "MacSCP (default)";
 "transfer.winscp" = "WinSCP";
-"transfer.import.supported" = "Suportă MacSCP, WinSCP.ini și Cyberduck (..duck fișier sau dosar semne de carte). Formatul este detectat automat.";
+"transfer.import.supported" = "Suportă MacSCP, fișiere portabile .macscp, WinSCP.ini și Cyberduck (fișier .duck sau dosar de marcaje). Formatul este detectat automat.";
+"share.portable" = "Partajează…";
+"overview.terminal" = "Terminal";
+"export.includeTunnels" = "Include tunelurile";
+"export.includeLoginSets" = "Include seturile de autentificare";
+"export.includeKeyFiles" = "Încorporează fișierele gestionate cu chei private";
+"archive.import.tunnels %lld" = "Tuneluri importate: %lld";
+"share.import.result %lld %lld" = "Conexiuni importate: %lld\nTuneluri importate: %lld\nDatele de autentificare trebuie introduse pe acest Mac.";
+"share.import.partial %lld %@" = "Conexiuni importate: %lld, dar tunelurile nu au putut fi importate: %@";
 "workspace.sessions" = "Sesiuni";
 "workspace.tunnels" = "Tuneluri";
 "tunnels.pool" = "Toate tunelurile";

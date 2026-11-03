@@ -500,6 +500,7 @@
 "export.password" = "Password";
 "export.passwordRepeat" = "Repeat password";
 "export.passwordHint" = "A long password makes the export harder to crack if the file is intercepted.";
+"export.shareHint" = "For a credential-free file to send to someone else, use Share… from the connection or group menu.";
 "export.plaintextWarning" = "Passwords will be stored in plain text in this file. Anyone who obtains it can read them.";
 "export.confirmAnyway" = "Export Anyway…";
 "export.action" = "Export…";
@@ -1320,6 +1321,7 @@
 "tunnel.action.delete" = "Delete";
 "tunnel.action.save" = "Save";
 "tunnel.action.start" = "Start";
+"tunnel.action.restart" = "Restart";
 "tunnel.action.stop" = "Stop";
 "tunnel.error.name" = "Give the forwarding a name.";
 "tunnel.error.listenPort" = "The listening port must be between 1 and 65535.";
@@ -1427,11 +1429,19 @@
 "sidebar.settings" = "Settings";
 "transfer.import" = "Import…";
 "transfer.import.prompt" = "Import";
-"transfer.import.invalid" = "Choose a MacSCP, WinSCP.ini or Cyberduck bookmark file (maximum 16 MiB).";
+"transfer.import.invalid" = "Choose a MacSCP, portable .macscp, WinSCP.ini or Cyberduck bookmark file (maximum 16 MiB).";
 "transfer.format" = "Format";
 "transfer.macscp" = "MacSCP (default)";
 "transfer.winscp" = "WinSCP";
-"transfer.import.supported" = "Supports MacSCP, WinSCP.ini and Cyberduck (.duck file or bookmarks folder). The format is detected automatically.";
+"transfer.import.supported" = "Supports MacSCP, portable .macscp files, WinSCP.ini and Cyberduck (.duck file or bookmarks folder). The format is detected automatically.";
+"share.portable" = "Share…";
+"overview.terminal" = "Terminal";
+"export.includeTunnels" = "Include tunnels";
+"export.includeLoginSets" = "Include login sets";
+"export.includeKeyFiles" = "Embed managed private key files";
+"archive.import.tunnels %lld" = "Imported tunnels: %lld";
+"share.import.result %lld %lld" = "Imported connections: %lld\nImported tunnels: %lld\nLogins must be entered on this Mac.";
+"share.import.partial %lld %@" = "Imported connections: %lld, but tunnels could not be imported: %@";
 /* Independent tunnel workspace. */
 "workspace.sessions" = "Sessions";
 "workspace.tunnels" = "Tunnels";

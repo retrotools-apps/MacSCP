@@ -35,7 +35,7 @@ public struct LoginSet: Equatable, Identifiable, Sendable {
 
 extension LoginSet {
     /// True when this set authenticates with a private key whose file is NOT
-    /// on this machine (M19). A `.macscplogins` file exported without embedded
+    /// on this machine (M19). A `.macscp` file exported without embedded
     /// key files carries only the `keyPath` STRING, so an imported set can
     /// point at a path that exists on the exporting machine and nowhere else —
     /// and the failure would otherwise only surface at connect time.

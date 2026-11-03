@@ -7,19 +7,21 @@ struct SessionImportDetectionTests {
     @Test(arguments: [false, true])
     func detectsNativeSessionsBeforeThePasswordIsKnown(encrypted: Bool) throws {
         let data = try JSONSerialization.data(withJSONObject: [
-            "format": "macscp-sessions", "version": 2, "encrypted": encrypted,
+            "format": "macscp", "version": 1, "encrypted": encrypted,
         ])
         #expect(try SessionImportDetection.detect(data) == .macscp)
         // Routing does not bypass the real decoder's envelope validation.
         var rejected = false
-        do { _ = try SessionExportCodec.decode(data, password: "synthetic") }
+        do { _ = try ConnectionSectionTestCodec.decode(data, password: "synthetic") }
         catch SessionExportError.notAnExportFile { rejected = true }
         #expect(rejected)
     }
 
-    @Test func detectsNativeLoginExports() throws {
-        let data = Data(#"{"format":"macscp-logins","version":1}"#.utf8)
-        #expect(try SessionImportDetection.detect(data) == .macscpLogins)
+    @Test func loginAndConnectionArchivesUseTheSameRoute() throws {
+        let archive = MacSCPArchiveBuilder.loginSets(LoginSetExportPayload(
+            includesSecrets: false, includesKeyFiles: false, sets: []))
+        let data = try MacSCPArchiveCodec.encode(archive, password: nil)
+        #expect(try SessionImportDetection.detect(data) == .macscp)
     }
 
     @Test func detectsWinSCPWithoutDecryptingAnything() throws {

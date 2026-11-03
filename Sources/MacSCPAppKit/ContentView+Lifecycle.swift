@@ -59,7 +59,7 @@ extension ContentView {
             }
             if !showsSettingsWorkspace, !showsTunnelWorkspace, activeTab.session != nil {
                 ToolbarItem(placement: .primaryAction) {
-                  HStack(spacing: 18) {
+                  HStack(spacing: 12) {
                     Button {
                         guard activeTabSupportsShell else {
                             presentTerminalUnavailable()
@@ -74,6 +74,9 @@ extension ContentView {
                     .keyboardShortcut("t", modifiers: .command)
                     .disabled(!activeTabSupportsShell)
                     .help(L10n.string("browser.terminalOpenExternalHelp", "Open in external terminal (⌘T)"))
+                    Divider()
+                        .frame(height: 18)
+                        .padding(.horizontal, 2)
                     // Diagnostics (design §1, the tab's door — its toolbar
                     // surface; the failed-connect surface is the other):
                     // offered
@@ -100,6 +103,7 @@ extension ContentView {
                     .buttonStyle(SessionToolbarButtonStyle())
                     Divider()
                         .frame(height: 18)
+                        .padding(.horizontal, 2)
                     Button {
                         activeTab.transfersPanelVisible.toggle()
                     } label: {
@@ -1339,11 +1343,10 @@ extension ContentView {
     /// after, because `addTab` makes the last added tab active and
     /// `TabsViewModel.activeTab` traps on an id it cannot resolve.
     ///
-    /// An empty description is left alone rather than treated as an error.
-    /// That covers a move seed (which describes nothing), a launch that is
-    /// not restoring, and a window whose description survived but whose
-    /// sessions did not — all three come up with the window's own fresh
-    /// tab, which is what the app does anyway.
+    /// An empty WINDOW description is left alone rather than treated as an
+    /// error. A described TAB without a usable saved session is different:
+    /// `makeRestoredTab(from:)` sends it to All Connections, the same landing
+    /// page as a genuinely fresh window.
     func restoreDescribedWindow() {
         guard let description = seed ?? restorationLaunch?.takePrimarySeed() else { return }
         // Outside the tab guard below (fix round 1): a window that floated
@@ -1361,7 +1364,12 @@ extension ContentView {
 
     func makeRestoredTab(from described: TabSeed) -> SessionTab {
         let tab = makeTab()
-        tab.restoredSessionID = described.sessionID
+        if let sessionID = described.sessionID,
+           sessionListViewModel.sessions.contains(where: { $0.id == sessionID }) {
+            tab.restoredSessionID = sessionID
+        } else {
+            tab.overviewGroupID = SessionGroupCatalog.allConnectionsID
+        }
         return tab
     }
 

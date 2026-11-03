@@ -24,17 +24,42 @@ extension ContentView {
         let (payload, missingPasswordCount) = sessionListViewModel.exportPayload(
             for: scope, includeGroups: options.includeGroups, includePasswords: options.includePasswords)
         do {
-            let data = try SessionExportCodec.encode(payload, password: options.password)
+            var archive = MacSCPArchiveBuilder.build(
+                scope: manifestScope(scope), connections: payload,
+                includeIdentities: true,
+                tunnels: options.includeTunnels ? TunnelManager.shared.allProfiles : [],
+                tunnelGroups: options.includeTunnels ? TunnelManager.shared.allGroups : [])
+            var missingLoginSecretCount = 0
+            if options.includeLoginSets {
+                let loginResult = sessionListViewModel.loginSetExportPayload(
+                    for: sessionListViewModel.loginSets,
+                    includeSecrets: options.includePasswords,
+                    includeKeyFiles: options.includeKeyFiles)
+                archive = MacSCPArchiveBuilder.addingLoginSets(loginResult.payload, to: archive)
+                missingLoginSecretCount = loginResult.missingSecretCount
+            }
+            let data = try MacSCPArchiveCodec.encode(archive, password: options.password)
             exportDocument = SessionExportDocument(data: data)
             // Only meaningful when passwords were actually requested —
             // `exportPayload` only counts missing entries in that case.
-            exportMissingPasswordCount = options.includePasswords ? missingPasswordCount : 0
+            exportMissingPasswordCount = options.includePasswords
+                ? missingPasswordCount + missingLoginSecretCount : 0
             showExportFileExporter = true
             return nil
         } catch {
             return String(format: L10n.string(
                 "export.error.encodeFailed %@", "Could not prepare the export: %@"),
                 String(describing: error))
+        }
+    }
+
+    private func manifestScope(
+        _ scope: SessionListViewModel.ExportScope
+    ) -> MacSCPArchiveManifest.Scope {
+        switch scope {
+        case .single: .connection
+        case .group: .group
+        case .all: .all
         }
     }
 
@@ -64,7 +89,7 @@ extension ContentView {
     func presentSessionImportPanel() {
         let panel = NSOpenPanel()
         panel.title = L10n.string("transfer.import", "Import…")
-        panel.message = L10n.string("transfer.import.supported", "Supports MacSCP, WinSCP.ini and Cyberduck (.duck file or bookmarks folder). The format is detected automatically.")
+        panel.message = L10n.string("transfer.import.supported", "Supports .macscp, WinSCP.ini and Cyberduck (.duck file or bookmarks folder). The format is detected automatically.")
         panel.prompt = L10n.string("transfer.import.prompt", "Import")
         panel.canChooseFiles = true
         panel.canChooseDirectories = true
@@ -93,7 +118,7 @@ extension ContentView {
                 defer { try? file.close() }
                 let data = try file.read(upToCount: SessionImportDetection.maximumFileSize + 1) ?? Data()
                 guard let format = try? SessionImportDetection.detect(data) else {
-                    importErrorMessage = L10n.string("transfer.import.invalid", "Choose a MacSCP, WinSCP.ini or Cyberduck bookmark file (maximum 16 MiB).")
+                    importErrorMessage = L10n.string("transfer.import.invalid", "Choose a .macscp, WinSCP.ini or Cyberduck bookmark file (maximum 16 MiB).")
                     return
                 }
                 switch format {
@@ -105,14 +130,9 @@ extension ContentView {
                 case .cyberduck:
                     Task { await presentExternalImport(folder: url, securityScoped: true) }
                     return
-                case .macscpLogins:
-                    detectedLoginImportData = data
-                    loginSetsSheetStartsImport = false
-                    showLoginSetsSheet = true
-                    return
                 case .macscp: break
                 }
-                if try SessionExportCodec.probe(data) {
+                if try MacSCPArchiveCodec.probe(data) {
                     importFileData = data
                     showImportPasswordSheet = true
                 } else {
@@ -146,9 +166,10 @@ extension ContentView {
     /// NOT happen here — see `pendingImport`'s doc comment.
     func decodeImport(data: Data, password: String?) -> ImportDecodeOutcome {
         do {
+            let archive = try MacSCPArchiveCodec.decode(data, password: password)
             return .ready(PendingSessionImport(
-                payload: try SessionExportCodec.decode(data, password: password),
-                wasEncrypted: password != nil))
+                payload: archive.connections, wasEncrypted: password != nil,
+                archive: archive))
         } catch SessionExportError.wrongPasswordOrCorrupted {
             return .retry(
                 L10n.string("import.password.wrong", "Wrong password, or the file is corrupted."))
@@ -178,29 +199,111 @@ extension ContentView {
     func applyImport(
         _ pending: PendingSessionImport, externalSecretsNotRead: Int? = nil
     ) async {
+        if let archive = pending.archive, archive.connections != nil,
+           !archive.manifest.includesIdentities {
+            await applyAnonymousArchive(archive)
+            return
+        }
         let bridge = importConflictBridge
         let arbiter = ImportConflictArbiter { conflict in await bridge.ask(conflict) }
-        let plan = await SessionImportPlanner.plan(
-            existing: sessionListViewModel.sessions,
-            existingGroups: sessionListViewModel.groups,
-            incoming: pending.payload,
-            arbiter: arbiter)
+        let loginPlan: LoginSetImportPlan?
+        if let loginSets = pending.archive?.loginSets {
+            let planned = await LoginSetImportPlanner.plan(
+                existing: sessionListViewModel.loginSets, incoming: loginSets, arbiter: arbiter)
+            guard !planned.cancelled else { return }
+            loginPlan = planned
+        } else {
+            loginPlan = nil
+        }
+        let plan: SessionImportPlan?
+        if let connections = pending.payload {
+            let planned = await SessionImportPlanner.plan(
+                existing: sessionListViewModel.sessions,
+                existingGroups: sessionListViewModel.groups,
+                incoming: connections,
+                arbiter: arbiter)
+            guard !planned.cancelled else { return }
+            plan = planned
+        } else {
+            plan = nil
+        }
         importFileData = nil
-        guard !plan.cancelled else { return }
-        let result = sessionListViewModel.applyImport(plan)
-        importResultMessage = ImportFeedbackText.importResultText(
-            result, plan: plan, includesSecrets: pending.payload.includesSecrets,
-            encrypted: pending.wasEncrypted,
-            external: externalSecretsNotRead.map { notRead in
-                ImportFeedbackText.ExternalImportOutcome(
-                    // Measured off the plan rather than off the payload: an
-                    // entry whose record was deleted between the preview and
-                    // the import falls back to a fresh session, and claiming
-                    // it as an update would be a number about a wish.
-                    updated: plan.sessionsToImport.filter(\.replacesExisting).count,
-                    secretsNotRead: notRead)
+        var messages: [String] = []
+        if let loginPlan, let loginSets = pending.archive?.loginSets {
+            let loginResult = await sessionListViewModel.applyLoginSetImport(loginPlan)
+            messages.append(String(format: L10n.string(
+                "logins.import.result %lld %lld %lld",
+                "%lld imported, %lld replaced, %lld skipped"),
+                loginResult.imported, loginResult.replaced, loginResult.skipped))
+            if loginSets.includesSecrets && !pending.wasEncrypted {
+                messages.append(L10n.string(
+                    "import.result.plaintext",
+                    "This file was not encrypted; any included passwords were stored in plain text."))
+            }
+        }
+        var sessionResult: SessionListViewModel.SessionImportResult?
+        if let plan, let connections = pending.payload {
+            let result = sessionListViewModel.applyImport(plan)
+            sessionResult = result
+            messages.append(ImportFeedbackText.importResultText(
+                result, plan: plan, includesSecrets: connections.includesSecrets,
+                encrypted: pending.wasEncrypted,
+                external: externalSecretsNotRead.map { notRead in
+                    ImportFeedbackText.ExternalImportOutcome(
+                        updated: plan.sessionsToImport.filter(\.replacesExisting).count,
+                        secretsNotRead: notRead)
+                }))
+        }
+        if let archive = pending.archive, let plan {
+            let sessionIDMap = Dictionary(uniqueKeysWithValues: plan.sessionsToImport.compactMap {
+                planned in planned.sourceID.map { ($0, planned.session.id) }
             })
+            do {
+                let tunnelPlan = try TunnelManager.shared.importArchive(
+                    archive, sessionIDMap: sessionIDMap)
+                messages.append(String(
+                    format: L10n.string(
+                        "archive.import.tunnels %lld", "Imported tunnels: %lld"),
+                    tunnelPlan.tunnels.count))
+            } catch {
+                importErrorMessage = String(
+                    format: L10n.string(
+                        "share.import.partial %lld %@",
+                        "Imported connections: %lld, but tunnels could not be imported: %@"),
+                    sessionResult?.imported ?? 0, String(describing: error))
+                return
+            }
+        }
+        importResultMessage = messages.joined(separator: "\n")
         showImportResultAlert = true
+    }
+
+    /// Imports an anonymous archive without reading or writing the Keychain.
+    /// Connections are committed first because every tunnel must point at a
+    /// stored connection; a tunnel-store failure is surfaced as a partial
+    /// import instead of pretending the already-written connections vanished.
+    func applyAnonymousArchive(_ archive: MacSCPArchivePayload) async {
+        do {
+            let connections = try sessionListViewModel.importAnonymousArchive(archive)
+            do {
+                let tunnels = try TunnelManager.shared.importArchive(
+                    archive, sessionIDMap: connections.sessionIDMap)
+                importResultMessage = String(
+                    format: L10n.string(
+                        "share.import.result %lld %lld",
+                        "Imported connections: %lld\nImported tunnels: %lld\nLogins must be entered on this Mac."),
+                    connections.sessions.count, tunnels.tunnels.count)
+                showImportResultAlert = true
+            } catch {
+                importErrorMessage = String(
+                    format: L10n.string(
+                        "share.import.partial %lld %@",
+                        "Imported connections: %lld, but tunnels could not be imported: %@"),
+                    connections.sessions.count, String(describing: error))
+            }
+        } catch {
+            importErrorMessage = ImportFeedbackText.readErrorMessage(error)
+        }
     }
 
     // MARK: - Import from another program (Cyberduck import, 2026-09-03)

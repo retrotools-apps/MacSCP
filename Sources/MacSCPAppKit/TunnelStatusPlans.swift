@@ -7,11 +7,14 @@ import macSCPCore
 enum TunnelPresentationState {
     enum ToggleAction: Equatable {
         case start
+        case restart
         case stop
     }
 
     static func toggleAction(for state: TunnelState) -> ToggleAction {
-        TunnelManager.Aggregate.isRunning(state) ? .stop : .start
+        if TunnelManager.Aggregate.isRunning(state) { return .stop }
+        if state == .failed(.connectionLost) { return .restart }
+        return .start
     }
 
     static func sessionSummary(profile: TunnelProfile, state: TunnelState) -> TunnelState {

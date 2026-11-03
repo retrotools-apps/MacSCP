@@ -157,6 +157,11 @@ struct WindowRestorationWiringGuardTests {
             beginEditing( prefill here, which put the form in edit mode and \
             offered "Save & connect" instead.)
             """)
+        #expect(body.contains("SessionGroupCatalog.allConnectionsID"), """
+            makeRestoredTab(from:) no longer sends an empty or stale restored \
+            tab to All Connections — reopening the app would expose the New \
+            Connection form even though the user did not request it.
+            """)
     }
 
     // MARK: - The file is written at quit, and only there
@@ -256,8 +261,7 @@ struct WindowRestorationWiringGuardTests {
 
     /// The overview branch resolves per TAB before it resolves per
     /// WINDOW (fix round 1). Without that, N restored tabs would all show
-    /// whichever session the one window-wide sidebar selection names — or,
-    /// with no selection, an empty form.
+    /// whichever session the one window-wide sidebar selection names.
     @Test func theOverviewBranchResolvesTheTabsOwnSessionFirst() throws {
         let detail = try Self.code(of: Self.detailFile)
         #expect(detail.contains("overviewSession(for: tab)"), """

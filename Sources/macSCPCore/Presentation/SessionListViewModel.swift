@@ -143,6 +143,18 @@ public final class SessionListViewModel {
         }
     }
 
+    /// Imports the connection half of a credential-free `.macscp` file.
+    /// Fresh IDs keep the source machine's Keychain namespace unreachable.
+    public func importAnonymousArchive(
+        _ archive: MacSCPArchivePayload
+    ) throws -> AnonymousConnectionImportPlan {
+        let plan = MacSCPArchiveImportPlanner.anonymousConnections(
+            from: archive, existingSessions: sessions, existingGroups: groups)
+        try store.appendPortable(groups: plan.groups, sessions: plan.sessions)
+        reload()
+        return plan
+    }
+
     /// Clears `errorMessage` — the sidebar's close button on the red caption,
     /// and also what its own six-second auto-dismiss calls. Does not touch
     /// anything else `reload()` sets; a later failure still shows again,
@@ -1922,7 +1934,7 @@ public final class SessionListViewModel {
 
     // MARK: - Login-set export/import (M19)
 
-    /// A built `.macscplogins` payload plus everything the export sheet has to
+    /// A built login-set section for a `.macscp` archive plus everything the export sheet has to
     /// tell the user about what did NOT make it into the file.
     public struct LoginSetExportResult: Equatable {
         public var payload: LoginSetExportPayload

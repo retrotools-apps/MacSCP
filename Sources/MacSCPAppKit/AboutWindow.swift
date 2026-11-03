@@ -8,8 +8,6 @@ struct AboutContent {
     static let copyrightPrefix = "© 2026"
     static let brand = "RetroTools"
     static let brandFontName = "Monaco"
-    static let signatureFontName = "Zapfino"
-    static let signature = "by Karel"
     static let copyright = copyrightPrefix + " " + brand
     let version: String?
     let licenseURL: URL?
@@ -79,11 +77,7 @@ struct AboutView: View {
                 .padding(.vertical, 5)
                 .background(.quaternary.opacity(0.5), in: Capsule())
                 .padding(.top, 14)
-            Text(verbatim: AboutContent.signature)
-                .font(.custom(AboutContent.signatureFontName, size: 10))
-                .foregroundStyle(.secondary)
-                .padding(.top, 18)
-                .padding(.bottom, 3)
+                .padding(.bottom, 14)
             HStack(spacing: 6) {
                 Text(AboutContent.copyrightPrefix)
                     .font(.system(size: 12, weight: .medium))

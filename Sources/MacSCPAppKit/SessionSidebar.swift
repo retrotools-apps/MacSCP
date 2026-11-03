@@ -609,6 +609,9 @@ struct SessionSidebar: View {
             onCommitRename: { commitGroupRename(group) },
             onCancelRename: endRename,
             onExport: { onExport(.group(group)) },
+            shareItem: PortableConfigurationShareItem.make(
+                name: group.name, scope: .group(group), viewModel: viewModel,
+                tunnels: tunnels.allProfiles, tunnelGroups: tunnels.allGroups),
             onColor: { viewModel.setGroupColor(group, color: $0) },
             onSortByName: { viewModel.sortChildrenByName(of: group.id) },
             onNewGroup: { beginNewGroup(forMoving: nil, inGroup: group.id) },
@@ -651,6 +654,9 @@ struct SessionSidebar: View {
             onDuplicate: { duplicate(session) },
             onRequestDelete: { sessionPendingDelete = session },
             onExport: { onExport(.single(session)) },
+            shareItem: PortableConfigurationShareItem.make(
+                name: session.name, scope: .single(session), viewModel: viewModel,
+                tunnels: tunnels.allProfiles, tunnelGroups: tunnels.allGroups),
             onShowAuditLog: { onShowAuditLog(session) },
             onDiagnose: { onDiagnose(session) },
             tunnels: tunnels,
@@ -970,6 +976,7 @@ private struct SidebarGroupRow: View {
     let onCommitRename: () -> Void
     let onCancelRename: () -> Void
     let onExport: () -> Void
+    let shareItem: PortableConfigurationShareItem?
     let onColor: (GroupColor?) -> Void
     let onSortByName: () -> Void
     /// "New group…" nested inside this folder (Task 4, jump-and-groups
@@ -1041,6 +1048,15 @@ private struct SidebarGroupRow: View {
             // entry cannot depend on one existing.
             Button(L10n.string("sidebar.newGroup", "New group…")) { onNewGroup() }
             Button(L10n.string("export.menu.group", "Export Group…")) { onExport() }
+            if let shareItem {
+                ShareLink(
+                    item: shareItem,
+                    preview: SharePreview(shareItem.filename)
+                ) {
+                    Label(L10n.string("share.portable", "Share…"), systemImage: "square.and.arrow.up")
+                }
+                .help(L10n.string("share.portable", "Share…"))
+            }
             // Offered only where it can do something — see
             // `SidebarSortMenuPlan`; this project hides what cannot act
             // rather than greying it out.
@@ -1121,6 +1137,7 @@ private struct SessionRow: View {
     let onDuplicate: () -> Void
     let onRequestDelete: () -> Void
     let onExport: () -> Void
+    let shareItem: PortableConfigurationShareItem?
     let onShowAuditLog: () -> Void
     let onDiagnose: () -> Void
     /// The app-wide forwardings, read by `tunnelPlan` below. The row asks
@@ -1340,6 +1357,15 @@ private struct SessionRow: View {
             }
             Button(L10n.string("sidebar.edit", "Edit…")) { onEdit() }
             Button(L10n.string("export.menu.single", "Export…")) { onExport() }
+            if let shareItem {
+                ShareLink(
+                    item: shareItem,
+                    preview: SharePreview(shareItem.filename)
+                ) {
+                    Label(L10n.string("share.portable", "Share…"), systemImage: "square.and.arrow.up")
+                }
+                .help(L10n.string("share.portable", "Share…"))
+            }
             Button(L10n.string("sidebar.rename", "Rename")) { onStartRename() }
             // Directly under Rename, in the menu that also holds Delete —
             // where the design puts it, among the entries that act on the

@@ -4,6 +4,9 @@ import Foundation
 /// fresh id, an optionally re-mapped group, and its carried-along password
 /// (if the export included one).
 public struct PlannedSession: Equatable, Sendable {
+    /// File-local id of the entry that produced this record. The generic
+    /// `.macscp` importer uses it to reconnect tunnel references.
+    public var sourceID: UUID?
     public var session: StoredSession
     public var password: String?
     /// Carried-along secret for `session.jump`, if any (M10c) — stored under
@@ -40,9 +43,10 @@ public struct PlannedSession: Equatable, Sendable {
     public var keepsExistingSecret: Bool
 
     public init(
-        session: StoredSession, password: String?, jumpPassword: String? = nil,
+        sourceID: UUID? = nil, session: StoredSession, password: String?, jumpPassword: String? = nil,
         replacesExisting: Bool = false, keepsExistingSecret: Bool = false
     ) {
+        self.sourceID = sourceID
         self.session = session
         self.password = password
         self.jumpPassword = jumpPassword
@@ -724,7 +728,7 @@ public enum SessionImportPlanner {
         }
         let secret = kind == .s3 ? fileSession.s3SecretAccessKey : fileSession.password
         return PlannedSession(
-            session: session, password: secret,
+            sourceID: fileSession.id, session: session, password: secret,
             // Keyed on the jump that actually landed on the session, not the
             // one parsed out of the file: a non-SSH session keeps no jump
             // since M23/T8, and a password for a hop nobody dials is an

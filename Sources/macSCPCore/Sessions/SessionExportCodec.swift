@@ -1,6 +1,6 @@
 import Foundation
 
-/// The on-disk payload of a `.macscpsessions` export (spec M9a §1). Key
+/// The connections section of a `.macscp` archive. Key
 /// FILES are never part of an export — `keyPath` is a plain path reference.
 public struct SessionExportPayload: Codable, Equatable, Sendable {
     public var includesSecrets: Bool
@@ -13,7 +13,6 @@ public struct SessionExportPayload: Codable, Equatable, Sendable {
         self.sessions = sessions
     }
 }
-
 public struct ExportedGroup: Codable, Equatable, Sendable {
     /// File-local reference target for `ExportedSession.groupID` and for
     /// `parentID` below — never imported as-is (the planner assigns fresh
@@ -157,7 +156,7 @@ public struct ExportedSession: Codable, Equatable, Sendable {
     // omits them, and nothing outside the decoder can set one (the
     // initializer does not take them, and their setters are private).
     //
-    // `SessionExportCodec.decode` folds them into `fields` and clears them
+    // Decoding folds them into `fields` and clears them
     // before returning, so every reader downstream — the planner above all —
     // only ever sees one shape.
 
@@ -398,58 +397,5 @@ public struct ExportedSession: Codable, Equatable, Sendable {
     private var hasLegacyWebDAVColumns: Bool {
         legacyWebDAVBaseURL != nil || legacyWebDAVUsername != nil
             || legacyWebDAVUseNextcloudPath != nil
-    }
-}
-
-/// `.macscpsessions` binding of the shared `ExportEnvelopeCodec` (spec M9a
-/// §1+§2.1). Nothing but format identity lives here — envelope shape, key
-/// derivation and AES-GCM are the generic core's job.
-public enum SessionExportCodec {
-    static let formatName = "macscp-sessions"
-
-    /// 2 since M23/P3, when the per-protocol columns became one field bag.
-    ///
-    /// What the bump BUYS: `ExportEnvelopeCodec` validates the header before
-    /// it decodes the payload, so an older MacSCP refuses a v2 file with
-    /// `unsupportedVersion` — a clear message — instead of half-reading a
-    /// shape it does not understand and importing sessions with no host.
-    ///
-    /// What it COSTS: exchanging `.macscp` files with older installations
-    /// ends. The format was additive until now, so an older build could read
-    /// a newer export minus the backends it did not know; after this it can
-    /// read nothing. That is the maintainer's decision and belongs in the
-    /// release notes. This direction still reads every v1 file — see
-    /// `ExportedSession.upgradeV1Columns`.
-    static let currentVersion = 2
-
-    public static func encode(_ payload: SessionExportPayload, password: String?) throws -> Data {
-        try ExportEnvelopeCodec.encode(
-            payload, format: formatName, version: currentVersion, password: password)
-    }
-
-    /// True = encrypted. Lets the UI decide whether to ask for a password
-    /// without attempting decryption.
-    public static func probe(_ data: Data) throws -> Bool {
-        try ExportEnvelopeCodec.probe(
-            data, as: SessionExportPayload.self, format: formatName,
-            currentVersion: currentVersion)
-    }
-
-    /// `password` defaults to nil so a caller that knows the file is
-    /// unencrypted need not say so; an encrypted file without one still
-    /// throws `passwordRequired` rather than failing silently.
-    public static func decode(
-        _ data: Data, password: String? = nil
-    ) throws -> SessionExportPayload {
-        var payload = try ExportEnvelopeCodec.decode(
-            data, as: SessionExportPayload.self, format: formatName,
-            currentVersion: currentVersion, password: password)
-        // The v1 -> bag upgrade happens HERE, not in the import planner: the
-        // planner should only ever see one shape, and so should every other
-        // reader of a decoded payload.
-        for index in payload.sessions.indices {
-            payload.sessions[index].upgradeV1Columns()
-        }
-        return payload
     }
 }

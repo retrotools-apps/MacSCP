@@ -53,7 +53,7 @@ struct JumpPassphraseFillGuardTests {
             that exist, so this scan is reading nothing.
             """)
 
-        let fills = scanned.writes.filter { $0.assigned != "\"\"" }
+        let fills = scanned.writes.filter { $0.assigned != "\"\"" && $0.assigned != "nil" }
         let named = fills.map { "\($0.file): \($0.assigned)" }.sorted()
         #expect(fills.isEmpty, """
             these write a form's `jumpPassword` without going through `\(Self.door)`, so the \
@@ -67,11 +67,12 @@ struct JumpPassphraseFillGuardTests {
     @Test func aClearIsAllowedAndAFillIsNot() {
         let found = Self.writes(inCommentFree: """
             form.jumpPassword = ""
+            form.jumpPassword = nil
             form.jumpPassword = resolved.login.secret ?? ""
             self.jumpPassword = jumpPassword
             let jumpPassword = planned.jumpPassword
             """, file: "fixture")
-        #expect(found.map(\.assigned) == ["\"\"", "resolved.login.secret ?? \"\""])
+        #expect(found.map(\.assigned) == ["\"\"", "nil", "resolved.login.secret ?? \"\""])
     }
 
     @Test func aScanOfATreeWithoutTheDoorIsNotRead() throws {

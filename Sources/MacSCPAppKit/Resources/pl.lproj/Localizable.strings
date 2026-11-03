@@ -496,6 +496,7 @@
 "export.password" = "Hasło";
 "export.passwordRepeat" = "Powtórz hasło";
 "export.passwordHint" = "Długie hasło utrudnia złamanie eksportu, jeśli plik zostanie przechwycony.";
+"export.shareHint" = "Aby wysłać komuś plik bez danych logowania, użyj Udostępnij… w menu połączenia lub grupy.";
 "export.plaintextWarning" = "Hasła zostaną zapisane w tym pliku w postaci jawnej. Każdy, kto go zdobędzie, będzie mógł je odczytać.";
 "export.confirmAnyway" = "Eksportuj mimo to…";
 "export.action" = "Eksportuj…";
@@ -1319,6 +1320,7 @@
 "tunnel.action.delete" = "Usuń";
 "tunnel.action.save" = "Zapisz";
 "tunnel.action.start" = "Uruchom";
+"tunnel.action.restart" = "Uruchom ponownie";
 "tunnel.action.stop" = "Zatrzymaj";
 "tunnel.error.name" = "Nadaj przekierowaniu nazwę.";
 "tunnel.error.listenPort" = "Port nasłuchu musi mieścić się w zakresie od 1 do 65535.";
@@ -1426,11 +1428,19 @@
 "sidebar.settings" = "Ustawienia";
 "transfer.import" = "Importuj…";
 "transfer.import.prompt" = "Importuj";
-"transfer.import.invalid" = "Wybierz plik MacSCP, WinSCP.ini lub zakładkę Cyberduck (maksymalnie 16 MiB).";
+"transfer.import.invalid" = "Wybierz plik MacSCP, przenośny plik .macscp, WinSCP.ini lub zakładkę Cyberduck (maksymalnie 16 MiB).";
 "transfer.format" = "Format";
 "transfer.macscp" = "MacSCP (domyślny)";
 "transfer.winscp" = "WinSCP";
-"transfer.import.supported" = "Obsługiwane formaty: MacSCP, WinSCP.ini i Cyberduck (plik .duck lub folder zakładek). Format jest wykrywany automatycznie.";
+"transfer.import.supported" = "Obsługiwane formaty: MacSCP, przenośne pliki .macscp, WinSCP.ini i Cyberduck (plik .duck lub folder zakładek). Format jest wykrywany automatycznie.";
+"share.portable" = "Udostępnij…";
+"overview.terminal" = "Terminal";
+"export.includeTunnels" = "Dołącz tunele";
+"export.includeLoginSets" = "Dołącz zestawy logowania";
+"export.includeKeyFiles" = "Osadź zarządzane pliki kluczy prywatnych";
+"archive.import.tunnels %lld" = "Zaimportowane tunele: %lld";
+"share.import.result %lld %lld" = "Zaimportowane połączenia: %lld\nZaimportowane tunele: %lld\nDane logowania należy wprowadzić na tym Macu.";
+"share.import.partial %lld %@" = "Zaimportowane połączenia: %lld, ale nie udało się zaimportować tuneli: %@";
 /* Independent tunnel workspace. */
 "workspace.sessions" = "Sesje";
 "workspace.tunnels" = "Tunele";

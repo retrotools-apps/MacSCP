@@ -3,7 +3,7 @@ import CryptoKit
 import Foundation
 
 /// Errors of every MacSCP export/import format. Named after the first format
-/// that used it (`macscp-sessions`, spec M9a); since M19 the login-set format
+/// that used it; the unified `.macscp` archive now owns the public format
 /// shares the same envelope, the same crypto, and therefore the same error
 /// cases. Kept under its original name deliberately — renaming would be a
 /// public API change with no benefit for callers.
@@ -38,7 +38,7 @@ public enum ExportEnvelopeCodec {
     /// Generic over the payload rather than carrying it as pre-encoded
     /// `Data`: `JSONEncoder` writes `Data` as a base64 string, which would
     /// have turned the nested `payload` object into an opaque blob and
-    /// changed every byte of the existing `.macscpsessions` format. As a
+    /// changed every byte of the earlier session-only format. As a
     /// type parameter the payload keeps encoding as a nested object, so the
     /// on-disk bytes are unchanged.
     private struct Envelope<P: Codable>: Codable {

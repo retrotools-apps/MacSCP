@@ -48,19 +48,21 @@ struct SessionOverviewWiringGuardTests {
     private static let scrollAnchor = "ScrollView("
 
     private static let expectedEntries = [
-        "connectFromSidebar(", "editStored(", "showDiagnostics(for: .stored",
+        "connectFromSidebar(", "openExternalTerminalFromSidebar(",
+        "editStored(", "showDiagnostics(for: .stored",
     ]
 
     /// Every other way this window reaches the user's host, or reaches it by
     /// proxy. Read together with `SessionRowActivation.swift`'s own doc
     /// comments, which state the rule these names belong to: an input that
     /// STARTS A SESSION on the user's host is an effect value, not a plain
-    /// callback. Counted while writing this: SIX names.
+    /// callback. Counted while writing this: FIVE names.
     ///
-    /// `connectFromSidebar` is deliberately absent — it is the one the
-    /// overview is allowed to reach, and `expectedEntries` above requires it.
+    /// `connectFromSidebar` and `openExternalTerminalFromSidebar` are
+    /// deliberately absent — they are the two routes the overview offers,
+    /// and `expectedEntries` above requires both.
     private static let otherHostReachingEntries = [
-        "openTerminalFromSidebar", "openExternalTerminalFromSidebar", "sidebarStart",
+        "openTerminalFromSidebar", "sidebarStart",
         "retryConnect", "reconnect(", "connect(in:",
     ]
 
@@ -148,13 +150,13 @@ struct SessionOverviewWiringGuardTests {
     }
 
     /// The positive partner of `noOtherHostReachingEntryIsWiredIntoTheOverview`.
-    @Test func theThreeActionsResolveToTheWindowsExistingEntries() throws {
+    @Test func theFourActionsResolveToTheWindowsExistingEntries() throws {
         let wiring = try Self.wiring()
         for entry in Self.expectedEntries {
             #expect(wiring.contains(entry), """
                 the overview's wiring in \(Self.detailPath) no longer names \(entry). The \
-                overview's three actions are the window's EXISTING entries handed over as \
-                values — a fourth way to connect, edit or diagnose is a second place a \
+                overview's four actions are the window's EXISTING entries handed over as \
+                values — another way to connect, open a terminal, edit or diagnose is a second place a \
                 security rule can be forgotten. Wiring read: \(wiring)
                 """)
         }
@@ -165,9 +167,8 @@ struct SessionOverviewWiringGuardTests {
         for entry in Self.otherHostReachingEntries {
             #expect(!wiring.contains(entry), """
                 the overview's wiring in \(Self.detailPath) names \(entry) — a route onto the \
-                user's host that this read-only surface does not offer. The overview's only \
-                connect is `connectFromSidebar`, handed over as a \
-                `SessionRowConnectEffect`.
+                user's host that this read-only surface does not offer. The overview receives \
+                only the typed connect and external-terminal effects it explicitly renders.
                 """)
         }
     }
@@ -188,6 +189,13 @@ struct SessionOverviewWiringGuardTests {
             way to fire a connect effect. Either the Connect action is dead, or it found \
             another way to run, which is the capability this discipline exists to withhold.
             """)
+    }
+
+    @Test func theTerminalButtonUsesOnlyTheExternalTerminalEffect() throws {
+        let file = try Self.viewFileViews()
+        #expect(file.code.contains("SessionRowExternalTerminalEffect"))
+        #expect(file.code.contains(".externalTerminalMenuEntry"))
+        #expect(file.code.contains("onConnect: SessionRowConnectEffect { _ in }"))
     }
 
     @Test func theViewFileNamesNoConnectFunctionOfItsOwn() throws {

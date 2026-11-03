@@ -1053,7 +1053,7 @@ struct SessionListViewModelTests {
     /// parameter, and the two planner tests that set it built
     /// `ExportedSession.fields` from that fixture directly — bypassing the
     /// codec. So the fixture proved what the fixture writes, and nothing
-    /// proved what `exportPayload` + `SessionExportCodec.encode`/`decode`
+    /// proved what `exportPayload` plus archive encode/decode
     /// write. This starts from a SAVED session and goes through both.
     ///
     /// The `bucket` half is asserted beside it: a list-mode session stores
@@ -1075,8 +1075,8 @@ struct SessionListViewModelTests {
 
         let payload = vm.exportPayload(
             for: .all, includeGroups: false, includePasswords: false).payload
-        let decoded = try SessionExportCodec.decode(
-            SessionExportCodec.encode(payload, password: nil))
+        let decoded = try ConnectionSectionTestCodec.decode(
+            ConnectionSectionTestCodec.encode(payload, password: nil))
 
         let exported = try #require(decoded.sessions.first)
         let fields = FieldValues(raw: exported.fields)
@@ -1102,8 +1102,8 @@ struct SessionListViewModelTests {
 
         let payload = vm.exportPayload(
             for: .all, includeGroups: false, includePasswords: false).payload
-        let decoded = try SessionExportCodec.decode(
-            SessionExportCodec.encode(payload, password: nil))
+        let decoded = try ConnectionSectionTestCodec.decode(
+            ConnectionSectionTestCodec.encode(payload, password: nil))
 
         let exported = try #require(decoded.sessions.first)
         // The KEY is present, not merely absent-and-therefore-false: that is
@@ -2754,8 +2754,8 @@ struct SessionListViewModelTests {
 
         // Round trip the payload through the encrypted codec too, proving
         // the whole chain (not just the in-memory struct) preserves it.
-        let data = try SessionExportCodec.encode(payload, password: "export-pw")
-        let decoded = try SessionExportCodec.decode(data, password: "export-pw")
+        let data = try ConnectionSectionTestCodec.encode(payload, password: "export-pw")
+        let decoded = try ConnectionSectionTestCodec.decode(data, password: "export-pw")
 
         // Nothing exists in the target store, so the planner must not reach
         // for the arbiter at all (M19).
@@ -2886,8 +2886,8 @@ struct SessionListViewModelTests {
         // export never grew a WebDAV secret column, and must not.
         #expect(exported.password == "dav-secret")
 
-        let data = try SessionExportCodec.encode(payload, password: "export-pw")
-        let decoded = try SessionExportCodec.decode(data, password: "export-pw")
+        let data = try ConnectionSectionTestCodec.encode(payload, password: "export-pw")
+        let decoded = try ConnectionSectionTestCodec.decode(data, password: "export-pw")
 
         let plan = await SessionImportPlanner.plan(
             existing: [], existingGroups: [], incoming: decoded,
@@ -2972,8 +2972,8 @@ struct SessionListViewModelTests {
         // nothing else, so no other backend can leak into its entry.
         #expect(exported.fields.keys.allSatisfy { $0.hasPrefix("SSHField.") })
 
-        let data = try SessionExportCodec.encode(payload, password: nil)
-        let decoded = try SessionExportCodec.decode(data, password: nil)
+        let data = try ConnectionSectionTestCodec.encode(payload, password: nil)
+        let decoded = try ConnectionSectionTestCodec.decode(data, password: nil)
         let plan = await SessionImportPlanner.plan(
             existing: [], existingGroups: [], incoming: decoded,
             arbiter: ImportConflictArbiter { _ in Issue.record("decider must not be asked"); return nil })
@@ -2986,32 +2986,6 @@ struct SessionListViewModelTests {
         #expect(importedVM.applyImport(plan).imported == 1)
         let imported = importedVM.sessions.first!
         #expect(imported.kind == .ssh)
-        #expect(imported.webdav == nil)
-    }
-
-    /// A `.macscp` file written BEFORE this fix: a `.webdav` session with no
-    /// `webdav*` columns. It must still import — the missing columns decode as
-    /// `nil`, exactly the way the `s3*` columns already do.
-    @Test func preFixExportFileStillImports() async throws {
-        let dir = URL(fileURLWithPath: NSTemporaryDirectory())
-            .appendingPathComponent("macscp-slvm-\(UUID().uuidString)")
-        defer { try? FileManager.default.removeItem(at: dir) }
-        let raw = Data("""
-        {"format":"macscp-sessions","version":1,"encrypted":false,"payload":{"includesSecrets":false,\
-        "groups":[],"sessions":[{"id":"\(UUID().uuidString)","name":"nextcloud","host":"unused",\
-        "port":22,"username":"unused","authKind":"password","kind":"webdav"}]}}
-        """.utf8)
-        let decoded = try SessionExportCodec.decode(raw, password: nil)
-        let plan = await SessionImportPlanner.plan(
-            existing: [], existingGroups: [], incoming: decoded,
-            arbiter: ImportConflictArbiter { _ in Issue.record("decider must not be asked"); return nil })
-        let importedVM = SessionListViewModel(
-            store: SessionStore(directory: dir), secrets: InMemorySecretStore(),
-            auditStore: AuditLogStore(directory: dir),
-            loginSetStore: LoginSetStore(directory: dir), keys: ManagedKeyStore(directory: dir))
-        #expect(importedVM.applyImport(plan).imported == 1)
-        let imported = importedVM.sessions.first!
-        #expect(imported.kind == .webdav)
         #expect(imported.webdav == nil)
     }
 

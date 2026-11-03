@@ -71,13 +71,14 @@ enum WindowRestorationPlan {
     /// tab that came back from `windows.json` and was never connected:
     /// `activeStoredSessionID` is written only by a connect, so without
     /// this fallback a tab restored once and then quit again untouched
-    /// described itself with `sessionID: nil` and came back blank a
-    /// second time. The designed path is a click that connects and
+    /// described itself with `sessionID: nil` and came back on All
+    /// Connections instead of its session a second time. The designed path
+    /// is a click that connects and
     /// replaces the restored pointer with a live one; nothing forces that
     /// click before a second quit, so the fallback covers the tab that
     /// never got it. `nil` when neither is set — an ad-hoc connection or
-    /// an untouched form, which `describeForRestoration(_:)` writes as an
-    /// empty tab on purpose.
+    /// an untouched form, which `describeForRestoration(_:)` writes without
+    /// connection details on purpose; that tab lands on All Connections.
     static func sessionID(active: UUID?, restored: UUID?) -> UUID? {
         active ?? restored
     }

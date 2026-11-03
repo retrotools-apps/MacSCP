@@ -4,7 +4,7 @@ import Foundation
 /// structure, version and credentials before any records are imported.
 public enum SessionImportDetection {
     public enum Format: Equatable, Sendable {
-        case macscp, macscpLogins, winscp, cyberduck
+        case macscp, winscp, cyberduck
     }
 
     public static let maximumFileSize = 16 * 1024 * 1024
@@ -12,8 +12,7 @@ public enum SessionImportDetection {
     public static func detect(_ data: Data) throws -> Format {
         guard data.count <= maximumFileSize else { throw SessionExportError.notAnExportFile }
         if let header = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
-            if header["format"] as? String == "macscp-sessions" { return .macscp }
-            if header["format"] as? String == "macscp-logins" { return .macscpLogins }
+            if header["format"] as? String == "macscp" { return .macscp }
         }
         if let plist = try? PropertyListSerialization.propertyList(from: data, options: [], format: nil),
            let bookmark = plist as? [String: Any],

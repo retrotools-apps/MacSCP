@@ -74,14 +74,14 @@ extension WindowSeed {
 /// is as much of the design as what it does: no host, no username, no
 /// path, and above all no secret. The stored session's id is enough —
 /// the session itself is read back out of `sessions-v2.json` at launch, so
-/// a description that outlives an edited or deleted session degrades to a
-/// plain empty tab instead of resurrecting stale connection details.
+/// a description that outlives an edited or deleted session degrades to the
+/// All Connections page instead of resurrecting stale connection details.
 ///
 /// The struct body holds stored properties and nothing else, for the same
 /// reason `WindowSeed`'s does.
 struct TabSeed: Codable, Hashable, Sendable {
     /// The stored session this tab was showing, or `nil` for a tab that
-    /// was on an ad-hoc connection or on an empty form. An ad-hoc
+    /// was on an ad-hoc connection or on the All Connections page. An ad-hoc
     /// connection is deliberately NOT described any further: it exists
     /// only in the form the user typed it into, and reconstructing it from
     /// a file is how a host and username nobody chose to save would end up

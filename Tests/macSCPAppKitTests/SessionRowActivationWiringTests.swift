@@ -531,8 +531,16 @@ struct SessionRowActivationWiringTests {
     /// One row per host-reaching effect since round 4 — an inert effect is
     /// exactly as invisible for the terminal entries as it was for connect.
     @Test func theSidebarIsHandedEffectsThatActuallyReachTheHost() throws {
-        let lines = try SourceCorpus.text(of: Self.detailFile)
+        let allLines = try SourceCorpus.text(of: Self.detailFile)
             .components(separatedBy: "\n")
+        let overviewStart = try #require(allLines.firstIndex {
+            Self.isCode($0) && $0.contains("SessionOverviewView(")
+        })
+        // The overview intentionally receives the same external-terminal
+        // effect. Guard J is about the earlier SessionSidebar construction,
+        // so count only that source region rather than treating a second,
+        // legitimate consumer as a duplicate hand-over.
+        let lines = Array(allLines[..<overviewStart])
         for wiring in Self.effectHandOvers {
             let handOvers = lines.indices.filter { index in
                 Self.isCode(lines[index]) && lines[index].contains(wiring.prefix)

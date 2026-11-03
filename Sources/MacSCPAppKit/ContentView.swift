@@ -501,7 +501,6 @@ struct ContentView: View {
     /// `sessionListViewModel`).
     @State var showLoginSetsSheet = false
     /// Internal bridge for opening the login manager's own import picker.
-    /// The unified import panel instead passes detectedLoginImportData.
     @State var loginSetsSheetStartsImport = false
 
     // MARK: - Session overview (session overview plan, Task 2)
@@ -590,8 +589,9 @@ struct ContentView: View {
     /// A decoded session-import payload plus whether the file it came from was
     /// itself encrypted (which the result alert's plaintext notice needs).
     struct PendingSessionImport {
-        let payload: SessionExportPayload
+        let payload: SessionExportPayload?
         let wasEncrypted: Bool
+        var archive: MacSCPArchivePayload? = nil
     }
 
     // MARK: - Share link (M14/T5)
@@ -627,7 +627,6 @@ struct ContentView: View {
     @State var pendingWinSCPImport: SessionExportPayload?
     @State var detectedWinSCPData: Data?
     @State var detectedWinSCPFileName = ""
-    @State var detectedLoginImportData: Data?
     /// Bytes read from the chosen import file, held between the initial
     /// `probe` and the (optional) password prompt's `decode` attempt.
     @State var importFileData: Data?

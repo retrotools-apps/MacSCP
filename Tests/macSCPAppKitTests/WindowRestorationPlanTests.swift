@@ -107,7 +107,8 @@ struct WindowRestorationPlanTests {
     /// The fallback this fix exists for: a tab restored once and never
     /// connected has no `activeStoredSessionID` at all — without the
     /// fallback to `restoredSessionID` it would describe itself as
-    /// `nil` and come back blank a second time.
+    /// `nil` and come back on All Connections instead of its session a
+    /// second time.
     @Test func aNeverConnectedRestoredTabKeepsItsRestoredSessionID() {
         let restored = UUID()
         #expect(WindowRestorationPlan.sessionID(active: nil, restored: restored) == restored)
@@ -115,7 +116,8 @@ struct WindowRestorationPlanTests {
 
     /// An ad-hoc tab or an untouched form has neither pointer — the
     /// description is `nil`, which `describeForRestoration(_:)` writes
-    /// as an empty tab on purpose.
+    /// without connection details on purpose. At launch that tab lands on
+    /// All Connections rather than reopening the connection form.
     @Test func aTabWithNeitherPointerDescribesAsNil() {
         #expect(WindowRestorationPlan.sessionID(active: nil, restored: nil) == nil)
     }

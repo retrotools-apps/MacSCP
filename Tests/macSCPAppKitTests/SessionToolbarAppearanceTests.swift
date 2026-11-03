@@ -7,7 +7,7 @@ import Testing
 @Suite("Session toolbar appearance")
 struct SessionToolbarAppearanceTests {
     @Test(arguments: [ColorScheme.light, .dark])
-    func sshStaysCompactWithAReadableAccentInsteadOfASolidBlueBlock(scheme: ColorScheme) throws {
+    func sshIsCompactAndClearlyAccented(scheme: ColorScheme) throws {
         let view = Button {} label: { Label("SSH", systemImage: "terminal") }
             .buttonStyle(SessionToolbarButtonStyle(prominent: true))
             .padding(8)
@@ -17,8 +17,8 @@ struct SessionToolbarAppearanceTests {
         renderer.scale = 1
         let image = try #require(renderer.cgImage)
         // Includes the preview's 8 pt margin on each side.
-        #expect(image.width < 80)
-        #expect(image.height == 38)
+        #expect(image.width < 90)
+        #expect(image.height == 42)
         let bitmap = NSBitmapImageRep(cgImage: image)
         var bluePixels = 0
         for y in 0..<bitmap.pixelsHigh {
@@ -31,7 +31,7 @@ struct SessionToolbarAppearanceTests {
                 }
             }
         }
-        #expect(bluePixels > 20, "The SSH glyph and label must retain their visible accent.")
-        #expect(bluePixels < 600, "The SSH action must not become a large solid-color button.")
+        #expect(bluePixels > 150, "The SSH action must remain clearly visible in the toolbar.")
+        #expect(bluePixels < 1_200, "The SSH action must remain compact rather than become a large block.")
     }
 }

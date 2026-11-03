@@ -59,6 +59,12 @@ Group related endpoints, choose recognizable icons and colors, and reuse login
 sets backed by passwords, private keys or the local SSH agent. Import selected
 OpenSSH, Cyberduck and WinSCP configurations, then review them before connecting.
 
+Export and Share use the same portable `.macscp` archive. A global export can
+contain connections, groups, tunnels and login sets in one self-describing file,
+optionally encrypted and optionally carrying passwords or managed private key
+files. Share uses the same format without login identities, secrets or keys, so
+it can be sent through the standard macOS AirDrop, Mail or Messages extensions.
+
 ![MacSCP connections overview with grouped fictional servers](docs/web/assets/screenshots/connections-light.webp)
 
 <details>

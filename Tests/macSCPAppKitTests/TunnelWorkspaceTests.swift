@@ -136,13 +136,14 @@ struct TunnelWorkspacePresentationTests {
         #expect(!TunnelPresentationState.canDismiss(.stopped))
     }
 
-    @Test func doubleClickStopsRunningTunnelsAndStartsEveryIdleState() {
+    @Test func connectionLossRestartsWhileOtherIdleStatesStart() {
         for state in [TunnelState.connecting, .reconnecting(attempt: 1), .active(connections: 2)] {
             #expect(TunnelPresentationState.toggleAction(for: state) == .stop)
         }
         for state in [TunnelState.stopped, .failed(.portInUse(port: 19080)), .needsConfirmation] {
             #expect(TunnelPresentationState.toggleAction(for: state) == .start)
         }
+        #expect(TunnelPresentationState.toggleAction(for: .failed(.connectionLost)) == .restart)
     }
 
     @Test func tunnelRowsAndTheirButtonUseTheSameToggleRoute() throws {
@@ -155,6 +156,9 @@ struct TunnelWorkspacePresentationTests {
         #expect(toggle.contains("TunnelPresentationState.toggleAction"))
         #expect(toggle.contains("manager.start(profile, decider: decider)"))
         #expect(toggle.contains("manager.stop(profile)"))
+        let title = try #require(SourceSpan.body(
+            after: "private func toggleTitle(for state: TunnelState)", in: code))
+        #expect(title.contains("tunnel.action.restart"))
     }
     @Test func requestedTrendsSymbolAlwaysHasAVisibleTemplateImage() {
         #expect(TunnelSymbols.tunnel == "apple.health.trends")

@@ -306,11 +306,9 @@ extension ContentView {
         // always show the exact same, up-to-date list.
         .sheet(isPresented: $showLoginSetsSheet, onDismiss: {
             loginSetsSheetStartsImport = false
-            detectedLoginImportData = nil
         }) {
             LoginSetsSheet(
-                sessionList: sessionListViewModel, startsImport: loginSetsSheetStartsImport,
-                initialImportData: detectedLoginImportData)
+                sessionList: sessionListViewModel, startsImport: loginSetsSheetStartsImport)
         }
         // SSH-keys sheet (M18/T5) — standalone overlay replacement for the
         // M17 Settings tab; owns its own `ManagedKeyStore` instance the same
@@ -330,8 +328,8 @@ extension ContentView {
         .fileExporter(
             isPresented: $showExportFileExporter,
             document: exportDocument,
-            contentType: .macscpSessions,
-            defaultFilename: "MacSCP Sessions.macscpsessions"
+            contentType: .macscpConfiguration,
+            defaultFilename: "MacSCP Configuration.macscp"
         ) { result in
             handleExportResult(result)
         }

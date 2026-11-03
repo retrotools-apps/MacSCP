@@ -12,11 +12,8 @@ import macSCPCore
 /// one set) rather than `KnownHostsSheet`'s multi-selection `Table`.
 struct LoginSetsSheet: View {
     let sessionList: SessionListViewModel
-    /// Opens the manager's own import picker. The unified session import
-    /// panel supplies initialImportData instead, avoiding a second picker.
+    /// Opens the manager's own import picker.
     var startsImport = false
-    /// Native login exports selected through the unified import panel.
-    var initialImportData: Data? = nil
 
     @Environment(\.dismiss) private var dismiss
     @State private var selectedID: LoginSet.ID?
@@ -39,7 +36,7 @@ struct LoginSetsSheet: View {
     // MARK: - Export/import state (M19/T8)
 
     @State private var exportTarget: ExportTarget?
-    @State private var exportDocument: LoginSetExportDocument?
+    @State private var exportDocument: SessionExportDocument?
     @State private var showExportFileExporter = false
     /// Assembled by `performExport` from the payload builder's report (sets
     /// with no stored secret, keys that could not be read, keys travelling
@@ -233,10 +230,7 @@ struct LoginSetsSheet: View {
             refreshMergeCandidate()
             // A reappearance after a child sheet closes must not restart
             // an import or reopen the picker.
-            if let initialImportData, !didAutoStartImport {
-                didAutoStartImport = true
-                acceptImportData(initialImportData)
-            } else if startsImport && !didAutoStartImport {
+            if startsImport && !didAutoStartImport {
                 didAutoStartImport = true
                 showImportFileImporter = true
             }
@@ -287,8 +281,8 @@ struct LoginSetsSheet: View {
         .fileExporter(
             isPresented: $showExportFileExporter,
             document: exportDocument,
-            contentType: .macscpLogins,
-            defaultFilename: "MacSCP Logins.macscplogins"
+            contentType: .macscpConfiguration,
+            defaultFilename: "MacSCP Logins.macscp"
         ) { result in
             handleExportResult(result)
         }
@@ -313,7 +307,7 @@ struct LoginSetsSheet: View {
         // MARK: Import (M19/T8)
         .fileImporter(
             isPresented: $showImportFileImporter,
-            allowedContentTypes: [.macscpLogins, .json],
+            allowedContentTypes: [.macscpConfiguration, .json],
             allowsMultipleSelection: false
         ) { result in
             handleImportFileSelection(result)
@@ -602,8 +596,9 @@ struct LoginSetsSheet: View {
             for: sets, includeSecrets: options.includeSecrets,
             includeKeyFiles: options.includeKeyFiles)
         do {
-            let data = try LoginSetExportCodec.encode(result.payload, password: options.password)
-            exportDocument = LoginSetExportDocument(data: data)
+            let archive = MacSCPArchiveBuilder.loginSets(result.payload)
+            let data = try MacSCPArchiveCodec.encode(archive, password: options.password)
+            exportDocument = SessionExportDocument(data: data)
             exportNotice = exportNoticeText(for: result)
             showExportFileExporter = true
             return nil
@@ -685,7 +680,7 @@ struct LoginSetsSheet: View {
 
     private func acceptImportData(_ data: Data) {
         do {
-            if try LoginSetExportCodec.probe(data) {
+            if try MacSCPArchiveCodec.probe(data) {
                 importFileData = data
                 showImportPasswordSheet = true
             } else if case .ready(let pending) = decodeImport(data: data, password: nil) {
@@ -709,9 +704,12 @@ struct LoginSetsSheet: View {
     /// prints the Cocoa error of a FILE READ, which never saw the payload.
     private func decodeImport(data: Data, password: String?) -> ImportDecodeOutcome {
         do {
+            let archive = try MacSCPArchiveCodec.decode(data, password: password)
+            guard let loginSets = archive.loginSets else {
+                throw SessionExportError.notAnExportFile
+            }
             return .ready(PendingLoginImport(
-                payload: try LoginSetExportCodec.decode(data, password: password),
-                wasEncrypted: password != nil))
+                payload: loginSets, wasEncrypted: password != nil))
         } catch SessionExportError.wrongPasswordOrCorrupted {
             return .retry(
                 L10n.string("import.password.wrong", "Wrong password, or the file is corrupted."))

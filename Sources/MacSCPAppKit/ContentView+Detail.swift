@@ -917,11 +917,14 @@ extension ContentView {
                             session: stored,
                             groupName: names.group,
                             loginSetName: names.loginSet,
-                            // The same three entries the sidebar's own row
-                            // menu reaches, and no fourth of anything: the
-                            // connect one as an effect value the view cannot
-                            // fire without naming an input.
+                            // The same entries the sidebar's own row menu
+                            // reaches: host-reaching actions arrive as effect
+                            // values the view cannot fire without naming an
+                            // explicit input.
                             onConnectSession: SessionRowConnectEffect { connectFromSidebar($0) },
+                            onOpenExternalTerminal: SessionRowExternalTerminalEffect {
+                                openExternalTerminalFromSidebar($0)
+                            },
                             onEdit: { editStored($0) },
                             onDiagnose: { showDiagnostics(for: .stored($0)) },
                             )

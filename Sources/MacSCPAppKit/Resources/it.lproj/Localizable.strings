@@ -378,6 +378,7 @@
 "export.password" = "Password";
 "export.passwordRepeat" = "Ripeti la password";
 "export.passwordHint" = "Una lunga password rende l'esportazione più difficile da rompere se il file è intercettato.";
+"export.shareHint" = "Per inviare a un’altra persona un file senza credenziali, usa Condividi… nel menu della connessione o del gruppo.";
 "export.plaintextWarning" = "Le password saranno memorizzate in testo normale in questo file. Chiunque lo ottenga può leggerli.";
 "export.confirmAnyway" = "Esportare comunque…";
 "export.action" = "Esportazione…";
@@ -1097,6 +1098,7 @@
 "tunnel.action.delete" = "Elimina";
 "tunnel.action.save" = "Salva";
 "tunnel.action.start" = "Avvia";
+"tunnel.action.restart" = "Riavvia";
 "tunnel.action.stop" = "Arresta";
 "tunnel.error.name" = "Inserisci un nome per il tunnel.";
 "tunnel.error.listenPort" = "La porta d'ascolto deve essere compresa tra 1 e 65535.";
@@ -1197,11 +1199,19 @@
 "sidebar.settings" = "Impostazioni";
 "transfer.import" = "Importa…";
 "transfer.import.prompt" = "Importazioni";
-"transfer.import.invalid" = "Scegliere un file di bookmark MacSCP, WinSCP.ini o Cyberduck (massimo 16 MiB).";
+"transfer.import.invalid" = "Scegli un file MacSCP, un file portatile .macscp, WinSCP.ini o un segnalibro Cyberduck (massimo 16 MiB).";
 "transfer.format" = "Formato";
 "transfer.macscp" = "MacSCP (default)";
 "transfer.winscp" = "WinSCP";
-"transfer.import.supported" = "Supporta MacSCP, WinSCP.ini e Cyberduck (cartella di file o segnalibri). Il formato viene rilevato automaticamente.";
+"transfer.import.supported" = "Supporta MacSCP, file portatili .macscp, WinSCP.ini e Cyberduck (file .duck o cartella dei segnalibri). Il formato viene rilevato automaticamente.";
+"share.portable" = "Condividi…";
+"overview.terminal" = "Terminale";
+"export.includeTunnels" = "Includi tunnel";
+"export.includeLoginSets" = "Includi set di accesso";
+"export.includeKeyFiles" = "Incorpora i file delle chiavi private gestite";
+"archive.import.tunnels %lld" = "Tunnel importati: %lld";
+"share.import.result %lld %lld" = "Connessioni importate: %lld\nTunnel importati: %lld\nLe credenziali devono essere inserite su questo Mac.";
+"share.import.partial %lld %@" = "Connessioni importate: %lld, ma non è stato possibile importare i tunnel: %@";
 "workspace.sessions" = "Sessioni";
 "workspace.tunnels" = "Tunnel";
 "tunnels.pool" = "Tutti i tunnel";

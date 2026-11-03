@@ -50,6 +50,9 @@ struct SessionOverviewView: View {
     /// that keeps a stray click from dialling is not a trade worth making
     /// for a shorter name.
     let onConnectSession: SessionRowConnectEffect<StoredSession>
+    /// Opens the configured external terminal without creating a MacSCP
+    /// connection or tab. This is the same typed effect the sidebar uses.
+    let onOpenExternalTerminal: SessionRowExternalTerminalEffect<StoredSession>
     let onEdit: (StoredSession) -> Void
     /// Both doors onto the diagnostics panel this view offers: the head's
     /// Diagnose control and a failed connection row's "Open diagnosis". One
@@ -145,20 +148,26 @@ struct SessionOverviewView: View {
     /// measured reason: below its natural width a `Button` wraps its title
     /// letter by letter rather than shrinking.
     ///
-    /// Both layouts draw the SAME three control properties, so
+    /// Both layouts draw the SAME control properties, so
     /// `.keyboardShortcut(.defaultAction)` appears exactly once in this file
     /// no matter which one `ViewThatFits` chooses.
     private var actions: some View {
         ViewThatFits(in: .horizontal) {
-            HStack(spacing: 10) {
-                connectControl
-                editControl
-                diagnoseControl
-                Spacer(minLength: 0)
-            }
-            VStack(alignment: .leading, spacing: 8) {
+            HStack(spacing: 24) {
                 HStack(spacing: 10) {
                     connectControl
+                    if terminalPlan.isShown { terminalControl }
+                }
+                HStack(spacing: 10) {
+                    editControl
+                    diagnoseControl
+                }
+                Spacer(minLength: 0)
+            }
+            VStack(alignment: .leading, spacing: 12) {
+                HStack(spacing: 10) {
+                    connectControl
+                    if terminalPlan.isShown { terminalControl }
                     Spacer(minLength: 0)
                 }
                 HStack(spacing: 10) {
@@ -171,22 +180,46 @@ struct SessionOverviewView: View {
     }
 
     private var connectControl: some View {
-        Button(L10n.string("connection.connect", "Connect")) { openConnection() }
-            .buttonStyle(.polished)
+        Button {
+            openConnection()
+        } label: {
+            Label(L10n.string("connection.connect", "Connect"), systemImage: "play.fill")
+        }
+            .buttonStyle(.polishedProminent)
             .keyboardShortcut(.defaultAction)
             .fixedSize(horizontal: true, vertical: false)
+            .help(L10n.string("connection.connect", "Connect"))
+    }
+
+    private var terminalPlan: SessionRowTerminalMenuPlan {
+        SessionRowTerminalMenuPlan.build(for: session.kind)
+    }
+
+    private var terminalControl: some View {
+        Button(action: openExternalTerminal) {
+            Label(L10n.string("overview.terminal", "Terminal"), systemImage: "terminal")
+        }
+            .buttonStyle(.polished)
+            .fixedSize(horizontal: true, vertical: false)
+            .help(L10n.string("overview.terminal", "Terminal"))
     }
 
     private var editControl: some View {
-        Button(L10n.string("sidebar.edit", "Edit…")) { onEdit(session) }
+        Button(action: { onEdit(session) }) {
+            Label(L10n.string("sidebar.edit", "Edit…"), systemImage: "pencil")
+        }
             .buttonStyle(.polished)
             .fixedSize(horizontal: true, vertical: false)
+            .help(L10n.string("sidebar.edit", "Edit…"))
     }
 
     private var diagnoseControl: some View {
-        Button(L10n.string("diagnostics.menu", "Diagnose…")) { onDiagnose(session) }
+        Button(action: { onDiagnose(session) }) {
+            Label(L10n.string("diagnostics.menu", "Diagnose…"), systemImage: "stethoscope")
+        }
             .buttonStyle(.polished)
             .fixedSize(horizontal: true, vertical: false)
+            .help(L10n.string("diagnostics.menu", "Diagnose…"))
     }
 
     /// The one place this view acts on the effect it holds.
@@ -194,11 +227,10 @@ struct SessionOverviewView: View {
     /// `.contextMenuEntry` is the input: the user did not make a gesture
     /// whose meaning has to be inferred, they read a button and pressed it —
     /// which is exactly what that case is for
-    /// (`SessionRowInput.isMenuEntry`). The three other effect slots are
-    /// no-ops constructed right here rather than parameters of this view, so
-    /// this surface HOLDS no way to open a terminal, local or external, and
-    /// `onSelect` has nothing to do: the overview is on screen because this
-    /// row is already the selection.
+    /// (`SessionRowInput.isMenuEntry`). The terminal effects are no-ops on
+    /// this path, and `onSelect` has nothing to do: the overview is already
+    /// showing the selected row. The external-terminal button has its own
+    /// explicit input and typed effect below.
     private func openConnection() {
         performSessionRowInput(
             .contextMenuEntry, on: session, isRenaming: false, isSelected: true,
@@ -206,6 +238,17 @@ struct SessionOverviewView: View {
             onConnect: onConnectSession,
             onOpenTerminal: SessionRowTerminalEffect { _ in },
             onOpenExternalTerminal: SessionRowExternalTerminalEffect { _ in })
+    }
+
+    /// Runs only the external-terminal effect. MacSCP neither creates a tab
+    /// nor opens its own SSH/SCP connection for this action.
+    private func openExternalTerminal() {
+        performSessionRowInput(
+            .externalTerminalMenuEntry, on: session, isRenaming: false, isSelected: true,
+            onSelect: SessionRowSelectEffect { _ in },
+            onConnect: SessionRowConnectEffect { _ in },
+            onOpenTerminal: SessionRowTerminalEffect { _ in },
+            onOpenExternalTerminal: onOpenExternalTerminal)
     }
 
     // MARK: - Facts

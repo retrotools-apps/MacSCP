@@ -1,6 +1,6 @@
 import Foundation
 
-/// The on-disk payload of a `.macscplogins` export (spec M19 "Payload"). Key
+/// The login-set section of a `.macscp` archive. Key
 /// FILES are embedded only for managed keys and only when the user opts in
 /// (see `ExportedLoginSet.embeddedKey`) -- external key paths are never read.
 public struct LoginSetExportPayload: Codable, Equatable, Sendable {
@@ -14,7 +14,6 @@ public struct LoginSetExportPayload: Codable, Equatable, Sendable {
         self.sets = sets
     }
 }
-
 public struct ExportedLoginSet: Codable, Equatable, Sendable {
     /// File-local id -- carried through so a `replace` import can keep the
     /// set's identity (sessions referencing it by id keep pointing at it).
@@ -91,33 +90,5 @@ public struct EmbeddedKey: Codable, Equatable, Sendable {
         self.publicKeyOpenSSH = publicKeyOpenSSH
         self.hasPassphrase = hasPassphrase
         self.passphrase = passphrase
-    }
-}
-
-/// `.macscplogins` binding of the shared `ExportEnvelopeCodec` (spec M19).
-/// Nothing but format identity lives here -- envelope shape, key derivation
-/// and AES-GCM are the generic core's job (see `SessionExportCodec`, the
-/// sibling facade for the `macscp-sessions` format).
-public enum LoginSetExportCodec {
-    static let formatName = "macscp-logins"
-    static let currentVersion = 1
-
-    public static func encode(_ payload: LoginSetExportPayload, password: String?) throws -> Data {
-        try ExportEnvelopeCodec.encode(
-            payload, format: formatName, version: currentVersion, password: password)
-    }
-
-    /// True = encrypted. Lets the UI decide whether to ask for a password
-    /// without attempting decryption.
-    public static func probe(_ data: Data) throws -> Bool {
-        try ExportEnvelopeCodec.probe(
-            data, as: LoginSetExportPayload.self, format: formatName,
-            currentVersion: currentVersion)
-    }
-
-    public static func decode(_ data: Data, password: String?) throws -> LoginSetExportPayload {
-        try ExportEnvelopeCodec.decode(
-            data, as: LoginSetExportPayload.self, format: formatName,
-            currentVersion: currentVersion, password: password)
     }
 }

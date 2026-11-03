@@ -512,6 +512,18 @@ final class TunnelManager {
         reload()
     }
 
+    /// Imports only stopped, freshly-keyed profiles. Nothing in this path
+    /// creates a runner or reaches a host.
+    func importArchive(
+        _ archive: MacSCPArchivePayload, sessionIDMap: [UUID: UUID]
+    ) throws -> MacSCPTunnelImportPlan {
+        let plan = MacSCPArchiveImportPlanner.tunnels(
+            from: archive, sessionIDMap: sessionIDMap, existingGroups: allGroups)
+        try store.appendPortable(groups: plan.groups, profiles: plan.tunnels)
+        reload()
+        return plan
+    }
+
     func removeGroup(_ group: TunnelGroup) throws {
         try store.deleteGroup(id: group.id)
         reload()

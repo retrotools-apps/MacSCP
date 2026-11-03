@@ -211,6 +211,17 @@ public struct TunnelStore: Sendable {
         try persist(file)
     }
 
+    /// Appends a re-keyed portable import in one atomic write. Imported
+    /// profiles have already been forced to `autoStart == .off`.
+    public func appendPortable(groups: [TunnelGroup], profiles: [TunnelProfile]) throws {
+        var file = try writableFile()
+        var storedGroups = file.groups ?? []
+        storedGroups.append(contentsOf: groups)
+        file.groups = storedGroups
+        file.profiles.append(contentsOf: profiles)
+        try persist(file)
+    }
+
     /// Removes the profile `id`. Throws `TunnelStoreError.unreadable`,
     /// changing nothing, when `tunnels.json` is present but undecodable.
     public func delete(id: UUID) throws {

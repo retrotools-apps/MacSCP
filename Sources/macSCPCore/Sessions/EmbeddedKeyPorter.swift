@@ -325,7 +325,7 @@ public enum EmbeddedKeyPorter {
     /// agrees with it.
     ///
     /// The declared metadata is attacker-controlled: a crafted
-    /// `.macscplogins` can pair foreign key bytes with the fingerprint of a
+    /// A `.macscp` login-set section can pair foreign key bytes with the fingerprint of a
     /// key its victim recognizes, and the keys list would then repeat that
     /// claim back at a user asking "is this my prod key?". So the values that
     /// end up in the store are derived, and a declared fingerprint that

@@ -125,8 +125,8 @@ cat > "$APP/Contents/Info.plist" <<PLIST
     <key>UTExportedTypeDeclarations</key>
     <array>
         <dict>
-            <key>UTTypeIdentifier</key><string>retroTools.MacSCP.sessions</string>
-            <key>UTTypeDescription</key><string>MacSCP Sessions</string>
+            <key>UTTypeIdentifier</key><string>retroTools.MacSCP.configuration</string>
+            <key>UTTypeDescription</key><string>MacSCP Configuration</string>
             <key>UTTypeConformsTo</key>
             <array>
                 <string>public.json</string>
@@ -135,27 +135,12 @@ cat > "$APP/Contents/Info.plist" <<PLIST
             <dict>
                 <key>public.filename-extension</key>
                 <array>
-                    <string>macscpsessions</string>
-                </array>
-            </dict>
-        </dict>
-        <dict>
-            <key>UTTypeIdentifier</key><string>retroTools.MacSCP.logins</string>
-            <key>UTTypeDescription</key><string>MacSCP Logins</string>
-            <key>UTTypeConformsTo</key>
-            <array>
-                <string>public.json</string>
-            </array>
-            <key>UTTypeTagSpecification</key>
-            <dict>
-                <key>public.filename-extension</key>
-                <array>
-                    <string>macscplogins</string>
+                    <string>macscp</string>
                 </array>
             </dict>
         </dict>
         <!-- The tab drag's own type (drag-detach fix, 2026-09-05). Shaped
-             deliberately unlike the session and login types above: it conforms to raw
+             deliberately unlike the configuration type above: it conforms to raw
              data only, never to a text kind, and it declares no filename
              extension. A tab drag means something only inside this app, and
              a type with neither of those gives the Finder nothing to accept

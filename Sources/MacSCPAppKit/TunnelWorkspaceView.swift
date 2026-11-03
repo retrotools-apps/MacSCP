@@ -180,7 +180,6 @@ struct TunnelWorkspaceView: View {
 
     private func tunnelRow(_ profile: TunnelProfile) -> some View {
         let state = manager.state(of: profile.id)
-        let running = isRunning(state)
         let carrier = sessions.first { $0.id == profile.sessionID }
         return HStack(alignment: .center, spacing: 12) {
             TunnelServiceIcon(appearance: profile.appearance, size: 20)
@@ -236,7 +235,7 @@ struct TunnelWorkspaceView: View {
                         }
                         .help(L10n.string("tunnels.open", "Open in browser"))
                     }
-                    Button(running ? L10n.string("tunnel.action.stop", "Stop") : L10n.string("tunnel.action.start", "Start")) {
+                    Button(toggleTitle(for: state)) {
                         toggleTunnel(profile)
                     }
                     .frame(minWidth: 48)
@@ -289,9 +288,17 @@ struct TunnelWorkspaceView: View {
     private func toggleTunnel(_ profile: TunnelProfile) {
         Task {
             switch TunnelPresentationState.toggleAction(for: manager.state(of: profile.id)) {
-            case .start: await manager.start(profile, decider: decider)
+            case .start, .restart: await manager.start(profile, decider: decider)
             case .stop: await manager.stop(profile)
             }
+        }
+    }
+
+    private func toggleTitle(for state: TunnelState) -> String {
+        switch TunnelPresentationState.toggleAction(for: state) {
+        case .start: L10n.string("tunnel.action.start", "Start")
+        case .restart: L10n.string("tunnel.action.restart", "Restart")
+        case .stop: L10n.string("tunnel.action.stop", "Stop")
         }
     }
 

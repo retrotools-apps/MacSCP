@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.4.0] (2026-11-03)
+
+### Highlights
+
+* **sharing:** Export or share connections, groups, tunnels and login sets in one portable `.macscp` archive.
+* **connections:** Open SSH terminals directly and start on All Connections instead of an empty connection form.
+* **interface:** Improved connection actions and made lost tunnels clearly offer Restart.
+
 ## [1.2.2] (2026-10-30)
 
 ### Highlights
