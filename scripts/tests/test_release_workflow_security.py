@@ -56,6 +56,12 @@ class ReleaseWorkflowSecurityTests(unittest.TestCase):
         self.assertNotIn("security export", build)
         self.assertNotIn(" -A ", build)
 
+        preflight = workflow.split("  preflight:\n", 1)[1].split("  store:\n", 1)[0]
+        self.assertIn("security import", preflight)
+        self.assertIn("security find-identity", preflight)
+        self.assertIn("security delete-keychain", preflight)
+        self.assertNotIn("openssl pkcs12", preflight)
+
         publish = workflow.split("  publish:\n", 1)[1]
         self.assertIn("    environment: release\n", publish)
         self.assertIn("      contents: write\n", publish)
