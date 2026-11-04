@@ -163,9 +163,9 @@ Run the unit suite with `swift test`.
 Non-Apple dependencies are versioned source trees in `Vendor/`. Official Apple
 packages use exact versions and the committed `Package.resolved` lock.
 `scripts/package-app` assembles a universal application. The GitHub release path
-uses free ad-hoc signing and requires no Apple certificate. Optional biometric
-Keychain protection requires an Apple-signed build with the appropriate
-entitlements.
+uses Developer ID signing and Apple notarization through the protected release
+environment. Optional biometric Keychain protection requires a separately
+qualified profile-backed build with the appropriate entitlements.
 
 <details>
 <summary><strong>Protocols and practical limits</strong></summary>

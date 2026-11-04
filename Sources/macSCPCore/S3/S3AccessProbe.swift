@@ -65,9 +65,8 @@ struct S3AccessResult: Sendable, Equatable {
 /// Nothing here interprets a status. A row saying `ListBuckets 403` is the
 /// answer; deciding what a user should do about it is the reader's job, and a
 /// probe that guessed would be guessing about every provider at once — the
-/// rig's own server already disagrees with AWS about this exact call
-/// (`docs/superpowers/specs/2026-09-02-s3-bucket-browser-design.md`: a scoped
-/// key gets a FILTERED list, not a refusal). Measured against MinIO on
+/// rig's own server already disagrees with AWS about this exact call: a scoped
+/// key gets a FILTERED list, not a refusal. Measured against MinIO on
 /// 2026-09-02 and against RustFS on 2026-09-25: both filter, neither
 /// refuses.
 struct S3AccessProbe: Sendable {

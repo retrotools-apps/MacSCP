@@ -228,8 +228,7 @@ final class TabDragPasteboardWriter: NSObject, NSPasteboardWriting {
 /// operation:)` is a method of the object that STARTED the session, and
 /// `.draggable` does not vend that object. SwiftUI's own drag-ended
 /// callback, `onDragSessionUpdated`, is macOS 26 — eleven major versions
-/// above this package's minimum (measured 2026-09-05, recorded in
-/// `docs/superpowers/specs/2026-09-03-detachable-tabs-design.md`).
+/// above this package's minimum.
 ///
 /// **Where it sits, and what that costs.** As an overlay over the tab's
 /// LABEL — its dots, title and protocol badge — and deliberately not over

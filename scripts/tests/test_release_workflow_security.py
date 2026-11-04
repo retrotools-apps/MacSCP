@@ -41,6 +41,15 @@ class ReleaseWorkflowSecurityTests(unittest.TestCase):
             self.assertIn("    environment: release\n", section)
             self.assertIn("secrets.MACSCP_SPARKLE_PRIVATE_KEY", section)
 
+        for name in [
+            "MACSCP_NOTARY_KEY_ID",
+            "MACSCP_NOTARY_ISSUER_ID",
+            "MACSCP_SIGN_IDENTITY",
+            "MACSCP_TEAM_ID",
+        ]:
+            self.assertIn(f"secrets.{name}", workflow)
+            self.assertNotIn(f"vars.{name}", workflow)
+
         build = workflow.split("  build:\n", 1)[1].split("  publish:\n", 1)[0]
         for secret in [
             "secrets.MACSCP_DEVELOPER_ID_P12_BASE64",
@@ -90,6 +99,7 @@ class ReleaseWorkflowSecurityTests(unittest.TestCase):
             env = dict(os.environ,
                        PATH=f"{root}:{os.environ['PATH']}",
                        REQUESTED_TAG="v1.2.0",
+                       REQUESTED_BUILD="11",
                        DEFAULT_BRANCH="main",
                        EVENT_NAME="workflow_dispatch",
                        GITHUB_REF="refs/heads/main",
@@ -102,6 +112,7 @@ class ReleaseWorkflowSecurityTests(unittest.TestCase):
                 "tag=v1.2.0",
                 f"commit={commit}",
                 f"tag_object={tag_object}",
+                "build=11",
             ])
 
             for rejected_ref in ("main", "refs/tags/v1.2.0", commit):
@@ -117,6 +128,13 @@ class ReleaseWorkflowSecurityTests(unittest.TestCase):
                                              text=True, capture_output=True)
             self.assertNotEqual(rejected_branch.returncode, 0)
             self.assertIn("must be dispatched from the default branch", rejected_branch.stdout)
+
+            env["GITHUB_REF"] = "refs/heads/main"
+            env["REQUESTED_BUILD"] = "1.2.0"
+            rejected_build = subprocess.run(["/bin/bash", "-c", script], env=env,
+                                            text=True, capture_output=True)
+            self.assertNotEqual(rejected_build.returncode, 0)
+            self.assertIn("build must be a positive integer", rejected_build.stdout)
 
 
 if __name__ == "__main__":

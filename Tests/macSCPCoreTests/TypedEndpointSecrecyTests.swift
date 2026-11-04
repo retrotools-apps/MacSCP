@@ -80,7 +80,7 @@ struct TypedEndpointSecrecyTests {
                 ("https://\(user):\(secret)@s3.example.test:9000/seed",
                  "https://s3.example.test:9000/seed"),
                 // Schemeless: the userinfo starts at the first character.
-                ("\(user):\(secret)@minio.lan:9000", "minio.lan:9000"),
+                ("\(user):\(secret)@object-store.example.invalid:9000", "object-store.example.invalid:9000"),
                 ("https://\(user):\(secret)@[2001:db8::1]:9000/dav", "https://[2001:db8::1]:9000/dav"),
                 ("https://\(user):\(secret)@[::1]", "https://[::1]"),
                 ("HTTP://\(user):\(secret)@192.0.2.10:9000", "HTTP://192.0.2.10:9000"),
@@ -96,7 +96,7 @@ struct TypedEndpointSecrecyTests {
     /// the account, and an account is often an e-mail address.
     static let untouchedRows = [
         "https://s3.example.test",
-        "minio.lan:9000",
+        "object-store.example.invalid:9000",
         "192.0.2.10:9000",
         "https://[::1]:9000",
         "",
@@ -358,7 +358,7 @@ struct TypedEndpointSecrecyTests {
     static let acceptedEndpoints = [
         "https://s3.example.test:9000/some/path",
         "https://s3.example.test",
-        "minio.lan:9000",
+        "object-store.example.invalid:9000",
         "http://[::1]:9000/",
     ]
 

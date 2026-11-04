@@ -35,9 +35,7 @@ private enum CancellableWaitState<Value: Sendable>: Sendable {
 /// not. On the regression this test actually exists for — a deadline that
 /// does not cover the resolving state — nothing fires at all, so through
 /// `get()` the red is written and the run then sits at 0 % CPU until the CI
-/// job timeout: the shape of
-/// `docs/superpowers/specs/2026-08-08-testsuite-hang-investigation.md`,
-/// arrived at from the other side.
+/// job timeout.
 ///
 /// No clock of its own. The wait ends when the future completes or when the
 /// task is cancelled, and nothing here measures how long either took.

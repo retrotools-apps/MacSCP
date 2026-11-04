@@ -2,9 +2,7 @@ import Foundation
 import MacSCPTestSupport
 import Testing
 
-/// Diagnostic-log plan, final fix round 2. The re-review traced an
-/// intermittent empty-file read (`.superpowers/sdd/2026-09-04-diagnostic-log/final-fix-report.md`,
-/// round 1's unexplained flake) to `DiagnosticLog.shared` being a
+/// An intermittent empty-file read was traced to `DiagnosticLog.shared` being a
 /// process-wide singleton: `currentFileURL` reads its LIVE `directory`/
 /// `fileDayKey` at call time, and another suite's own `configure(...)` on
 /// that same instance can overwrite either between one test's `await

@@ -2,8 +2,7 @@ import Foundation
 import Testing
 @testable import macSCPCore
 
-/// `ImportPreviewPlanner` — the pure planner behind the import preview
-/// (`docs/superpowers/specs/2026-09-03-cyberduck-import-design.md` §2/§3/§6).
+/// `ImportPreviewPlanner` — the pure planner behind the import preview.
 ///
 /// No store, no file system, no keychain: every fixture is a `StoredSession`
 /// or an `ExternalBookmark` built in memory. No secret ever reaches this

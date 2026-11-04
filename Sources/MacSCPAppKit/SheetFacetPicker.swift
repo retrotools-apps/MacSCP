@@ -1,8 +1,7 @@
 import SwiftUI
 import macSCPCore
 
-/// The management sheets' facet quick filter, drawn once for all of them
-/// (design: `docs/superpowers/specs/2026-08-29-sheet-facets-filter-design.md`).
+/// The management sheets' facet quick filter, drawn once for all of them.
 ///
 /// The facets are DATA: the host sheet hands over the values it derived from
 /// its own rows (`SheetFacetFilter.values(of:facet:)`) and keeps the mapping

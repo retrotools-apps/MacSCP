@@ -1,8 +1,7 @@
 // `@preconcurrency` because Citadel's SFTP handles are plain classes with no
 // `Sendable` conformance, and the stack underneath is no better: the SSH
 // transport reaches this app through a third-party fork of Apple's
-// swift-nio-ssh that never took Apple's `Sendable` adoption (measured in
-// docs/superpowers/specs/2026-08-20-backlog-dependencies.md). Those
+// swift-nio-ssh that never took Apple's `Sendable` adoption. Those
 // annotations belong to packages this project does not own, so there is
 // nothing to conform here — but be clear about what the suppression costs:
 // the compiler stops diagnosing `Sendable` violations involving Citadel's
@@ -1491,8 +1490,8 @@ public final class CitadelFileSystem: RemoteFileSystem, @unchecked Sendable {
         // This comment used to put that as "so `disconnect()` itself still
         // returns immediately". It did not, and the claim was measured
         // false: against a peer that stops answering, the SFTP close
-        // above was entered and never left inside bounds of 120 s and 30 s
-        // (`.superpowers/sdd/frozen-peer-measurement.md`). The detachment
+        // above was entered and never left inside bounds of 120 s and 30 s.
+        // The detachment
         // was never what made `disconnect()` prompt — it only kept this
         // 16-second sleep out of the caller's way. What bounds the call is
         // `BoundedSFTPSession.closeBoundSeconds`.

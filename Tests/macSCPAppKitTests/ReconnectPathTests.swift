@@ -410,8 +410,7 @@ struct ReconnectPathTests {
     /// rather than only the validation failure it produces downstream --
     /// for this same input, `ConnectionFieldSchema.firstViolation` reaches
     /// the endpoint field first (declaration order), so a validation-only
-    /// check would not have caught a region leak here (see the backlog
-    /// entry, `docs/superpowers/specs/2026-08-31-backlog-s3-without-bucket.md`).
+    /// check would not have caught a region leak here.
     @Test func fillFormLeavesTheRegionEmptyForANilS3Block() throws {
         let workDir = makeTempDirectory("predial-s3-nil-block")
         defer { try? FileManager.default.removeItem(at: workDir) }

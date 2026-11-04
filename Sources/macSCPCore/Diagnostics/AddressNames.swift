@@ -15,8 +15,7 @@ import Foundation
 /// name that leads somewhere else, is common and no fault by itself — shared
 /// hosting, a provider's generic PTR, a home line. So nothing here changes
 /// the resolve row's outcome: the row reports what the lookups answered and
-/// the reader judges (the S3 access probe's precedent, item 18 of
-/// `docs/superpowers/specs/2026-09-02-backlog-maintainer-notes.md`).
+/// the reader judges.
 public enum DiagnosticNameColumn {
     public static let address = "diagnostics.names.column.address"
     public static let name = "diagnostics.names.column.name"

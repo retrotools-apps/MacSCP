@@ -134,8 +134,8 @@ import macSCPCore
     }
 
     @Test func siblingHuesAreSeparatedAndSharedByContentDespiteFiltering() throws {
-        let root = StoredGroup(name: "Phantom")
-        let children = ["Deception", "Services", "Tools"].map { StoredGroup(name: $0, parentID: root.id) }
+        let root = StoredGroup(name: "Example Group")
+        let children = ["Development", "Services", "Tools"].map { StoredGroup(name: $0, parentID: root.id) }
         let groups = ([root] + children).map(SidebarGroupBands.Group.init)
         let hues = SidebarGroupBands.hues(groups: groups)
         let reversed = SidebarGroupBands.hues(groups: groups.reversed())

@@ -93,13 +93,13 @@ struct SessionOverviewModelTests {
             name: "backups", kind: .s3,
             s3: StoredS3Config(
                 accessKeyID: "AKIAEXAMPLE", region: "eu-central-1",
-                endpoint: "https://minio.lan:9000", bucket: "backups",
+                endpoint: "https://object-store.example.invalid:9000", bucket: "backups",
                 usePathStyle: true, startsAtBucketList: false))
 
         let overview = model(session)
 
         #expect(overview.kind == .s3)
-        #expect(overview.endpointText == "minio.lan:9000")
+        #expect(overview.endpointText == "object-store.example.invalid:9000")
         #expect(text(overview, "bucket") == "backups")
     }
 
@@ -273,7 +273,7 @@ struct SessionOverviewModelTests {
             name: "backups", kind: .s3,
             s3: StoredS3Config(
                 accessKeyID: "AKIAEXAMPLE", region: "eu-central-1",
-                endpoint: "https://minio.lan:9000", bucket: "backups",
+                endpoint: "https://object-store.example.invalid:9000", bucket: "backups",
                 usePathStyle: true, startsAtBucketList: false))
         let webdav = StoredSession(
             name: "nextcloud", kind: .webdav,
@@ -367,16 +367,16 @@ struct SessionOverviewModelTests {
             name: "backups", kind: .s3,
             s3: StoredS3Config(
                 accessKeyID: "AKIAEXAMPLE", region: "eu-central-1",
-                endpoint: "https://AKIAEXAMPLE:\(planted)@minio.lan:9000",
+                endpoint: "https://AKIAEXAMPLE:\(planted)@object-store.example.invalid:9000",
                 bucket: "backups", usePathStyle: true, startsAtBucketList: false))
 
         let overview = model(session)
 
         let rendered = overview.facts.map(\.text) + [overview.endpointText, overview.name]
         // The positive companion — see the WebDAV plant above.
-        let strippedEndpointIsRendered = rendered.contains { $0 == "https://minio.lan:9000" }
+        let strippedEndpointIsRendered = rendered.contains { $0 == "https://object-store.example.invalid:9000" }
         #expect(strippedEndpointIsRendered)
-        let hostIsRendered = rendered.contains { $0.contains("minio.lan") }
+        let hostIsRendered = rendered.contains { $0.contains("object-store.example.invalid") }
         #expect(hostIsRendered)
 
         let anyCarriesIt = rendered.contains { $0.contains(planted) }
@@ -435,7 +435,7 @@ struct SessionOverviewModelTests {
             name: "backups", kind: .s3,
             s3: StoredS3Config(
                 accessKeyID: "AKIAEXAMPLE", region: "eu-central-1",
-                endpoint: "https://minio.lan:9000", bucket: "backups",
+                endpoint: "https://object-store.example.invalid:9000", bucket: "backups",
                 usePathStyle: true, startsAtBucketList: false))
 
         let overview = model(session, groupName: "Production", loginSetName: "Backup key")
@@ -459,7 +459,7 @@ struct SessionOverviewModelTests {
             name: "half-configured", kind: .s3,
             s3: StoredS3Config(
                 accessKeyID: "AKIAEXAMPLE", region: "eu-central-1",
-                endpoint: "https://minio.lan:9000", bucket: "",
+                endpoint: "https://object-store.example.invalid:9000", bucket: "",
                 usePathStyle: true, startsAtBucketList: false))
 
         let overview = model(session)
@@ -475,7 +475,7 @@ struct SessionOverviewModelTests {
             name: "everything", kind: .s3,
             s3: StoredS3Config(
                 accessKeyID: "AKIAEXAMPLE", region: "eu-central-1",
-                endpoint: "https://minio.lan:9000", bucket: "",
+                endpoint: "https://object-store.example.invalid:9000", bucket: "",
                 usePathStyle: true, startsAtBucketList: true))
 
         let bucket = text(model(session), "bucket")

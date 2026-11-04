@@ -1407,10 +1407,8 @@ enum LivenessProbeRace {
 /// a third fact (see `ConnectionSurfacePlan.surface`). The jump-and-groups
 /// plan's Task 1 moved that call site out of the view body and into
 /// `DetailSurfacePlan.surface`, which composes this answer with the
-/// session overview's. Named per the design
-/// spec's own framing
-/// (`docs/superpowers/specs/2026-08-21-connection-state-design.md` §4):
-/// one and the same tab area for connecting, connected and lost.
+/// session overview's: one and the same tab area for connecting, connected
+/// and lost.
 enum ConnectionAttemptSurface: Equatable {
     /// The ordinary new-connection/edit form (`ConnectionFormView`).
     case form
@@ -2473,10 +2471,7 @@ private struct ConnectFailureView: View {
 /// "Connecting…" with a Cancel control (connection-liveness plan, Task 6) —
 /// shown instead of `ConnectionFormView` while `ConnectionSurfacePlan
 /// .surface(for:hostKeyPromptPending:connectAttemptFailed:)` answers
-/// `.connecting`. The design
-/// spec's own framing for this surface
-/// (`docs/superpowers/specs/2026-08-21-connection-state-design.md` §4):
-/// the connection attempt becomes a cancellable task on the same tab area,
+/// `.connecting`. The connection attempt becomes a cancellable task on the same tab area,
 /// so the rest of the window — other tabs, the sidebar once this one's own
 /// dial ends — stays usable instead of the tab looking like a dead modal
 /// with nothing to click.

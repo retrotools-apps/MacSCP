@@ -23,8 +23,7 @@ import Synchronization
 /// `dateFormatter` is a `DateFormatter`, which THIS SDK already declares
 /// `Sendable` — it is wrapped anyway so the file does not depend on which
 /// toolchain builds it (the CI toolchain is older, and the two have already
-/// disagreed on concurrency inference once; see
-/// docs/superpowers/specs/2026-08-26-backlog-toolchain-deviation.md).
+/// disagreed on concurrency inference once).
 public enum FileListFormatter {
     private static let byteFormatter = Mutex<ByteCountFormatter>({
         let f = ByteCountFormatter()

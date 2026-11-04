@@ -179,8 +179,7 @@ struct RSASHA2Signature: NIOSSHSignatureProtocol, Sendable {
 /// rather than going through Citadel's `SSHAlgorithms.publicKeyAlgorihtms`,
 /// which does exactly this call and nothing else (`Modification.register()`,
 /// Citadel `Client.swift`). This originally avoided the upstream generic
-/// Sendable constraint on non-Sendable protocol metatypes (measured in
-/// `.superpowers/sdd/2026-09-02-rsa-host-key-spike`). The local Citadel patch
+/// Sendable constraint on non-Sendable protocol metatypes. The local Citadel patch
 /// now scopes sendability to its metatype-only algorithm configuration;
 /// direct registration remains equivalent and avoids an unnecessary wrapper.
 ///

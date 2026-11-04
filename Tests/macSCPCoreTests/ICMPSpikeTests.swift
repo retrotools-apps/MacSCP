@@ -3,10 +3,8 @@ import Foundation
 import MacSCPTestSupport
 import Testing
 
-/// The ICMP spike of `docs/superpowers/plans/2026-09-03-connection-tools-spike.md`.
-///
-/// It answers §5 of `docs/superpowers/specs/2026-09-02-connection-tools-design.md`
-/// — whether an UNPRIVILEGED process on this machine can (a) send an ICMP
+/// This suite determines whether an UNPRIVILEGED process on this machine can
+/// (a) send an ICMP
 /// echo request and read the reply through a `SOCK_DGRAM` ICMP socket, and
 /// (b)/(c) whether that same socket is handed the ICMP time-exceeded message
 /// a TTL-limited UDP probe provokes. The verdicts decide which rows §2.3

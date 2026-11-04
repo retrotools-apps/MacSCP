@@ -389,7 +389,7 @@ struct SessionListViewModelTests {
         let set = LoginSet(name: "Shared", username: "operator", authKind: .password)
         #expect(vm.saveLoginSet(set, secret: "old-password"))
         let stored = try #require(vm.save(
-            name: "AI server", values: sshValues(host: "ai-server", port: 22, username: "ignored"),
+            name: "Compute node", values: sshValues(host: "compute.example.invalid", port: 22, username: "ignored"),
             password: "ignored-session-password", loginSetID: set.id))
 
         #expect(vm.saveLoginSet(set, secret: "replacement-password"))
@@ -731,7 +731,7 @@ struct SessionListViewModelTests {
             auditStore: AuditLogStore(directory: dir),
             loginSetStore: LoginSetStore(directory: dir), keys: ManagedKeyStore(directory: dir))
         let session = StoredSession(
-            name: "AI server", kind: .ssh,
+            name: "Compute node", kind: .ssh,
             ssh: StoredSSHConfig(
                 host: "ai-server", port: 22, username: "operator", authKind: .password))
         let candidate = "replacement-credential"
@@ -4440,7 +4440,7 @@ struct SessionListViewModelTests {
             auditStore: AuditLogStore(directory: dir),
             loginSetStore: LoginSetStore(directory: dir), keys: ManagedKeyStore(directory: dir))
         _ = otherProcess.save(
-            name: "db", values: sshValues(host: "db.internal", port: 22, username: "u"),
+            name: "db", values: sshValues(host: "database.example.invalid", port: 22, username: "u"),
             password: "")
 
         #expect(vm.sessions.map(\.name) == ["web"], """
@@ -4472,7 +4472,7 @@ struct SessionListViewModelTests {
             auditStore: AuditLogStore(directory: dir),
             loginSetStore: LoginSetStore(directory: dir), keys: ManagedKeyStore(directory: dir))
         _ = otherProcess.save(
-            name: "db", values: sshValues(host: "db.internal", port: 22, username: "u"),
+            name: "db", values: sshValues(host: "database.example.invalid", port: 22, username: "u"),
             password: "")
 
         // The app becomes active in the middle of the edit.

@@ -8,8 +8,7 @@
 // actor instead fails the other way on 6.3 ("sending 'client' risks causing
 // data races" at the `client.close()` call), so the two toolchains leave no
 // shape both accept without this. Same divergence and same remedy as
-// `Sources/macSCPCore/SSH/CitadelFileSystem.swift`; see
-// `docs/superpowers/specs/2026-08-26-backlog-toolchain-deviation.md`. What
+// `Sources/macSCPCore/SSH/CitadelFileSystem.swift`. What
 // stops being checked: Sendable diagnostics involving Citadel's types in
 // THIS test file — every such value here lives for one test and is handed
 // across exactly once.
@@ -99,8 +98,8 @@ private let isolatedWriteCloseServerPort = 2229
 /// keep working, and how far above is not written here in prose — a second
 /// copy of `closeBoundSeconds` is exactly what this file's own rule about
 /// numbers forbids. `FileCloseBoundRelationTests` below asserts the relation
-/// against the production constant instead. 10s, per the measurement plan
-/// (`.superpowers/sdd/2026-09-02-unbounded-file-closes-measurement/task-1-brief.md`).
+/// against the production constant instead. The integration fixture allows
+/// 10 seconds for a remote close to complete.
 private let fileCloseBoundSeconds = 10
 
 /// Pins the one thing the comment above cannot say without copying a number:
@@ -1230,9 +1229,7 @@ struct LivenessProbeDropIntegrationTests {
     }
 
     /// The question `aSilentlyFrozenPeerIsNoticedByTheDeadline` deliberately
-    /// does not settle, and the one the backlog entry
-    /// `docs/superpowers/specs/2026-08-25-backlog-teardown-with-frozen-peer.md`
-    /// was filed to close: the same give-up lap, run against a peer that is
+    /// does not settle: the same give-up lap, run against a peer that is
     /// STILL frozen.
     ///
     /// Why it is a different question. `handleLivenessGiveUp(_:)` reaches

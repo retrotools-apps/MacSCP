@@ -16,8 +16,7 @@ public enum HostKeyStatus: Sendable, Equatable {
     case notApplicable
 }
 
-/// Everything the read-only session overview shows, derived from what is
-/// stored (design: `docs/superpowers/specs/2026-09-04-session-overview-design.md`).
+/// Everything the read-only session overview shows, derived from what is stored.
 ///
 /// **No secret reaches this type.** The credential question is answered by
 /// `SecretPresence`, which returns a `Bool` and has no way of carrying a

@@ -161,9 +161,7 @@ package struct SubprocessCancelled: Error, CustomStringConvertible, Sendable {
 /// runs every test on it. A test that blocks — `Process.waitUntilExit()`, a
 /// `DispatchGroup.wait()`, a semaphore — holds one of those few threads for
 /// as long as the child runs, and on a three-core CI runner three such tests
-/// are enough to starve the other three thousand (CLAUDE.md, "Tests never
-/// block the cooperative pool"; the measurement is in
-/// `docs/superpowers/specs/2026-08-08-testsuite-hang-investigation.md`).
+/// are enough to starve the other three thousand.
 ///
 /// So every wait here is a suspension, and no thread is parked on the
 /// child's behalf either: the pipes are read by `FileHandle.readabilityHandler`

@@ -43,10 +43,6 @@
     "executable": false,
     "sha256": "9c10a71f85c51c8ebf1d96412b56cf340df4a29629e3aa9792f0a974193feaee"
   },
-  "bigint/Demo.playground/Contents.o": {
-    "executable": false,
-    "sha256": "a52d4fae2549df226f2190eb4ac7734560eeca9dca7bc2a8d5bfe902b624764f"
-  },
   "bigint/Demo.playground/Pages/Digits of Pi.xcplaygroundpage/Contents.swift": {
     "executable": false,
     "sha256": "c556318d1957ece44d4ff7f274bf8f4884cbb3163115aa6d8f4c7f92109aeeac"

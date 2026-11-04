@@ -609,9 +609,7 @@ struct SessionSidebar: View {
             onCommitRename: { commitGroupRename(group) },
             onCancelRename: endRename,
             onExport: { onExport(.group(group)) },
-            shareItem: PortableConfigurationShareItem.make(
-                name: group.name, scope: .group(group), viewModel: viewModel,
-                tunnels: tunnels.allProfiles, tunnelGroups: tunnels.allGroups),
+            onShare: { share(name: group.name, scope: .group(group)) },
             onColor: { viewModel.setGroupColor(group, color: $0) },
             onSortByName: { viewModel.sortChildrenByName(of: group.id) },
             onNewGroup: { beginNewGroup(forMoving: nil, inGroup: group.id) },
@@ -654,9 +652,7 @@ struct SessionSidebar: View {
             onDuplicate: { duplicate(session) },
             onRequestDelete: { sessionPendingDelete = session },
             onExport: { onExport(.single(session)) },
-            shareItem: PortableConfigurationShareItem.make(
-                name: session.name, scope: .single(session), viewModel: viewModel,
-                tunnels: tunnels.allProfiles, tunnelGroups: tunnels.allGroups),
+            onShare: { share(name: session.name, scope: .single(session)) },
             onShowAuditLog: { onShowAuditLog(session) },
             onDiagnose: { onDiagnose(session) },
             tunnels: tunnels,
@@ -670,6 +666,17 @@ struct SessionSidebar: View {
         )
         .listRowInsets(EdgeInsets(top: 0, leading: 4, bottom: 0, trailing: 4))
         .listRowSeparator(.hidden)
+    }
+
+    /// Builds the portable archive and the native ShareKit picker only after
+    /// the user selects Share. Keeping this work behind the menu action is
+    /// essential: a session row reevaluates on hover and must stay pure.
+    private func share(name: String, scope: SessionListViewModel.ExportScope) {
+        guard let item = PortableConfigurationShareItem.make(
+            name: name, scope: scope, viewModel: viewModel,
+            tunnels: tunnels.allProfiles, tunnelGroups: tunnels.allGroups)
+        else { return }
+        PortableConfigurationSharer.show(item)
     }
 
     /// Empty-state row shared by the session list states.
@@ -976,7 +983,7 @@ private struct SidebarGroupRow: View {
     let onCommitRename: () -> Void
     let onCancelRename: () -> Void
     let onExport: () -> Void
-    let shareItem: PortableConfigurationShareItem?
+    let onShare: () -> Void
     let onColor: (GroupColor?) -> Void
     let onSortByName: () -> Void
     /// "New group…" nested inside this folder (Task 4, jump-and-groups
@@ -1048,15 +1055,10 @@ private struct SidebarGroupRow: View {
             // entry cannot depend on one existing.
             Button(L10n.string("sidebar.newGroup", "New group…")) { onNewGroup() }
             Button(L10n.string("export.menu.group", "Export Group…")) { onExport() }
-            if let shareItem {
-                ShareLink(
-                    item: shareItem,
-                    preview: SharePreview(shareItem.filename)
-                ) {
-                    Label(L10n.string("share.portable", "Share…"), systemImage: "square.and.arrow.up")
-                }
-                .help(L10n.string("share.portable", "Share…"))
+            Button(action: onShare) {
+                Label(L10n.string("share.portable", "Share…"), systemImage: "square.and.arrow.up")
             }
+            .help(L10n.string("share.portable", "Share…"))
             // Offered only where it can do something — see
             // `SidebarSortMenuPlan`; this project hides what cannot act
             // rather than greying it out.
@@ -1137,7 +1139,7 @@ private struct SessionRow: View {
     let onDuplicate: () -> Void
     let onRequestDelete: () -> Void
     let onExport: () -> Void
-    let shareItem: PortableConfigurationShareItem?
+    let onShare: () -> Void
     let onShowAuditLog: () -> Void
     let onDiagnose: () -> Void
     /// The app-wide forwardings, read by `tunnelPlan` below. The row asks
@@ -1315,6 +1317,13 @@ private struct SessionRow: View {
         .background(RoundedRectangle(cornerRadius: 6).fill(highlightFill))
         .overlay(RoundedRectangle(cornerRadius: 6).strokeBorder(dropPlan.borderColor, lineWidth: 2))
         .contentShape(Rectangle())
+        // Keep the physical row's tooltip and accessibility identity outside
+        // the context-menu subtree. In a native List, the final reusable cell
+        // can otherwise inherit the menu's accessibility node and lose both
+        // its hit target and its help tag.
+        .help(connectionSummary)
+        .accessibilityLabel(Text(session.name))
+        .accessibilityValue(Text(connectionSummary))
         .onTapGesture(count: 2) { _ = onInput(.doubleClick, session) }
         .onTapGesture(count: 1) { _ = onInput(.singleClick, session) }
         // Focusable only while it is not being renamed: the inline rename
@@ -1357,15 +1366,10 @@ private struct SessionRow: View {
             }
             Button(L10n.string("sidebar.edit", "Edit…")) { onEdit() }
             Button(L10n.string("export.menu.single", "Export…")) { onExport() }
-            if let shareItem {
-                ShareLink(
-                    item: shareItem,
-                    preview: SharePreview(shareItem.filename)
-                ) {
-                    Label(L10n.string("share.portable", "Share…"), systemImage: "square.and.arrow.up")
-                }
-                .help(L10n.string("share.portable", "Share…"))
+            Button(action: onShare) {
+                Label(L10n.string("share.portable", "Share…"), systemImage: "square.and.arrow.up")
             }
+            .help(L10n.string("share.portable", "Share…"))
             Button(L10n.string("sidebar.rename", "Rename")) { onStartRename() }
             // Directly under Rename, in the menu that also holds Delete —
             // where the design puts it, among the entries that act on the
@@ -1444,10 +1448,6 @@ private struct SessionRow: View {
                 onRequestDelete()
             }
         }
-        // Pure data interpolation, backend-specific (user@host for SSH,
-        // bucket @ endpoint-host for S3, user @ host for WebDAV) — no
-        // natural-language words to translate, identical in every locale.
-        .help(connectionSummary)
     }
 
     /// The payload a drag of this row carries — and the one moment the

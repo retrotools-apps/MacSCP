@@ -26,7 +26,6 @@
 !/docs/web/
 !/docs/DEPENDENCY_FORKS.md
 !/docs/WINSCP_FORMAT.md
-!/docs/SPARKLE.md
 !/docs/USER_GUIDE.md
 !/docs/product/
 !/docs/product/**
@@ -54,6 +53,7 @@
 !/scripts/application-icon-scope.json
 !/scripts/check-public-tree
 !/scripts/check-release-environment
+!/scripts/check-sparkle-build-order
 !/scripts/verify-appcast.swift
 !/scripts/verify-sparkle-key.swift
 !/scripts/prepare-website

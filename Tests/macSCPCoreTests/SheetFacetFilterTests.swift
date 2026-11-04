@@ -3,8 +3,7 @@ import Testing
 
 @testable import macSCPCore
 
-/// The management sheets' facet quick filter, as a value
-/// (`docs/superpowers/specs/2026-08-29-sheet-facets-filter-design.md`).
+/// The management sheets' facet quick filter, as a value.
 ///
 /// Everything decidable about it is decided here rather than in three
 /// `filteredRows` bodies: what a facet selection means, where the offered

@@ -132,6 +132,11 @@ class VendorPolicyTests(unittest.TestCase):
         (cache / "config").write_text("generated cache")
         self.run_policy()
 
+    def test_compiled_objects_are_rejected_from_vendored_source(self):
+        (self.package / "developer-path.o").write_bytes(b"compiled fixture")
+        with self.assertRaisesRegex(ValueError, "compiled object forbidden"):
+            self.run_policy("--record")
+
     def test_effective_graph_must_contain_only_the_recorded_local_packages(self):
         graph = {"path": str(self.root), "dependencies": [{
             "path": str(self.package), "url": str(self.package),

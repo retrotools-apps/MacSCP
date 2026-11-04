@@ -234,7 +234,7 @@ public enum S3FieldSchema {
     /// **A schemeless endpoint means `https`, and its port is honoured**
     /// (2026-09-03, maintainer report: `host:9000` could not connect).
     /// Foundation is the reason the rule needs code: `URLComponents(string:)`
-    /// reads `minio.lan:9000` as a SCHEME of `minio.lan` with no host at all,
+    /// reads `minio.example.test:9000` as a SCHEME of `minio.example.test` with no host at all,
     /// and refuses `192.0.2.10:9000` outright because a scheme may not begin
     /// with a digit. FOUR of the eight spellings in
     /// `S3EndpointParsingTests`' table parsed without a host before the
@@ -272,7 +272,7 @@ public enum S3FieldSchema {
     /// `ALPHA *( ALPHA / DIGIT / "+" / "-" / "." )` followed by `://`.
     ///
     /// The `//` is part of the test on purpose. A bare colon is not evidence
-    /// of a scheme: `minio.lan:9000` and `[::1]:9000` both carry one and are
+    /// of a scheme: `minio.example.test:9000` and `[::1]:9000` both carry one and are
     /// exactly the spellings this must treat as schemeless.
     private static func hasScheme(_ text: String) -> Bool {
         guard let separator = text.range(of: "://") else { return false }
@@ -293,7 +293,7 @@ public enum S3FieldSchema {
     /// the same nil the connect path refuses on.
     ///
     /// The form shows this under the endpoint field, so a user who types
-    /// `minio.lan:9000` can see that it became `https://minio.lan:9000`
+    /// `minio.example.test:9000` can see that it became `https://minio.example.test:9000`
     /// BEFORE a connection is attempted. Core composes the origin only; the
     /// sentence around it is the App's, out of its catalogs.
     ///
@@ -526,7 +526,7 @@ public enum S3FieldSchema {
     /// Reads the host through `endpointComponents` and not through a
     /// `URL(string:)` of its own (2026-09-03): the second parse disagreed
     /// with the first for exactly the spellings this task is about — for
-    /// `minio.lan:9000` it found no host and the sidebar fell back to
+    /// `minio.example.test:9000` it found no host and the sidebar fell back to
     /// printing the whole endpoint string.
     ///
     /// The PORT is part of it (review 2026-09-04): without it a MinIO on

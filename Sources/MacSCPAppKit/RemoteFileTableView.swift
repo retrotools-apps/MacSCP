@@ -641,8 +641,7 @@ struct RemoteFileTableView: NSViewRepresentable {
     
     }
 
-    /// `NSTableView` subclass driving Finder-style keyboard shortcuts
-    /// (M11j/T2) — see `docs/superpowers/specs/2026-07-30-m11j-browser-keyboard-design.md`.
+    /// `NSTableView` subclass driving Finder-style keyboard shortcuts.
     /// Split across two overrides because AppKit routes Command-modified key
         /// presses through `performKeyEquivalent(with:)`, NOT `keyDown(with:)` —
     /// the classic trap this design works around.

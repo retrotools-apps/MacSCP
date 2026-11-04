@@ -4,7 +4,7 @@ import Testing
 import macSCPCore
 
 /// Guards the line the S3 endpoint field draws under itself — "Connects to
-/// https://minio.lan:9000" — against the two ways it can go missing without
+/// https://object-store.example.invalid:9000" — against the two ways it can go missing without
 /// anything turning red (2026-09-03, the task that made a schemeless
 /// `host:9000` connectable): `ConnectionFormView` stops handing
 /// `SchemaFormView` the closure, or `SchemaFormView` stops calling it.

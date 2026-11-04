@@ -2,9 +2,8 @@ import Foundation
 import Testing
 @testable import macSCPCore
 
-/// `CyberduckBookmarkSource` reads Cyberduck's `.duck` property lists
-/// (measured 2026-09-03, `docs/superpowers/specs/2026-09-03-cyberduck-import-design.md`
-/// §1/§6). Fixtures live under `Tests/macSCPCoreTests/Fixtures/Cyberduck/`,
+/// `CyberduckBookmarkSource` reads Cyberduck's `.duck` property lists.
+/// Fixtures live under `Tests/macSCPCoreTests/Fixtures/Cyberduck/`,
 /// with synthetic `*.example.net` hosts — never the maintainer's real
 /// bookmark folder.
 @Suite("CyberduckBookmarkSource")

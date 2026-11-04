@@ -4,9 +4,8 @@ import Synchronization
 /// How much a `DiagnosticLog` line matters, and how verbose the sink
 /// currently is.
 ///
-/// Ordered by declaration (`off < error < info < debug`), which is also the
-/// order the design (`docs/superpowers/specs/2026-09-04-diagnostic-log-design.md`,
-/// "The sink") states it in. A line is written when its own level is at most
+/// Ordered by declaration (`off < error < info < debug`). A line is written
+/// when its own level is at most
 /// the configured level — `error` passes at `.info`, `debug` does not — and
 /// nothing is ever written while the configured level is `.off`, which
 /// `DiagnosticLog.log` checks separately from the ordering (`.off <= .off`

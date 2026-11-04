@@ -325,8 +325,7 @@ extension SSHForwardingConnection {
     /// Refusing port 0 is the alternative to a forward that looks healthy and
     /// silently swallows every connection. What would retire the guard is a
     /// fork that registers the handler under the BOUND pair, after the reply,
-    /// instead of under the requested one before it — written down as a debt
-    /// in `docs/superpowers/specs/2026-08-20-backlog-dependencies.md`.
+    /// instead of under the requested one before it.
     /// `TunnelRigITests.aRemoteForwardOnPortZeroIsRefused` pins THIS guard,
     /// not Citadel's behaviour, so it cannot announce the fix: it must be
     /// removed together with the guard.

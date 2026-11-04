@@ -62,19 +62,19 @@ struct SessionSidebarCompactRowGuardTests {
     }
 
     @Test func compactTunnelNamesHideOnlyTheMatchingListenPortSuffix() {
-        var profile = TunnelProfile(sessionID: UUID(), name: "harpoon · 18680",
-            kind: .local(bind: "127.0.0.1", localPort: 18680, host: "example.invalid", remotePort: 80))
-        #expect(TunnelCatalog.sidebarName(profile, compact: true) == "harpoon")
-        #expect(TunnelCatalog.sidebarName(profile, compact: false) == "harpoon · 18680")
-        #expect(profile.name == "harpoon · 18680")
-        profile.name = "My tunnel 18680"
+        var profile = TunnelProfile(sessionID: UUID(), name: "example-service · 18080",
+            kind: .local(bind: "127.0.0.1", localPort: 18080, host: "example.invalid", remotePort: 80))
+        #expect(TunnelCatalog.sidebarName(profile, compact: true) == "example-service")
+        #expect(TunnelCatalog.sidebarName(profile, compact: false) == "example-service · 18080")
+        #expect(profile.name == "example-service · 18080")
+        profile.name = "My tunnel 18080"
         #expect(TunnelCatalog.sidebarName(profile, compact: true) == profile.name)
-        profile.name = "harpoon · 8080"
+        profile.name = "example-service · 8080"
         #expect(TunnelCatalog.sidebarName(profile, compact: true) == profile.name)
         profile.kind = .remote(bind: "127.0.0.1", remotePort: 8080, localHost: "localhost", localPort: 80)
-        #expect(TunnelCatalog.sidebarName(profile, compact: true) == "harpoon")
+        #expect(TunnelCatalog.sidebarName(profile, compact: true) == "example-service")
         profile.kind = .dynamic(bind: "127.0.0.1", localPort: 8080)
-        #expect(TunnelCatalog.sidebarName(profile, compact: true) == "harpoon")
+        #expect(TunnelCatalog.sidebarName(profile, compact: true) == "example-service")
         profile.name = " · 8080"
         #expect(TunnelCatalog.sidebarName(profile, compact: true) == profile.name)
     }

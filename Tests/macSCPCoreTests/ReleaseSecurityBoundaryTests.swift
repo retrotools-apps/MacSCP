@@ -138,7 +138,7 @@ struct ReleaseSecurityBoundaryTests {
         #expect(S3FieldSchema.endpointComponents(endpoint) == nil)
     }
 
-    @Test(arguments: ["https://s3.example.test", "minio.lan:9000", "https://[::1]:9000"])
+    @Test(arguments: ["https://s3.example.test", "object-store.example.invalid:9000", "https://[::1]:9000"])
     func validEndpointsRoundTrip(_ endpoint: String) throws {
         let config = StoredS3Config(accessKeyID: "test", region: "test", endpoint: endpoint,
                                     bucket: "test", usePathStyle: true)

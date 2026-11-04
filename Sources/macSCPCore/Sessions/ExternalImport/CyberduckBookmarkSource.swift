@@ -3,8 +3,7 @@ import Foundation
 /// Reads Cyberduck's bookmark files: one XML property list per bookmark,
 /// `<UUID>.duck`, under Cyberduck's Group Container.
 ///
-/// Measured 2026-09-03 (`docs/superpowers/specs/2026-09-03-cyberduck-import-design.md`
-/// §1): a `.duck` file is a top-level dictionary of string values (and, for
+/// A `.duck` file is a top-level dictionary of string values (and, for
 /// `Labels`, an array of strings). Keys read here: `Protocol`, `Hostname`,
 /// `Port`, `UUID`, `Username`, `Nickname`, `Private Key File`, `Path`,
 /// `Labels`. `Provider`, `Download Folder` and `Access Timestamp` are read

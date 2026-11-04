@@ -362,9 +362,7 @@ struct TunnelRigITests {
     /// OUR guard, not Citadel's behaviour: it would stay green against a
     /// fixed Citadel, because the guard would still refuse before anything
     /// reached the library. It must be REMOVED together with the guard —
-    /// both are one change, recorded as a debt in
-    /// `docs/superpowers/specs/2026-08-20-backlog-dependencies.md` with what
-    /// the fork would have to do. The measurement that put the guard there
+    /// both are one change. The measurement that put the guard there
     /// is in `SSHForwardingConnection.withRemotePortForward`'s doc comment and in
     /// the case above.
     ///

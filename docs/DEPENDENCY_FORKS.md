@@ -55,11 +55,8 @@ adaptations still rely on their local APIs. BigInt's local adaptation remains
 a compiler deployment-floor adjustment; it has not been reimported here.
 The Sparkle native project still uses the local Argument Parser snapshot.
 Public advisory listings are not proof of absence of vulnerabilities.
-For the free GitHub channel, updater qualification requires a real
-older-to-newer installation between ad-hoc signed builds. The previous
-notarized-update qualification plan applies only if a Developer ID channel is
-introduced; it is not a prerequisite for the GitHub build. See
-[distribution-specific update checks](SPARKLE.md).
+Updater changes require a separate source review and an older-to-newer
+installation test with the signed release artifacts.
 
 ## SFTP resource-boundary review — 2026-10-23
 

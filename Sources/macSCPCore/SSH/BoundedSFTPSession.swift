@@ -30,8 +30,7 @@ final class BoundedSFTPSession: Sendable {
     /// connection(s) anyway.
     ///
     /// There has to be a bound at all because the underlying close does not
-    /// return against a peer that has stopped answering. Measured, not
-    /// assumed (`.superpowers/sdd/frozen-peer-measurement.md`): held directly
+    /// return against a peer that has stopped answering. Held directly
     /// against a `docker pause`d container, that one call sat inside a
     /// 20-second bound for 20.01678975 s, while `SSHClient.close()` on the
     /// same frozen peer returned in 0.051039125 s; driven through the real
@@ -124,11 +123,8 @@ final class BoundedSFTPSession: Sendable {
 /// One level down from `BoundedSFTPSession`, for the same reason and by the
 /// same move. `7ac7f7e` bounded the session close and left the file closes
 /// alone; they were then measured against a `docker pause`d peer and behave
-/// exactly like the session close did — the numbers, the shape of the
-/// measurement and what it did NOT establish are in
-/// `docs/superpowers/specs/2026-08-28-backlog-unbounded-file-closes.md`
-/// ("Measured 2026-09-02"), which is where they stay rather than being
-/// copied here to drift.
+/// exactly like the session close did. The bound is intentionally centralized
+/// rather than copied here to drift.
 ///
 /// Why the raw file must not escape: counted in this pass,
 /// `CitadelFileSystem` closed a file at eight call sites — five directly on

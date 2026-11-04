@@ -1,0 +1,43 @@
+#!/usr/bin/env python3
+"""Reject a release build that Sparkle cannot order after the stable feed."""
+
+from pathlib import Path
+import re
+import sys
+import xml.etree.ElementTree as ET
+
+
+SPARKLE_NAMESPACE = "http://www.andymatuschak.org/xml-namespaces/sparkle"
+
+
+def positive_build(value: str, label: str) -> int:
+    if re.fullmatch(r"[1-9][0-9]*", value) is None:
+        raise ValueError(f"{label} must be a positive integer")
+    return int(value)
+
+
+def current_build(path: Path) -> int:
+    root = ET.parse(path).getroot()
+    values = root.findall(f"./channel/item/{{{SPARKLE_NAMESPACE}}}version")
+    if len(values) != 1 or values[0].text is None:
+        raise ValueError("stable appcast must contain exactly one Sparkle build")
+    return positive_build(values[0].text.strip(), "stable Sparkle build")
+
+
+def main() -> None:
+    if len(sys.argv) != 3:
+        raise SystemExit("usage: check-sparkle-build-order <candidate-build> <stable-appcast>")
+    try:
+        candidate = positive_build(sys.argv[1], "candidate build")
+        stable = current_build(Path(sys.argv[2]))
+    except (ET.ParseError, OSError, ValueError) as error:
+        raise SystemExit(f"error: {error}") from error
+    if candidate <= stable:
+        raise SystemExit(
+            f"error: candidate build {candidate} must be greater than stable Sparkle build {stable}"
+        )
+    print(f"Verified Sparkle build order: {candidate} > {stable}")
+
+
+if __name__ == "__main__":
+    main()

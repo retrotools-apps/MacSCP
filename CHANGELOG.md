@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.4.2] (2026-11-04)
+
+### Highlights
+
+* **updates:** Restored Sparkle update ordering and reject releases with non-increasing builds.
+* **interface:** Prevented the native Share menu from stalling sidebar hover and selection.
+* **security:** Removed a compiled vendor artifact containing upstream build-path metadata.
+
 ## [1.4.1] (2026-11-03)
 
 ### Highlights

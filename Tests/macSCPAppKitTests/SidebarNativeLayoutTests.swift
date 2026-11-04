@@ -11,11 +11,11 @@ import Testing
         let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
         defer { try? FileManager.default.removeItem(at: directory) }
         let store = SessionStore(directory: directory)
-        let root = StoredGroup(name: "Phantom", color: GroupColor(rgb: 0xE6E673))
-        let child = StoredGroup(name: "Deception", parentID: root.id, color: GroupColor(rgb: 0xE673AC))
+        let root = StoredGroup(name: "Example Group", color: GroupColor(rgb: 0xE6E673))
+        let child = StoredGroup(name: "Development", parentID: root.id, color: GroupColor(rgb: 0xE673AC))
         let tools = StoredGroup(name: "Tools", parentID: root.id, color: GroupColor(rgb: 0xAC73E6))
         for group in [root, child, tools] { try store.upsertGroup(group) }
-        for (name, group) in [("z-bastion", root.id), ("phantom-central", child.id), ("phantom-pop1", child.id), ("phantom-pop2", child.id), ("AI server", tools.id), ("dns server", tools.id)] {
+        for (name, group) in [("edge-bastion", root.id), ("service-central", child.id), ("service-node1", child.id), ("service-node2", child.id), ("compute server", tools.id), ("dns server", tools.id)] {
             try store.upsert(StoredSession(name: name, groupID: group, ssh: StoredSSHConfig(host: "example.invalid", username: "operator")))
         }
         let model = SessionListViewModel(store: store, secrets: NoSecretsStore(), auditStore: AuditLogStore(directory: directory), loginSetStore: LoginSetStore(directory: directory), keys: ManagedKeyStore(directory: directory))
@@ -70,8 +70,8 @@ import Testing
         defer { rig.tearDown() }
         let group = TunnelGroup(name: "Services", color: GroupColor(rgb: 0x73E6D0))
         try rig.store.upsertGroup(group)
-        try rig.store.upsert(TunnelProfile(sessionID: UUID(), name: "harpoon · 18680",
-            kind: .local(bind: "127.0.0.1", localPort: 18680, host: "example.invalid", remotePort: 80), groupID: group.id))
+        try rig.store.upsert(TunnelProfile(sessionID: UUID(), name: "example-service · 18080",
+            kind: .local(bind: "127.0.0.1", localPort: 18080, host: "example.invalid", remotePort: 80), groupID: group.id))
         rig.manager.reload()
         let host = NSHostingView(rootView: TunnelWorkspaceSidebar(manager: rig.manager, sidebarCompact: compact, onSessions: {})
             .modifier(SidebarWorkspaceVisibility(isVisible: true))
@@ -119,8 +119,8 @@ import Testing
     func collapsedLabelsAreCenteredWithinTheirOwnGroupSurface(scheme: ColorScheme) async throws {
         let metrics = CollapsedSidebarMetrics()
         let home = StoredGroup(name: "Home", color: GroupColor(rgb: 0x8FE673))
-        let root = StoredGroup(name: "Phantom", color: GroupColor(rgb: 0xE6E673))
-        let child = StoredGroup(name: "Deception", parentID: root.id, color: GroupColor(rgb: 0xE673AC))
+        let root = StoredGroup(name: "Example Group", color: GroupColor(rgb: 0xE6E673))
+        let child = StoredGroup(name: "Development", parentID: root.id, color: GroupColor(rgb: 0xE673AC))
         let tools = StoredGroup(name: "Tools", parentID: root.id, color: GroupColor(rgb: 0xAC73E6))
         let groups = [home, root, child, tools]
         let bands = SidebarGroupBands.build(entries: groups.map { .init(id: $0.id, groupID: $0.id) }, groups: groups.map(SidebarGroupBands.Group.init))

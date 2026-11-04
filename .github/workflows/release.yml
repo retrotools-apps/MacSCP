@@ -6,6 +6,9 @@ on:
       tag:
         description: 'Existing release tag matching VERSION'
         required: true
+      build:
+        description: 'Optional monotonically increasing CFBundleVersion (defaults to the workflow run number)'
+        required: false
 
 permissions:
   contents: read
@@ -22,12 +25,14 @@ jobs:
       tag: ${{ steps.release.outputs.tag }}
       commit: ${{ steps.release.outputs.commit }}
       tag_object: ${{ steps.release.outputs.tag_object }}
+      build: ${{ steps.release.outputs.build }}
     steps:
       - name: Resolve and validate the exact release tag
         id: release
         env:
           GH_TOKEN: ${{ github.token }}
           REQUESTED_TAG: ${{ inputs.tag || github.ref_name }}
+          REQUESTED_BUILD: ${{ inputs.build || github.run_number }}
           DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
           EVENT_NAME: ${{ github.event_name }}
         run: |
@@ -35,6 +40,10 @@ jobs:
           TAG="$REQUESTED_TAG"
           if [[ ! "$TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+([+-][0-9A-Za-z][0-9A-Za-z.-]*)?$ ]]; then
             echo '::error::Release input must be a bare semantic-version tag such as v1.2.3.'
+            exit 1
+          fi
+          if [[ ! "$REQUESTED_BUILD" =~ ^[1-9][0-9]*$ ]]; then
+            echo '::error::Release build must be a positive integer.'
             exit 1
           fi
           if [[ "$EVENT_NAME" = workflow_dispatch && "$GITHUB_REF" != "refs/heads/$DEFAULT_BRANCH" ]]; then
@@ -70,6 +79,7 @@ jobs:
           echo "tag=$TAG" >> "$GITHUB_OUTPUT"
           echo "commit=$OBJECT_SHA" >> "$GITHUB_OUTPUT"
           echo "tag_object=$TAG_OBJECT" >> "$GITHUB_OUTPUT"
+          echo "build=$REQUESTED_BUILD" >> "$GITHUB_OUTPUT"
 
   preflight:
     name: Validate publication and signing key before building
@@ -83,15 +93,16 @@ jobs:
       - name: Verify publication inputs
         env:
           TAG: ${{ needs.resolve.outputs.tag }}
+          BUILD: ${{ needs.resolve.outputs.build }}
           REPOSITORY_PRIVATE: ${{ github.event.repository.private }}
           GH_TOKEN: ${{ github.token }}
           MACSCP_DEVELOPER_ID_P12_BASE64: ${{ secrets.MACSCP_DEVELOPER_ID_P12_BASE64 }}
           MACSCP_DEVELOPER_ID_P12_PASSWORD: ${{ secrets.MACSCP_DEVELOPER_ID_P12_PASSWORD }}
           MACSCP_NOTARY_PRIVATE_KEY: ${{ secrets.MACSCP_NOTARY_PRIVATE_KEY }}
-          MACSCP_NOTARY_KEY_ID: ${{ vars.MACSCP_NOTARY_KEY_ID }}
-          MACSCP_NOTARY_ISSUER_ID: ${{ vars.MACSCP_NOTARY_ISSUER_ID }}
-          MACSCP_SIGN_IDENTITY: ${{ vars.MACSCP_SIGN_IDENTITY }}
-          MACSCP_TEAM_ID: ${{ vars.MACSCP_TEAM_ID }}
+          MACSCP_NOTARY_KEY_ID: ${{ secrets.MACSCP_NOTARY_KEY_ID }}
+          MACSCP_NOTARY_ISSUER_ID: ${{ secrets.MACSCP_NOTARY_ISSUER_ID }}
+          MACSCP_SIGN_IDENTITY: ${{ secrets.MACSCP_SIGN_IDENTITY }}
+          MACSCP_TEAM_ID: ${{ secrets.MACSCP_TEAM_ID }}
           MACSCP_SPARKLE_PRIVATE_KEY: ${{ secrets.MACSCP_SPARKLE_PRIVATE_KEY }}
         run: |
           set -euo pipefail
@@ -106,6 +117,14 @@ jobs:
             echo '::error::This version is already published. Create a new version instead.'
             exit 1
           fi
+          LATEST_TAG="$(gh api "repos/$GITHUB_REPOSITORY/releases/latest" --jq '.tag_name' 2>/dev/null || true)"
+          if [[ -n "$LATEST_TAG" ]]; then
+            LATEST_DIR="$RUNNER_TEMP/latest-stable-release"
+            mkdir "$LATEST_DIR"
+            gh release download "$LATEST_TAG" --repo "$GITHUB_REPOSITORY" \
+              --pattern appcast.xml --dir "$LATEST_DIR"
+            python3 scripts/check-sparkle-build-order "$BUILD" "$LATEST_DIR/appcast.xml"
+          fi
       - name: Verify Sparkle key matches the application
         env:
           MACSCP_SPARKLE_PRIVATE_KEY: ${{ secrets.MACSCP_SPARKLE_PRIVATE_KEY }}
@@ -116,10 +135,10 @@ jobs:
           MACSCP_DEVELOPER_ID_P12_BASE64: ${{ secrets.MACSCP_DEVELOPER_ID_P12_BASE64 }}
           MACSCP_DEVELOPER_ID_P12_PASSWORD: ${{ secrets.MACSCP_DEVELOPER_ID_P12_PASSWORD }}
           MACSCP_NOTARY_PRIVATE_KEY: ${{ secrets.MACSCP_NOTARY_PRIVATE_KEY }}
-          MACSCP_NOTARY_KEY_ID: ${{ vars.MACSCP_NOTARY_KEY_ID }}
-          MACSCP_NOTARY_ISSUER_ID: ${{ vars.MACSCP_NOTARY_ISSUER_ID }}
-          MACSCP_SIGN_IDENTITY: ${{ vars.MACSCP_SIGN_IDENTITY }}
-          MACSCP_TEAM_ID: ${{ vars.MACSCP_TEAM_ID }}
+          MACSCP_NOTARY_KEY_ID: ${{ secrets.MACSCP_NOTARY_KEY_ID }}
+          MACSCP_NOTARY_ISSUER_ID: ${{ secrets.MACSCP_NOTARY_ISSUER_ID }}
+          MACSCP_SIGN_IDENTITY: ${{ secrets.MACSCP_SIGN_IDENTITY }}
+          MACSCP_TEAM_ID: ${{ secrets.MACSCP_TEAM_ID }}
         run: |
           set -euo pipefail
           CERTIFICATE_PATH="$RUNNER_TEMP/developer-id.p12"
@@ -180,9 +199,9 @@ jobs:
     environment: release
     env:
       MACSCP_DISTRIBUTION: direct
-      MACSCP_BUILD: ${{ github.run_number }}
-      MACSCP_SIGN_IDENTITY: ${{ vars.MACSCP_SIGN_IDENTITY }}
-      MACSCP_TEAM_ID: ${{ vars.MACSCP_TEAM_ID }}
+      MACSCP_BUILD: ${{ needs.resolve.outputs.build }}
+      MACSCP_SIGN_IDENTITY: ${{ secrets.MACSCP_SIGN_IDENTITY }}
+      MACSCP_TEAM_ID: ${{ secrets.MACSCP_TEAM_ID }}
     steps:
       - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
         with:
@@ -232,8 +251,8 @@ jobs:
           MACSCP_DEVELOPER_ID_P12_BASE64: ${{ secrets.MACSCP_DEVELOPER_ID_P12_BASE64 }}
           MACSCP_DEVELOPER_ID_P12_PASSWORD: ${{ secrets.MACSCP_DEVELOPER_ID_P12_PASSWORD }}
           MACSCP_NOTARY_PRIVATE_KEY: ${{ secrets.MACSCP_NOTARY_PRIVATE_KEY }}
-          MACSCP_NOTARY_KEY_ID: ${{ vars.MACSCP_NOTARY_KEY_ID }}
-          MACSCP_NOTARY_ISSUER_ID: ${{ vars.MACSCP_NOTARY_ISSUER_ID }}
+          MACSCP_NOTARY_KEY_ID: ${{ secrets.MACSCP_NOTARY_KEY_ID }}
+          MACSCP_NOTARY_ISSUER_ID: ${{ secrets.MACSCP_NOTARY_ISSUER_ID }}
         run: |
           set -euo pipefail
           VERSION="${TAG#v}"

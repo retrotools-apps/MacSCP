@@ -92,6 +92,8 @@ def inventory():
         relative = str(path.relative_to(VENDOR))
         if ".build" in path.relative_to(VENDOR).parts:
             continue  # SwiftPM/Xcode may create disposable nested build caches.
+        if path.is_file() and path.suffix == ".o":
+            fail(f"compiled object forbidden in vendored source: {relative}")
         if ".git" in path.relative_to(VENDOR).parts:
             fail(f"nested Git metadata forbidden: {relative}")
         if path == INVENTORY or (path.is_dir() and not path.is_symlink()):

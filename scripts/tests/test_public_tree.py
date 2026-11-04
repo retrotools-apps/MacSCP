@@ -45,8 +45,9 @@ class PublicTreeTests(unittest.TestCase):
     def test_website_is_public_but_screenshot_production_stays_local(self):
         private = ["website/index.html", "website/assets/screenshots/workspace-light.png",
                    "scripts/local/screenshots/capture.swift", "output/screenshots/release/demo.png",
-                   "docs/images/private.png", "docs/web/.env", "docs/web/assets/.DS_Store"]
-        public = ["docs/images/readme-header.svg", "docs/USER_GUIDE.md", "Sources/App.swift",
+                   "docs/images/private.png", "docs/web/.env", "docs/web/assets/.DS_Store",
+                   "docs/local/RELEASING.md", "docs/SPARKLE.md"]
+        public = ["README.md", "docs/images/readme-header.svg", "docs/USER_GUIDE.md", "Sources/App.swift",
                   "docs/index.html", "docs/.nojekyll",
                   "docs/web/index.html", "docs/web/assets/screenshots/workspace-light.webp",
                   "scripts/prepare-website", "scripts/website_documents.py",

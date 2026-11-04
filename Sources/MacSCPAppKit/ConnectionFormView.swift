@@ -798,7 +798,7 @@ struct ConnectionFormView: View {
     ///
     /// **The endpoint** prints where the request will actually go. The parse
     /// behind it accepts spellings that are not URLs as typed — a schemeless
-    /// `minio.lan:9000` means `https://minio.lan:9000` since 2026-09-03 — and
+    /// `minio.example.test:9000` means `https://minio.example.test:9000` — and
     /// the addressing style moves the destination again: with virtual-hosted
     /// addressing and a bucket set, the request goes to
     /// `<bucket>.<host>`. So the line prints `S3FieldSchema.requestOrigin`,

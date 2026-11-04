@@ -12,8 +12,7 @@ import Testing
 /// `ListBuckets` (may it enumerate the account). The unit half drives a fake
 /// transport, so what is measured is the request each call builds and the
 /// line the step reports; the gated half asks the rig's S3 server and asserts
-/// WHAT THAT SERVER DOES — which is not what AWS would do, and is recorded as such
-/// in `docs/superpowers/specs/2026-09-02-s3-bucket-browser-design.md`.
+/// WHAT THAT SERVER DOES — which is not necessarily what AWS would do.
 @Suite("S3 access probe")
 struct S3AccessProbeTests {
     private static let config = S3ConnectionConfig(

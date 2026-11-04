@@ -102,8 +102,7 @@ struct GoServerRSAIntegrationTests {
     /// `x/crypto/ssh` could not PARSE the blob and aborted the connection
     /// instead of answering the userauth request; SFTPGo logged
     /// `ssh: unknown key algorithm: rsa-sha2-512` with `login_type:
-    /// no_auth_tried`. The full record is
-    /// `.superpowers/sdd/2026-09-02-rsa-blob-typing-rfc8332/task-1-report.md`.
+    /// no_auth_tried`.
     ///
     /// What the fix has to keep true is that this string is ABSENT from the
     /// log of a run — a negative check, so it never stands alone: the

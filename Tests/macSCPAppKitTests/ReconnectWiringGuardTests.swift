@@ -765,7 +765,7 @@ struct ReconnectWiringGuardTests {
         let wrappedLiteral = try SwiftSource.blankingCommentsAndStrings("""
             Text(L10n.string(
                 "connection.failed.body",
-                "Host: prod-db.internal"))
+                "Host: database.example.invalid"))
             """)
         #expect(Self.localizedCallsWithALiteralArgument(in: wrappedLiteral).count == 1, """
             a hardcoded label wrapped onto the next line is invisible to a line-based check, \
@@ -775,7 +775,7 @@ struct ReconnectWiringGuardTests {
         // A literal in the SECOND position only — the shape a check that
         // looked at the first argument alone would wave through.
         let literalFallback = try SwiftSource.blankingCommentsAndStrings("""
-            Text(L10n.string(content.body.key, "Host: prod-db.internal"))
+            Text(L10n.string(content.body.key, "Host: database.example.invalid"))
             """)
         #expect(Self.localizedCallsWithALiteralArgument(in: literalFallback).count == 1)
     }
@@ -1726,7 +1726,7 @@ struct ReconnectWiringGuardTests {
     /// literal to whitespace, so a hardcoded label read as `L10n.string( ,
     /// )` and was caught, but the identical call with its arguments wrapped
     /// onto the next line read as `L10n.string(` followed by a NEWLINE and
-    /// was green — with `Host: prod-db.internal` on the surface. Wrapping
+    /// was green — with `Host: database.example.invalid` on the surface. Wrapping
     /// is not a semantic difference, and a check that a reformat can defeat
     /// is not a check.
     ///

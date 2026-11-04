@@ -4,9 +4,9 @@ import Testing
 @Suite("Clickable path prefixes")
 struct PathBreadcrumbTests {
     @Test func absolutePathIncludesEveryNavigableAncestor() {
-        let parts = PathBreadcrumb.components(of: "/home/karel/work")
-        #expect(parts.map(\.label) == ["/", "home", "karel", "work"])
-        #expect(parts.map(\.path) == ["/", "/home", "/home/karel", "/home/karel/work"])
+        let parts = PathBreadcrumb.components(of: "/home/alice/work")
+        #expect(parts.map(\.label) == ["/", "home", "alice", "work"])
+        #expect(parts.map(\.path) == ["/", "/home", "/home/alice", "/home/alice/work"])
     }
 
     @Test func rootHasOneButton() {

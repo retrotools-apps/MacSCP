@@ -1,27 +1,17 @@
-import CoreTransferable
+import AppKit
 import Foundation
-import SwiftUI
-import UniformTypeIdentifiers
 import macSCPCore
 
-/// A file promised to the native macOS sharing picker. `ShareLink` turns
-/// this representation into the standard AirDrop/Mail/Messages menu and
-/// also exposes third-party sharing extensions installed on the Mac.
-struct PortableConfigurationShareItem: Transferable {
+/// The portable file handed to the native macOS sharing picker.
+///
+/// This is deliberately a plain value rather than a `Transferable` used by a
+/// `ShareLink`. SwiftUI constructs context-menu links while evaluating a row,
+/// and row hover changes reevaluate that body. On macOS that eagerly creates
+/// ShareKit pickers and can stall pointer handling. The picker below is built
+/// only after the user explicitly chooses Share.
+struct PortableConfigurationShareItem {
     let data: Data
     let filename: String
-
-    static var transferRepresentation: some TransferRepresentation {
-        FileRepresentation(exportedContentType: .macscpConfiguration) { item in
-            let directory = FileManager.default.temporaryDirectory
-                .appendingPathComponent("macscp-share-\(UUID().uuidString)", isDirectory: true)
-            try FileManager.default.createDirectory(
-                at: directory, withIntermediateDirectories: true)
-            let url = directory.appendingPathComponent(item.filename)
-            try item.data.write(to: url, options: .atomic)
-            return SentTransferredFile(url)
-        }
-    }
 
     @MainActor static func make(
         name: String, scope: SessionListViewModel.ExportScope,
@@ -55,5 +45,38 @@ struct PortableConfigurationShareItem: Transferable {
         let joined = pieces.joined(separator: "-")
             .trimmingCharacters(in: .whitespacesAndNewlines)
         return joined.isEmpty ? "MacSCP Configuration" : joined
+    }
+}
+
+@MainActor
+enum PortableConfigurationSharer {
+    static func show(_ item: PortableConfigurationShareItem) {
+        guard let window = NSApp.keyWindow ?? NSApp.mainWindow,
+              let anchor = window.contentView,
+              let url = try? writeTemporaryFile(item) else {
+            NSSound.beep()
+            return
+        }
+
+        // Let the context menu dismiss before presenting its replacement.
+        DispatchQueue.main.async {
+            let windowPoint = window.convertPoint(fromScreen: NSEvent.mouseLocation)
+            let anchorPoint = anchor.convert(windowPoint, from: nil)
+            let picker = NSSharingServicePicker(items: [url])
+            picker.show(
+                relativeTo: NSRect(origin: anchorPoint, size: .zero),
+                of: anchor,
+                preferredEdge: .minY)
+        }
+    }
+
+    private static func writeTemporaryFile(_ item: PortableConfigurationShareItem) throws -> URL {
+        let directory = FileManager.default.temporaryDirectory
+            .appendingPathComponent("macscp-share-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(
+            at: directory, withIntermediateDirectories: true)
+        let url = directory.appendingPathComponent(item.filename)
+        try item.data.write(to: url, options: .atomic)
+        return url
     }
 }

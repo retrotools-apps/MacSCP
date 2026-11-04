@@ -3,9 +3,7 @@ import Testing
 
 @testable import macSCPCore
 
-/// MEASUREMENT (2026-08-28), specified by
-/// `docs/superpowers/specs/2026-08-28-two-open-questions-design.md`, section
-/// "Die S3-Redirect-Frage".
+/// Measures S3 redirect authorization behavior.
 ///
 /// The question: `S3FileSystem` sets `Authorization` by hand and runs over
 /// `URLSessionHTTPTransport` on a session carrying no delegate, so there is
@@ -181,9 +179,7 @@ struct S3RedirectAuthorizationMeasurementTests {
     }
 
     /// Dumps every request head both stubs recorded. OFF by default —
-    /// eleven full request dumps on every `swift test` would be noise, and
-    /// the measurement they belong to is written down in
-    /// `.superpowers/sdd/s3-redirect-measurement.md`. Set
+    /// eleven full request dumps on every `swift test` would be noise. Set
     /// `MACSCP_REDIRECT_DUMP=1` to reproduce the evidence. This gates
     /// PRINTING only; every assertion runs either way, unlike
     /// `MACSCP_ITEST`/`MACSCP_KEYCHAIN`, which gate whole suites.

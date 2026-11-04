@@ -9,8 +9,7 @@ import Testing
 /// blocks one of its threads takes that share of the package's concurrency
 /// away from the other three thousand tests. On the three-core CI runner
 /// three such tests were enough to sit at 0 % CPU until the timeout; ten
-/// local cores hid it completely. The measurement is
-/// `docs/superpowers/specs/2026-08-08-testsuite-hang-investigation.md`.
+/// local cores hid it completely.
 ///
 /// The scan is a NEGATIVE check — it wants to find nothing — and CLAUDE.md's
 /// "Guards that name what they watch" is explicit that only a negative check
@@ -70,8 +69,7 @@ import Testing
 /// `SSHKeyConverter.swift` to call `SubprocessRunner.run(` too.
 @Suite("Tests never block the cooperative pool")
 struct TestsNeverBlockThePoolGuardTests {
-    /// The blocking waits forbidden in a test target, as measured by the grep
-    /// in `.superpowers/sdd/2026-09-03-subprocess-runner-async/task-1-brief.md`.
+    /// The blocking waits forbidden in a test target.
     ///
     /// `DispatchGroup` is here whole rather than as `.wait(`: the only reason
     /// a test in this corpus ever built one was to block on it, and the
