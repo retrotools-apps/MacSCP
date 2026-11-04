@@ -1,4 +1,5 @@
 import Foundation
+import MacSCPTestSupport
 import SwiftUI
 import Testing
 import macSCPCore
@@ -18,6 +19,10 @@ import macSCPCore
 /// indistinguishable from a lookup for the other kind.
 @Suite("Sidebar drag payload")
 struct SidebarDragPayloadTests {
+    private static let repoRoot = URL(fileURLWithPath: #filePath)
+        .deletingLastPathComponent().deletingLastPathComponent()
+        .deletingLastPathComponent()
+
     @Test func aFolderRoundTripsAsAFolder() {
         let id = UUID()
         let payload = SidebarDragPayload.text(for: .group(id))
@@ -28,6 +33,45 @@ struct SidebarDragPayloadTests {
         let id = UUID()
         let payload = SidebarDragPayload.text(for: .session(id))
         #expect(SidebarDragPayload.item(from: [payload]) == .session(id))
+    }
+
+    /// A row-level SwiftUI drag source makes `List` retain its source cell
+    /// while the model moves the connection. After an out-and-back move that
+    /// retained cell is the blank row reported between a folder header and
+    /// its first connection. Keep the AppKit source present and the List row
+    /// free of both SwiftUI drag-source spellings.
+    @Test func aConnectionDragDoesNotEnrollItsListRowAsTheSource() throws {
+        let app = Self.repoRoot.appendingPathComponent("Sources/MacSCPAppKit")
+        let sidebar = try SourceCorpus.code(of: app.appendingPathComponent("SessionSidebar.swift"))
+        let source = try SourceCorpus.code(of: app.appendingPathComponent("SidebarDrag.swift"))
+        let sessionRowStart = try #require(sidebar.range(of: "private struct SessionRow"))
+        let sessionRow = sidebar[sessionRowStart.lowerBound...]
+
+        let hasAppKitSource = sessionRow.contains("SidebarDragSourceView(")
+            && source.contains("NSDraggingSource")
+            && source.contains("beginDraggingSession(")
+        let hasSwiftUIListSource = sessionRow.contains(".onDrag")
+            || sessionRow.contains(".draggable(")
+
+        #expect(hasAppKitSource, "connection rows have no native drag source")
+        #expect(hasSwiftUIListSource == false, "the List row is still a SwiftUI drag source")
+    }
+
+    @Test func aGroupDragDoesNotEnrollItsListRowAsTheSource() throws {
+        let app = Self.repoRoot.appendingPathComponent("Sources/MacSCPAppKit")
+        let sidebar = try SourceCorpus.code(of: app.appendingPathComponent("SessionSidebar.swift"))
+        let source = try SourceCorpus.code(of: app.appendingPathComponent("SidebarDrag.swift"))
+        let groupRow = try TransferQueueBarCancelGuardTests.declarationBody(
+            of: "private struct SidebarGroupRow: View", in: sidebar)
+
+        let hasAppKitSource = groupRow.contains("SidebarDragSourceView(")
+            && source.contains("NSDraggingSource")
+            && source.contains("beginDraggingSession(")
+        let hasSwiftUIListSource = groupRow.contains(".onDrag")
+            || groupRow.contains(".draggable(")
+
+        #expect(hasAppKitSource, "group rows have no native drag source")
+        #expect(hasSwiftUIListSource == false, "the group List row is still a SwiftUI drag source")
     }
 
     /// The two spellings are distinct even for the same id, which is what

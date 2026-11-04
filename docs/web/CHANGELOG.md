@@ -1,5 +1,14 @@
 # Changelog
 
+## [1.4.4] (2026-11-04)
+
+### Highlights
+
+* **portability:** Export nested groups, TLS tunnels and reusable login sets with strict, user-controlled import conflict handling.
+* **organization:** Move connections and tunnels by drag and drop, delete complete groups safely, and inherit credentials or SSH relays from groups.
+* **interface:** Reworked the connection editor into compact SSH, TLS and relay sections and added a native graphite-and-jade application icon.
+* **reliability:** Preserve shared Keychain secrets while replacing or deleting imported and grouped configurations.
+
 ## [1.4.2] (2026-11-04)
 
 ### Highlights

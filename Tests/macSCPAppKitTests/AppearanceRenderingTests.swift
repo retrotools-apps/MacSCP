@@ -11,7 +11,9 @@ import Testing
         let rig = TunnelManagerTests.Rig()
         defer { rig.tearDown() }
         let views: [(String, AnyView, NSSize)] = [
+            ("custom icon color", AnyView(CustomIconColorPicker(color: GroupColor(rgb: 0x007AFF), onCancel: {}, onUse: { _ in })), NSSize(width: 252, height: 260)),
             ("picker", AnyView(SessionAppearancePicker(appearance: .constant(appearance), kind: .ssh).padding(24)), NSSize(width: 620, height: 170)),
+            ("compact picker", AnyView(SessionAppearancePicker(appearance: .constant(appearance), kind: .ssh).frame(width: 260).padding(16)), NSSize(width: 292, height: 145)),
             ("catalogue", AnyView(AppearanceCataloguePicker(appearance: .constant(appearance), kind: .ssh, onSelect: {})), NSSize(width: 460, height: 440)),
             ("editor", AnyView(TunnelWorkspaceEditor(profile: nil, sessions: [], manager: rig.manager, onClose: {})), NSSize(width: 900, height: 780))
         ]

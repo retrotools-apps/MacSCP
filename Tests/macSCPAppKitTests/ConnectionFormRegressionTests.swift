@@ -1,3 +1,4 @@
+import AppKit
 import Foundation
 import MacSCPTestSupport
 import Testing
@@ -46,6 +47,20 @@ struct ConnectionFormRegressionTests {
 
     @Test func theCompactWindowFitsTheFormAndTheWidestSidebar() {
         #expect(MainWindowSizePlan.formSize.width >= CGFloat(SettingsStore.sidebarWidthRange.upperBound) + 500)
+    }
+
+    @Test func connectionFormScrollbarStaysDiscoverable() {
+        let scrollView = NSScrollView()
+        scrollView.hasVerticalScroller = false
+        scrollView.autohidesScrollers = true
+        scrollView.scrollerStyle = .overlay
+
+        PersistentVerticalScroller.configure(scrollView)
+
+        #expect(scrollView.hasVerticalScroller)
+        #expect(!scrollView.autohidesScrollers)
+        #expect(scrollView.scrollerStyle == .legacy)
+        #expect(scrollView.verticalScroller?.controlSize == .small)
     }
 
     @Test func appKitDoesNotStartInsideAnAsyncMainJob() throws {

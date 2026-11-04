@@ -151,6 +151,10 @@ public enum SidebarOrdering {
         _ item: SidebarItem, intoGroup parentID: UUID?, in tree: Tree
     ) -> MoveOutcome {
         guard let origin = parent(of: item, in: tree) else { return .refused(.noSuchItem) }
+        // Releasing a folder on its own row is the drag equivalent of
+        // cancelling in place. It is not an attempt to create a cycle; the
+        // descendant case below remains a real refusal.
+        if case .group(let id) = item, parentID == id { return .moved(tree) }
         if let parentID, !tree.groups.contains(where: { $0.id == parentID }) {
             return .refused(.noSuchTarget)
         }

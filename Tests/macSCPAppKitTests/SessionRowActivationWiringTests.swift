@@ -40,8 +40,8 @@ import Testing
 ///    against those would be worth less than the stated limit.
 /// 5. The entry point is called from somewhere else in the sidebar, or with
 ///    an input the caller did not receive. → **Guard A** (every input
-///    literal in the file sits on its own site) and **Guard B** (one call
-///    site, inside `activate`).
+///    literal in the file sits on its own site), the click-count decision
+///    test below, and **Guard B** (one call site, inside `activate`).
 /// 6. A handler acts through a DIFFERENT host-reaching callback instead of
 ///    forwarding. → **Guard D** in the row's body, **Guard E** in
 ///    `activate`. Reached by `.onHover` while this suite only read two
@@ -87,8 +87,8 @@ struct SessionRowActivationWiringTests {
     /// in the table for the same reason the gestures are: each is an input
     /// now, not a connect path of its own.
     private static let inputRoutes: [(input: String, site: String)] = [
-        (".singleClick", ".onTapGesture(count: 1)"),
-        (".doubleClick", ".onTapGesture(count: 2)"),
+        (".singleClick", "return .singleClick"),
+        (".doubleClick", "count > 1"),
         (".returnKey", ".onKeyPress(.return)"),
         (".contextMenuEntry", "\"sidebar.connect\""),
         (".terminalMenuEntry", "Button(openTerminalTitle)"),
@@ -154,6 +154,12 @@ struct SessionRowActivationWiringTests {
             \(SessionRowInput.allCases.count) — an input nothing in this table names is an \
             input Guard A does not route.
             """)
+    }
+
+    @Test func bothClickDeliveryPathsShareOneCountDecision() {
+        #expect(SessionRowClickInput.input(for: 1) == .singleClick)
+        #expect(SessionRowClickInput.input(for: 2) == .doubleClick)
+        #expect(SessionRowClickInput.input(for: 3) == .doubleClick)
     }
 
     // MARK: - Guard A: every input literal sits on its own site, file-wide
@@ -618,16 +624,17 @@ struct SessionRowActivationWiringTests {
         })
     }
 
-    /// A handler that forwards a second, connecting input — the shape that
-    /// survived an earlier round.
+    /// A click-count decision that names the connecting input from a second
+    /// branch — the shared decoder's version of the shape that survived an
+    /// earlier round in an individual handler.
     @Test func scannerFlagsAHandlerThatNamesASecondInput() {
         let body = [
-            "        .onTapGesture(count: 2) { _ = onInput(.doubleClick, session) }",
-            "        .onTapGesture(count: 1) { _ = onInput(.singleClick, session); _ = onInput(.doubleClick, session) }",
+            "        if count > 1 { return .doubleClick }",
+            "        return .singleClick",
+            "        if count == 1 { return .doubleClick }",
         ]
         #expect(body.filter { $0.contains(".doubleClick") }.count == 2)
-        let singleLine = body.first { $0.contains(".onTapGesture(count: 1)") } ?? ""
-        #expect(singleLine.contains(".doubleClick"))
+        #expect(body.first { $0.contains("count == 1") }?.contains(".doubleClick") == true)
     }
 
     /// The compliant shape must pass — without a check for it, the
@@ -635,8 +642,8 @@ struct SessionRowActivationWiringTests {
     /// everything.
     @Test func scannerAcceptsOneSitePerInput() {
         let body = [
-            "        .onTapGesture(count: 2) { _ = onInput(.doubleClick, session) }",
-            "        .onTapGesture(count: 1) { _ = onInput(.singleClick, session) }",
+            "        if count > 1 { return .doubleClick }",
+            "        return .singleClick",
             "        .onKeyPress(.return) { onInput(.returnKey, session) ? .handled : .ignored }",
             "            Button(L10n.string(\"sidebar.connect\", \"Connect\")) { _ = onInput(.contextMenuEntry, session) }",
             "                Button(openTerminalTitle) { _ = onInput(.terminalMenuEntry, session) }",
@@ -668,7 +675,7 @@ struct SessionRowActivationWiringTests {
         let tap = "        .onTapGesture(count: 1) { onEdit() }"
         #expect(Self.callbackCalls(in: tap).filter { $0 != "onInput" } == ["onEdit"])
 
-        let compliant = "        .onTapGesture(count: 1) { _ = onInput(.singleClick, session) }"
+        let compliant = "        .onTapGesture(count: 1) { _ = onInput(SessionRowClickInput.input(for: 1), session) }"
         #expect(Self.callbackCalls(in: compliant).filter { $0 != "onInput" }.isEmpty)
 
         let plainHover = "        .onHover { isHovering = $0 }"

@@ -90,6 +90,8 @@
 "core.s3.redirectRefused %@ %@" = "La conexión se negó — el punto final S3 %1$@ redireccionó esta solicitud a %2$@, un servidor diferente. No se envió nada allí. Si confía en ese servidor, ingrese como punto final.";
 "core.session.loadFailed %@" = "Failed to load sessions: %@";
 "core.session.saveFailed %@" = "Failed to save session: %@";
+"core.session.sharedSecretSlot" = "Este cambio no se guardó porque la credencial del llavero también la utiliza otra conexión.";
+"core.import.anonymousLocalCredential" = "La conexión local no se reemplazó porque su credencial del llavero no está incluida en este archivo compartido.";
 "core.session.deleteFailed %@" = "Failed to delete session: %@";
 "core.session.groupSaveFailed %@" = "No se puede guardar grupo: %@";
 "core.session.groupParentMissing" = "la carpeta seleccionada ya no existe";

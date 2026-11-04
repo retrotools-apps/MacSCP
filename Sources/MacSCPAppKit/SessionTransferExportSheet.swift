@@ -6,6 +6,7 @@ import macSCPCore
 struct SessionTransferExportSheet: View {
     let viewModel: SessionListViewModel
     let scope: SessionListViewModel.ExportScope
+    let hasTunnelConfiguration: Bool
     let onExport: (SessionExportOptions) -> String?
     @State private var format: Format = .macscp
 
@@ -15,7 +16,7 @@ struct SessionTransferExportSheet: View {
         switch scope {
         case .all: Set(viewModel.sessions.map(\.id))
         case .single(let session): [session.id]
-        case .group(let group): Set(viewModel.sessions(inGroup: group.id).map(\.id))
+        case .group(let group): Set(viewModel.sessions(inSubtreeOf: group.id).map(\.id))
         }
     }
 
@@ -30,7 +31,9 @@ struct SessionTransferExportSheet: View {
             .padding(.top, 20)
             switch format {
             case .macscp:
-                SessionExportSheet(viewModel: viewModel, scope: scope, onExport: onExport)
+                SessionExportSheet(
+                    viewModel: viewModel, scope: scope,
+                    hasTunnelConfiguration: hasTunnelConfiguration, onExport: onExport)
             case .winscp:
                 WinSCPTransferSheet(action: .exportFile, sessions: viewModel, exportSessionIDs: scopedIDs) { _ in }
             }

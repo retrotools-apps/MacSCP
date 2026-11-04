@@ -5,6 +5,33 @@ enum TunnelWorkspaceSelection: Hashable {
     case all, ungrouped, group(UUID), profile(UUID)
 }
 
+enum TunnelSidebarDragPayload: Equatable {
+    case group(UUID)
+    case profile(UUID)
+
+    private static let groupPrefix = "macscp.tunnel-sidebar.group:"
+    private static let profilePrefix = "macscp.tunnel-sidebar.profile:"
+
+    var text: String {
+        switch self {
+        case .group(let id): Self.groupPrefix + id.uuidString
+        case .profile(let id): Self.profilePrefix + id.uuidString
+        }
+    }
+
+    init?(text: String) {
+        if text.hasPrefix(Self.groupPrefix),
+           let id = UUID(uuidString: String(text.dropFirst(Self.groupPrefix.count))) {
+            self = .group(id)
+        } else if text.hasPrefix(Self.profilePrefix),
+                  let id = UUID(uuidString: String(text.dropFirst(Self.profilePrefix.count))) {
+            self = .profile(id)
+        } else {
+            return nil
+        }
+    }
+}
+
 enum TunnelCatalog {
     /// Generated names append the listen port. Compact presentation strips
     /// only that exact suffix; the saved name and custom text stay untouched.
@@ -113,6 +140,9 @@ struct TunnelWorkspaceSidebar: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             SidebarWorkspaceHeading(title: L10n.string("workspace.tunnels", "Tunnels"))
+                .dropDestination(for: String.self) { payload, _ in
+                    drop(payload, intoGroup: nil)
+                }
             SidebarList {
                     Button { selection.wrappedValue = .all } label: {
                         SidebarNavigationLabel(title: L10n.string("tunnels.pool", "All tunnels"), symbol: "apple.health.trends")
@@ -200,6 +230,12 @@ struct TunnelWorkspaceSidebar: View {
                         .frame(maxWidth: .infinity, alignment: .leading)
                         .padding(.horizontal, 2).padding(.vertical, 1)
                         .contentShape(Rectangle())
+                        .overlay {
+                            SidebarDragSourceView(
+                                makePayload: { TunnelSidebarDragPayload.group(group.id).text },
+                                onClick: { _ in selection.wrappedValue = .group(group.id) })
+                            .accessibilityHidden(true)
+                        }
                 }
                 .help(group.name)
                 if !sidebarCompact {
@@ -230,6 +266,9 @@ struct TunnelWorkspaceSidebar: View {
                 }
                 Button(L10n.string("sidebar.group.dissolve", "Dissolve group")) { deletingGroup = group }
             }
+        .dropDestination(for: String.self) { payload, _ in
+            drop(payload, intoGroup: group.id)
+        }
         .padding(.leading, SidebarIndentation.leading(depth: depth))
     }
 
@@ -265,6 +304,32 @@ struct TunnelWorkspaceSidebar: View {
         }
         .help(profile.name + "\n" + TunnelProfilesSheet.stateTooltip(state))
         .modifier(TunnelProfileActions(profile: profile, sessions: sessions, manager: manager, decider: decider))
+        .overlay {
+            SidebarDragSourceView(
+                makePayload: { TunnelSidebarDragPayload.profile(profile.id).text },
+                onClick: { _ in selection.wrappedValue = .profile(profile.id) })
+            .accessibilityHidden(true)
+        }
+        .dropDestination(for: String.self) { payload, _ in
+            drop(payload, intoGroup: profile.groupID)
+        }
+    }
+
+    private func drop(_ payload: [String], intoGroup groupID: UUID?) -> Bool {
+        guard let raw = payload.first, let item = TunnelSidebarDragPayload(text: raw) else {
+            return false
+        }
+        switch item {
+        case .profile(let id):
+            guard let profile = manager.allProfiles.first(where: { $0.id == id }),
+                  profile.groupID != groupID else { return false }
+            move(profile, to: groupID)
+        case .group(let id):
+            guard let group = manager.allGroups.first(where: { $0.id == id }),
+                  group.parentID != groupID, group.id != groupID else { return false }
+            moveGroup(group, to: groupID)
+        }
+        return true
     }
 
     private func move(_ profile: TunnelProfile, to id: UUID?) {

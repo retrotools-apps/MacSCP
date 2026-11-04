@@ -4,6 +4,8 @@ import Foundation
 /// carried-over id, possibly renamed) plus whatever secret material rides
 /// along, gated by the payload's `includesSecrets`/`includesKeyFiles` flags.
 public struct PlannedLoginSet: Equatable, Sendable {
+    /// File-local id used to restore session references in a full archive.
+    public var sourceID: UUID?
     public var set: LoginSet
     public var secret: String?
     public var embeddedKey: EmbeddedKey?
@@ -11,7 +13,11 @@ public struct PlannedLoginSet: Equatable, Sendable {
     /// overwrite that set's Keychain secret.
     public var replacesExisting: Bool
 
-    public init(set: LoginSet, secret: String?, embeddedKey: EmbeddedKey?, replacesExisting: Bool) {
+    public init(
+        sourceID: UUID? = nil, set: LoginSet, secret: String?, embeddedKey: EmbeddedKey?,
+        replacesExisting: Bool
+    ) {
+        self.sourceID = sourceID
         self.set = set
         self.secret = secret
         self.embeddedKey = embeddedKey
@@ -23,16 +29,19 @@ public struct PlannedLoginSet: Equatable, Sendable {
 /// (writing to the store and the Keychain) is the app's job.
 public struct LoginSetImportPlan: Equatable, Sendable {
     public var setsToImport: [PlannedLoginSet]
+    public var referenceIDMap: [UUID: UUID]
     public var skipped: [String]
     public var replaced: [String]
     public var renamed: [String]
     public var cancelled: Bool
 
     public init(
-        setsToImport: [PlannedLoginSet] = [], skipped: [String] = [],
+        setsToImport: [PlannedLoginSet] = [], referenceIDMap: [UUID: UUID] = [:],
+        skipped: [String] = [],
         replaced: [String] = [], renamed: [String] = [], cancelled: Bool = false
     ) {
         self.setsToImport = setsToImport
+        self.referenceIDMap = referenceIDMap
         self.skipped = skipped
         self.replaced = replaced
         self.renamed = renamed
@@ -71,6 +80,7 @@ public enum LoginSetImportPlanner {
         var skipped: [String] = []
         var replaced: [String] = []
         var renamed: [String] = []
+        var referenceIDMap: [UUID: UUID] = [:]
 
         // Names are never enforced unique in the store, so `existing` can
         // legitimately contain two entries that collide under
@@ -91,9 +101,12 @@ public enum LoginSetImportPlanner {
 
             guard takenNames.contains(key) else {
                 takenNames.insert(key)
-                setsToImport.append(PlannedLoginSet(
+                let planned = PlannedLoginSet(
+                    sourceID: fileSet.id,
                     set: makeSet(from: fileSet, id: UUID(), name: trimmedName),
-                    secret: secret, embeddedKey: embeddedKey, replacesExisting: false))
+                    secret: secret, embeddedKey: embeddedKey, replacesExisting: false)
+                setsToImport.append(planned)
+                referenceIDMap[fileSet.id] = planned.set.id
                 continue
             }
 
@@ -111,15 +124,25 @@ public enum LoginSetImportPlanner {
             switch resolution {
             case .skip:
                 skipped.append(trimmedName)
+                if let match = existing.first(where: { normalizedKey($0.name) == key }) {
+                    referenceIDMap[fileSet.id] = match.id
+                } else if let planned = setsToImport.first(where: {
+                    normalizedKey($0.set.name) == key
+                }) {
+                    referenceIDMap[fileSet.id] = planned.set.id
+                }
 
             case .replace:
                 if let match = existing.first(where: {
                     normalizedKey($0.name) == key && !replacedExistingIDs.contains($0.id)
                 }) {
                     replacedExistingIDs.insert(match.id)
-                    setsToImport.append(PlannedLoginSet(
+                    let planned = PlannedLoginSet(
+                        sourceID: fileSet.id,
                         set: makeSet(from: fileSet, id: match.id, name: trimmedName),
-                        secret: secret, embeddedKey: embeddedKey, replacesExisting: true))
+                        secret: secret, embeddedKey: embeddedKey, replacesExisting: true)
+                    setsToImport.append(planned)
+                    referenceIDMap[fileSet.id] = planned.set.id
                     replaced.append(trimmedName)
                 } else {
                     // Either the collision was against a name already
@@ -132,24 +155,31 @@ public enum LoginSetImportPlanner {
                     // double-binding two incoming sets to the same id.
                     let uniqueName = uniqueName(for: trimmedName, avoiding: takenNames)
                     takenNames.insert(normalizedKey(uniqueName))
-                    setsToImport.append(PlannedLoginSet(
+                    let planned = PlannedLoginSet(
+                        sourceID: fileSet.id,
                         set: makeSet(from: fileSet, id: UUID(), name: uniqueName),
-                        secret: secret, embeddedKey: embeddedKey, replacesExisting: false))
+                        secret: secret, embeddedKey: embeddedKey, replacesExisting: false)
+                    setsToImport.append(planned)
+                    referenceIDMap[fileSet.id] = planned.set.id
                     renamed.append(uniqueName)
                 }
 
             case .rename:
                 let uniqueName = uniqueName(for: trimmedName, avoiding: takenNames)
                 takenNames.insert(normalizedKey(uniqueName))
-                setsToImport.append(PlannedLoginSet(
+                let planned = PlannedLoginSet(
+                    sourceID: fileSet.id,
                     set: makeSet(from: fileSet, id: UUID(), name: uniqueName),
-                    secret: secret, embeddedKey: embeddedKey, replacesExisting: false))
+                    secret: secret, embeddedKey: embeddedKey, replacesExisting: false)
+                setsToImport.append(planned)
+                referenceIDMap[fileSet.id] = planned.set.id
                 renamed.append(uniqueName)
             }
         }
 
         return LoginSetImportPlan(
-            setsToImport: setsToImport, skipped: skipped, replaced: replaced,
+            setsToImport: setsToImport, referenceIDMap: referenceIDMap,
+            skipped: skipped, replaced: replaced,
             renamed: renamed, cancelled: false)
     }
 

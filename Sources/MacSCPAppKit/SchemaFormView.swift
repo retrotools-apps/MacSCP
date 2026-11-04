@@ -100,6 +100,21 @@ struct SchemaFormView: View {
     /// depends on the form's kind, not on the field alone.
     var accessory: ((_ field: ConnectionField) -> AnyView?)?
 
+    /// Picker fields that use macOS segmented controls instead of pop-up
+    /// menus. Authentication choices are few, stable and mutually exclusive,
+    /// so the segmented presentation keeps both SSH hops visually aligned.
+    var segmentedPickerFieldIDs: Set<String> = []
+
+    /// Field ids that share one visual row. The schema still owns field order
+    /// and visibility; this is presentation metadata for wide macOS forms.
+    /// Fields absent from these groups keep their normal full-width row.
+    var rowGroups: [[String]] = []
+
+    /// Preferred widths for short controls within a grouped row (for example,
+    /// a port or authentication picker). Width is for the complete labelled
+    /// field, not just its control.
+    var preferredFieldWidths: [String: CGFloat] = [:]
+
     /// Fields whose value is decided by a RULE rather than by the user: the
     /// id maps to the value the form must show, and the row is rendered
     /// greyed and unwritable (review 2026-09-04, I-3).
@@ -134,18 +149,77 @@ struct SchemaFormView: View {
             if !presets.isEmpty { presetPicker }
             // The filter is Core's, and tested there.
             ForEach(Array(schemas.enumerated()), id: \.offset) { _, schema in
-                ForEach(schema.visibleFields(in: values, namespace: namespace)) { field in
-                    if !skipping.contains(field.id) { row(for: field) }
+                let rows = rows(for: schema)
+                ForEach(Array(rows.enumerated()), id: \.offset) { _, fields in
+                    laidOutRow(fields)
                 }
             }
         }
     }
 
     @ViewBuilder
+    private func laidOutRow(_ fields: [ConnectionField]) -> some View {
+        if fields.count == 1, let field = fields.first {
+            framedRow(for: field)
+        } else {
+            ViewThatFits(in: .horizontal) {
+                HStack(alignment: .top, spacing: 16) {
+                    ForEach(fields) { field in
+                        framedRow(for: field, grouped: true)
+                    }
+                }
+                VStack(alignment: .leading, spacing: 10) {
+                    ForEach(fields) { field in
+                        framedRow(for: field)
+                    }
+                }
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func framedRow(for field: ConnectionField, grouped: Bool = false) -> some View {
+        if let width = preferredFieldWidths[field.id] {
+            VStack(alignment: .leading, spacing: 10) {
+                row(for: field)
+            }
+            .frame(width: width, alignment: .leading)
+        } else {
+            VStack(alignment: .leading, spacing: 10) {
+                row(for: field)
+            }
+            .frame(
+                minWidth: grouped ? 280 : nil,
+                maxWidth: .infinity,
+                alignment: .leading)
+        }
+    }
+
+    private func rows(for schema: ConnectionFieldSchema) -> [[ConnectionField]] {
+        let visible = schema.visibleFields(in: values, namespace: namespace)
+            .filter { !skipping.contains($0.id) }
+        let byID = Dictionary(uniqueKeysWithValues: visible.map { ($0.id, $0) })
+        var consumed: Set<String> = []
+        var result: [[ConnectionField]] = []
+
+        for field in visible where !consumed.contains(field.id) {
+            guard let group = rowGroups.first(where: { $0.contains(field.id) }) else {
+                consumed.insert(field.id)
+                result.append([field])
+                continue
+            }
+            let fields = group.compactMap { byID[$0] }.filter { !consumed.contains($0.id) }
+            consumed.formUnion(fields.map(\.id))
+            if !fields.isEmpty { result.append(fields) }
+        }
+        return result
+    }
+
+    @ViewBuilder
     private func row(for field: ConnectionField) -> some View {
         if let leafKind = field.kind.asLeafKind {
             leafRow(label: L10n.string(field.labelKey, field.labelDefault),
-                    kind: leafKind, binding: binding(field.id),
+                    fieldID: field.id, kind: leafKind, binding: binding(field.id),
                     accessory: accessory?(field))
                 .errorHighlight(failedFieldID == key(field.id))
                 // Greyed for a field whose value a rule decides. The footnote
@@ -175,7 +249,8 @@ struct SchemaFormView: View {
                     ForEach(ConnectionFieldSchema.visibleLeaves(
                         of: field, in: values, owner: namespace)) { leaf in
                         leafRow(label: L10n.string(leaf.labelKey, leaf.labelDefault),
-                                kind: leaf.kind, binding: binding(field.id, leaf.id))
+                                fieldID: nil, kind: leaf.kind,
+                                binding: binding(field.id, leaf.id))
                             .errorHighlight(failedFieldID == key(field.id, leaf.id))
                     }
                 }
@@ -196,7 +271,7 @@ struct SchemaFormView: View {
     /// other kinds have no room for one and ignore it.
     @ViewBuilder
     private func leafRow(
-        label: String, kind: LeafField.Kind, binding: Binding<String>,
+        label: String, fieldID: String?, kind: LeafField.Kind, binding: Binding<String>,
         accessory: AnyView? = nil
     ) -> some View {
         switch kind {
@@ -233,30 +308,41 @@ struct SchemaFormView: View {
         case .picker(let source):
             let options = resolve(source)
             FormRow(label: label) {
-                Picker(label, selection: binding) {
-                    // The "unset" row the preset picker already carries, for
-                    // the same reason: a selection that matches no option --
-                    // an empty managed-key id, a login set that was deleted,
-                    // a value from a schema whose defaults were never
-                    // seeded -- renders the popup BLANK, with no row to pick
-                    // and therefore no way back. "—" is a pure symbol,
-                    // identical in every locale, so it stays a literal.
-                    //
-                    // Gated on the value actually matching nothing (fix round
-                    // 1): an unconditional row let the user pick "no auth
-                    // kind", which hides every credential row while
-                    // `authChoice` still falls back to `.password` -- so a
-                    // rejected connect outlines a password field that is not
-                    // on screen and offers nowhere to type.
-                    if !options.contains(where: { $0.id == binding.wrappedValue }) {
-                        Text(verbatim: "—").tag("")
-                    }
-                    ForEach(options) { option in
-                        Text(optionLabel(option)).tag(option.id)
-                    }
-                }
-                .labelsHidden()
+                optionPicker(
+                    label: label, binding: binding, options: options,
+                    segmented: fieldID.map(segmentedPickerFieldIDs.contains) ?? false)
             }
+        }
+    }
+
+    @ViewBuilder
+    private func optionPicker(
+        label: String, binding: Binding<String>, options: [FieldOption], segmented: Bool
+    ) -> some View {
+        if segmented {
+            Picker(label, selection: binding) {
+                pickerOptions(options, selection: binding.wrappedValue)
+            }
+            .pickerStyle(.segmented)
+            .labelsHidden()
+        } else {
+            Picker(label, selection: binding) {
+                pickerOptions(options, selection: binding.wrappedValue)
+            }
+            .labelsHidden()
+        }
+    }
+
+    @ViewBuilder
+    private func pickerOptions(_ options: [FieldOption], selection: String) -> some View {
+        // An unmatched value needs a route back to a valid choice. The dash
+        // appears only in that state, so it cannot be selected deliberately
+        // to hide a required credential field.
+        if !options.contains(where: { $0.id == selection }) {
+            Text(verbatim: "—").tag("")
+        }
+        ForEach(options) { option in
+            Text(optionLabel(option)).tag(option.id)
         }
     }
 

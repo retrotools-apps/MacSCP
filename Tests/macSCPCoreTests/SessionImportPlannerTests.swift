@@ -137,7 +137,7 @@ struct SessionImportPlannerTests {
         #expect(plan.skipped.map(\.name) == ["zweite"])
     }
 
-    @Test func groupsMatchByNameOrGetCreatedFresh() async {
+    @Test func keepingALocalGroupMapsSessionsToItWhileNewGroupsAreCreated() async {
         let existingGroup = StoredGroup(name: "Prod")
         let fileGroupProd = ExportedGroup(id: UUID(), name: "Prod")
         let fileGroupNew = ExportedGroup(id: UUID(), name: "Staging")
@@ -147,7 +147,7 @@ struct SessionImportPlannerTests {
                 [exported(name: "p", host: "h1", groupID: fileGroupProd.id),
                  exported(name: "s", host: "h2", groupID: fileGroupNew.id)],
                 groups: [fileGroupProd, fileGroupNew]),
-            arbiter: neverAsked)
+            arbiter: skipEverything)
         #expect(plan.groupsToCreate.map(\.name) == ["Staging"])
         let p = plan.sessionsToImport.first { $0.session.name == "p" }!
         let s = plan.sessionsToImport.first { $0.session.name == "s" }!
@@ -239,17 +239,16 @@ struct SessionImportPlannerTests {
         #expect(plan.liftedGroups.isEmpty)
     }
 
-    /// A folder can also nest under one the store already has — the name
-    /// match resolves the parent to an EXISTING id, through the same map.
-    /// Nothing about that existing folder is changed by the import.
-    @Test func aParentThatMatchesAnExistingFolderByNameNestsUnderIt() async throws {
+    /// Keeping the local parent resolves the imported child beneath its
+    /// existing id without mutating that parent.
+    @Test func aKeptLocalParentReceivesTheImportedChild() async throws {
         let existingGroup = StoredGroup(name: "Prod")
         let fileProd = ExportedGroup(id: UUID(), name: "Prod")
         let fileChild = ExportedGroup(id: UUID(), name: "EU", parentID: fileProd.id)
         let plan = await SessionImportPlanner.plan(
             existing: [], existingGroups: [existingGroup],
             incoming: incoming([exported(groupID: fileChild.id)], groups: [fileProd, fileChild]),
-            arbiter: neverAsked)
+            arbiter: skipEverything)
 
         #expect(plan.groupsToCreate.map(\.name) == ["EU"])
         #expect(try #require(plan.groupsToCreate.first).parentID == existingGroup.id)
@@ -272,6 +271,37 @@ struct SessionImportPlannerTests {
             arbiter: neverAsked)
 
         #expect(plan.groupsToCreate.map(\.name) == ["Outer", "Inner"])
+    }
+
+    @Test func portableArchivePreservesEmptyDescendantGroups() async {
+        let root = ExportedGroup(id: UUID(), name: "Root")
+        let empty = ExportedGroup(id: UUID(), name: "Empty", parentID: root.id)
+        let plan = await SessionImportPlanner.plan(
+            existing: [], existingGroups: [],
+            incoming: incoming([], groups: [root, empty]), arbiter: neverAsked,
+            preserveEmptyGroups: true)
+
+        #expect(plan.groupsToCreate.map(\.name) == ["Root", "Empty"])
+        #expect(plan.groupsToCreate.first { $0.name == "Empty" }?.parentID
+            == plan.groupsToCreate.first { $0.name == "Root" }?.id)
+    }
+
+    @Test func replacingAGroupUsesItsExistingLocalIDAndPortableIdentity() async throws {
+        let portableID = UUID()
+        let existingGroup = StoredGroup(name: "Local", portableID: portableID)
+        let fileGroup = ExportedGroup(
+            id: UUID(), name: "Imported", color: GroupColor(rgb: 0x123456),
+            portableID: portableID)
+        let plan = await SessionImportPlanner.plan(
+            existing: [], existingGroups: [existingGroup],
+            incoming: incoming([exported(groupID: fileGroup.id)], groups: [fileGroup]),
+            arbiter: ImportConflictArbiter { _ in (.replace, true) })
+
+        let replacement = try #require(plan.groupsToCreate.first)
+        #expect(replacement.id == existingGroup.id)
+        #expect(replacement.name == "Imported")
+        #expect(replacement.portableID == portableID)
+        #expect(plan.sessionsToImport.first?.session.groupID == existingGroup.id)
     }
 
     /// A foreign file can carry a ring. It imports COMPLETELY — additive,
@@ -634,8 +664,8 @@ struct SessionImportPlannerTests {
         #expect(jump?.username == "jumper")
         #expect(jump?.authKind == .privateKey)
         #expect(jump?.keyPath == "/k")
-        // Sets are never imported -- a jump referencing one falls back to
-        // manual mode with the resolved values baked into the spec.
+        // Without a matching set in the same archive, the resolved values
+        // remain a portable manual fallback.
         #expect(jump?.loginSetID == nil)
         #expect(planned.jumpPassword == "jp")
     }
@@ -645,6 +675,138 @@ struct SessionImportPlannerTests {
             existing: [], existingGroups: [], incoming: incoming([exported()]), arbiter: neverAsked)
         #expect(plan.sessionsToImport[0].session.jump == nil)
         #expect(plan.sessionsToImport[0].jumpPassword == nil)
+    }
+
+    @Test func fullArchiveReferencesAreRemappedToPlannedLocalIDs() async throws {
+        let sourceSetID = UUID()
+        let localSetID = UUID()
+        let sourceJumpID = UUID()
+        let jumpTarget = ExportedSession(
+            id: sourceJumpID, name: "bastion", kind: .ssh,
+            fields: sshExportFields(host: "bastion", username: "jump"))
+        let target = ExportedSession(
+            id: UUID(), name: "target", kind: .ssh,
+            fields: sshExportFields(host: "target", username: "user"),
+            loginSetID: sourceSetID, jumpSessionID: sourceJumpID,
+            jumpHost: "fallback", jumpUsername: "fallback-user")
+
+        let plan = await SessionImportPlanner.plan(
+            existing: [], existingGroups: [], incoming: incoming([jumpTarget, target]),
+            arbiter: neverAsked, loginSetIDMap: [sourceSetID: localSetID])
+        let plannedTarget = try #require(
+            plan.sessionsToImport.first { $0.sourceID == target.id })
+        let plannedJump = try #require(
+            plan.sessionsToImport.first { $0.sourceID == sourceJumpID })
+        #expect(plannedTarget.session.loginSetID == localSetID)
+        #expect(plannedTarget.session.jump?.sessionID == plannedJump.session.id)
+    }
+
+    @Test func groupCredentialAndRelayReferencesAreRemapped() async throws {
+        let sourceSetID = UUID()
+        let localSetID = UUID()
+        let relay = ExportedSession(
+            id: UUID(), name: "relay", kind: .ssh,
+            fields: sshExportFields(host: "relay", username: "operator"))
+        let group = ExportedGroup(
+            id: UUID(), name: "Targets", loginSetID: sourceSetID,
+            sshRelaySessionID: relay.id)
+        let target = exported(groupID: group.id)
+
+        let plan = await SessionImportPlanner.plan(
+            existing: [], existingGroups: [],
+            incoming: incoming([relay, target], groups: [group]),
+            arbiter: neverAsked, loginSetIDMap: [sourceSetID: localSetID])
+
+        let importedRelay = try #require(
+            plan.sessionsToImport.first { $0.sourceID == relay.id })
+        let importedGroup = try #require(plan.groupsToCreate.first)
+        #expect(importedGroup.loginSetID == localSetID)
+        #expect(importedGroup.sshRelaySessionID == importedRelay.session.id)
+    }
+
+    @Test func keepingLocalConnectionPreservesArchiveReferencesToIt() async throws {
+        let localRelay = sshSession(
+            name: "local relay", host: "relay", username: "operator")
+        let portableRelay = ExportedSession(
+            id: UUID(), name: "portable relay", kind: .ssh,
+            fields: sshExportFields(host: "relay", username: "operator"))
+        let group = ExportedGroup(
+            id: UUID(), name: "Targets", sshRelaySessionID: portableRelay.id)
+        let target = ExportedSession(
+            id: UUID(), name: "target", kind: .ssh,
+            fields: sshExportFields(host: "target", username: "user"),
+            groupID: group.id, jumpSessionID: portableRelay.id,
+            jumpHost: "fallback", jumpUsername: "fallback-user")
+
+        let plan = await SessionImportPlanner.plan(
+            existing: [localRelay], existingGroups: [],
+            incoming: incoming([portableRelay, target], groups: [group]),
+            arbiter: skipEverything)
+
+        #expect(plan.referenceIDMap[portableRelay.id] == localRelay.id)
+        let plannedTarget = try #require(
+            plan.sessionsToImport.first { $0.sourceID == target.id })
+        #expect(plannedTarget.session.jump?.sessionID == localRelay.id)
+        #expect(try #require(plan.groupsToCreate.first).sshRelaySessionID == localRelay.id)
+    }
+
+    @Test func keepingFirstInFileDuplicateMapsReferencesToTheAcceptedConnection() async throws {
+        let first = exported(name: "first", host: "same-host")
+        let duplicate = exported(name: "duplicate", host: "same-host")
+        let target = ExportedSession(
+            id: UUID(), name: "target", kind: .ssh,
+            fields: sshExportFields(host: "target", username: "user"),
+            jumpSessionID: duplicate.id,
+            jumpHost: "fallback", jumpUsername: "fallback-user")
+
+        let plan = await SessionImportPlanner.plan(
+            existing: [], existingGroups: [],
+            incoming: incoming([first, duplicate, target]), arbiter: skipEverything)
+
+        let accepted = try #require(
+            plan.sessionsToImport.first { $0.sourceID == first.id })
+        #expect(plan.referenceIDMap[duplicate.id] == accepted.session.id)
+        let plannedTarget = try #require(
+            plan.sessionsToImport.first { $0.sourceID == target.id })
+        #expect(plannedTarget.session.jump?.sessionID == accepted.session.id)
+    }
+
+    @Test func repeatedPortableImportDetectsTheSameObjectAfterItsEndpointChanged() async throws {
+        let portableID = UUID()
+        var existing = sshSession(name: "local", host: "old-host", username: "root")
+        existing.portableID = portableID
+        var file = exported(name: "incoming", host: "new-host")
+        file.portableID = portableID
+        let log = DeciderCallLog()
+
+        let plan = await SessionImportPlanner.plan(
+            existing: [existing], existingGroups: [], incoming: incoming([file]),
+            arbiter: ImportConflictArbiter {
+                await log.record($0.itemName)
+                return (.replace, true)
+            })
+
+        let planned = try #require(plan.sessionsToImport.first)
+        #expect(await log.names == ["incoming"])
+        #expect(planned.session.id == existing.id)
+        #expect(planned.session.ssh?.host == "new-host")
+        #expect(planned.session.portableID == portableID)
+        #expect(plan.replaced == ["incoming"])
+    }
+
+    @Test func jumpLoginSetReferenceIsRemappedWhenIncluded() async throws {
+        let sourceSetID = UUID()
+        let localSetID = UUID()
+        let file = ExportedSession(
+            id: UUID(), name: "target", kind: .ssh,
+            fields: sshExportFields(host: "target", username: "user"),
+            jumpLoginSetID: sourceSetID,
+            jumpHost: "bastion", jumpUsername: "fallback-user")
+
+        let plan = await SessionImportPlanner.plan(
+            existing: [], existingGroups: [], incoming: incoming([file]),
+            arbiter: neverAsked, loginSetIDMap: [sourceSetID: localSetID])
+        #expect(plan.sessionsToImport.first?.session.jump?.loginSetID == localSetID)
     }
 
     // MARK: - Agent auth (M10d/T3)

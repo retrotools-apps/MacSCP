@@ -54,6 +54,17 @@ enum SessionRowTunnelMenuPlan: Equatable {
     }
 }
 
+/// Translates the click count delivered by either the SwiftUI accessibility
+/// gesture or the physical AppKit drag overlay into the row's one input
+/// vocabulary. Keeping this decision outside either handler prevents the two
+/// delivery paths from disagreeing about whether a click connects.
+enum SessionRowClickInput {
+    static func input(for count: Int) -> SessionRowInput {
+        if count > 1 { return .doubleClick }
+        return .singleClick
+    }
+}
+
 /// Left column: stored connections and folders, drawn as a tree of arbitrary
 /// depth. A click selects a connection, a double click or Return connects it;
 /// context menus cover connect/edit/rename/duplicate/move/delete on connections,
@@ -237,6 +248,8 @@ struct SessionSidebar: View {
     @State private var dragOrigin = SidebarDragOrigin()
 
     @State private var sessionPendingDelete: StoredSession?
+    @State private var groupPendingRecursiveDelete: StoredGroup?
+    @State private var groupPendingConfiguration: StoredGroup?
     /// Red inline message after a delete whose jump-restoration pass
     /// (M11a/T3) hit a keychain failure — same pattern as
     /// `LoginSetsSheet.deleteErrorMessage`.
@@ -301,6 +314,13 @@ struct SessionSidebar: View {
             .scrollContentBackground(.hidden)
             .contextMenu {
                 backgroundMenu
+            }
+            .onDeleteCommand {
+                guard !interactionsDisabled, renamingID == nil,
+                      let selectedSessionID,
+                      let session = viewModel.sessions.first(where: { $0.id == selectedSessionID })
+                else { return }
+                sessionPendingDelete = session
             }
             .onChange(of: focusedRenameID) { _, newValue in
                 // Focus lost without an explicit commit (which already
@@ -409,6 +429,41 @@ struct SessionSidebar: View {
             }
         } message: {
             Text(deleteConfirmMessage)
+        }
+        .confirmationDialog(
+            String(
+                format: L10n.string(
+                    "sidebar.group.delete.confirmTitle %@", "Delete “%@” and everything inside?"),
+                groupPendingRecursiveDelete?.name ?? ""),
+            isPresented: Binding(
+                get: { groupPendingRecursiveDelete != nil },
+                set: { if !$0 { groupPendingRecursiveDelete = nil } }),
+            titleVisibility: .visible
+        ) {
+            Button(
+                L10n.string("sidebar.group.delete.action", "Delete Group and Contents"),
+                role: .destructive
+            ) {
+                guard let group = groupPendingRecursiveDelete else { return }
+                let result = viewModel.deleteGroupRecursively(group)
+                jumpRestoreErrorMessage = result.secretFailures > 0
+                    ? String(
+                        format: L10n.string(
+                            "sidebar.delete.jumpRestoreError %lld",
+                            "Could not restore the stored password for %lld connections."),
+                        result.secretFailures)
+                    : nil
+                groupPendingRecursiveDelete = nil
+            }
+        } message: {
+            Text(L10n.string(
+                "sidebar.group.delete.confirmMessage",
+                "All subgroups, connections, and their saved credentials will be permanently deleted."))
+        }
+        .sheet(item: $groupPendingConfiguration) { group in
+            GroupDefaultsSheet(group: group, viewModel: viewModel) {
+                groupPendingConfiguration = nil
+            }
         }
     }
 
@@ -611,9 +666,12 @@ struct SessionSidebar: View {
             onExport: { onExport(.group(group)) },
             onShare: { share(name: group.name, scope: .group(group)) },
             onColor: { viewModel.setGroupColor(group, color: $0) },
+            onConfigure: { groupPendingConfiguration = group },
+            onSelect: { selectGroup(group) },
             onSortByName: { viewModel.sortChildrenByName(of: group.id) },
             onNewGroup: { beginNewGroup(forMoving: nil, inGroup: group.id) },
             onDissolve: { viewModel.dissolveGroup(group) },
+            onDeleteRecursively: { groupPendingRecursiveDelete = group },
             // The same call a drop onto another folder makes, so the menu
             // and the gesture put a folder in the same place.
             onMove: { parentID in viewModel.move(.group(group.id), intoGroup: parentID) },
@@ -702,7 +760,10 @@ struct SessionSidebar: View {
         Button(L10n.string("menu.logins", "Logins…")) { onShowLogins() }
         Divider()
         Button(L10n.string("export.menu.all", "Export All…")) { onExport(.all) }
-            .disabled(viewModel.sessions.isEmpty)
+            .disabled(
+                viewModel.sessions.isEmpty && viewModel.groups.isEmpty
+                    && viewModel.loginSets.isEmpty && tunnels.allProfiles.isEmpty
+                    && tunnels.allGroups.isEmpty)
         Button(L10n.string("import.menu", "Import…")) { onImport() }
     }
 
@@ -970,7 +1031,8 @@ private struct SidebarGroupRow: View {
     @Binding var renameDraft: String
     var focusedRenameID: FocusState<UUID?>.Binding
     /// The sidebar's shared note of which row a drag is carrying — written
-    /// by this row's own payload, read when a drop is targeted here.
+    /// by this row's native drag-source payload, read when a drop is targeted
+    /// here.
     let dragOrigin: SidebarDragOrigin
     let sortPlan: SidebarSortMenuPlan
     /// Every group in the store, handed down for the same reason `SessionRow`
@@ -985,6 +1047,8 @@ private struct SidebarGroupRow: View {
     let onExport: () -> Void
     let onShare: () -> Void
     let onColor: (GroupColor?) -> Void
+    let onConfigure: () -> Void
+    let onSelect: () -> Void
     let onSortByName: () -> Void
     /// "New group…" nested inside this folder (Task 4, jump-and-groups
     /// plan) — `beginNewGroup(forMoving:inGroup:)` with this folder's id, the
@@ -992,6 +1056,7 @@ private struct SidebarGroupRow: View {
     /// than at the top level.
     let onNewGroup: () -> Void
     let onDissolve: () -> Void
+    let onDeleteRecursively: () -> Void
     /// "Move to…" (Sidebar Polish, Task 3) — the same call a drop onto
     /// another folder makes (`viewModel.move(.group(group.id),
     /// intoGroup:)`), so the menu and the gesture put a folder in the same
@@ -1021,11 +1086,23 @@ private struct SidebarGroupRow: View {
                     .onSubmit(onCommitRename)
                     .onExitCommand(perform: onCancelRename)
             } else {
-                // Display-only uppercase (spec: folder labels are versal);
-                // the stored group name keeps its original casing.
-                SidebarGroupTitle(name: group.name)
+                HStack(spacing: 0) {
+                    // Display-only uppercase (spec: folder labels are versal);
+                    // the stored group name keeps its original casing.
+                    SidebarGroupTitle(name: group.name)
+                    Spacer(minLength: 0)
+                }
+                .contentShape(Rectangle())
+                .overlay {
+                    SidebarDragSourceView(
+                        makePayload: {
+                            dragOrigin.draggedItem = .group(group.id)
+                            return SidebarDragPayload.text(for: .group(group.id))
+                        },
+                        onClick: { _ in onSelect() })
+                    .accessibilityHidden(true)
+                }
             }
-            Spacer(minLength: 0)
             if !isCompact {
                 GroupColorControl(hue: group.colorHue, color: group.color, isPresented: $choosingColor, onChange: onColor)
             }
@@ -1039,12 +1116,17 @@ private struct SidebarGroupRow: View {
         .background(RoundedRectangle(cornerRadius: 6).fill(dropPlan.fill))
         .overlay(RoundedRectangle(cornerRadius: 6).strokeBorder(dropPlan.borderColor, lineWidth: 2))
         .contentShape(Rectangle())
-        .draggable(dragPayload())
         .dropDestination(for: String.self) { payload, _ in
             onDrop(payload)
         } isTargeted: { isDropTargeted = $0 }
         .contextMenu {
             Button(L10n.string("sidebar.rename", "Rename")) { onStartRename() }
+            Button(action: onConfigure) {
+                Label(
+                    L10n.string("sidebar.group.configure", "Group Settings…"),
+                    systemImage: "slider.horizontal.3")
+            }
+            .help(L10n.string("sidebar.group.configure", "Group Settings…"))
             // Directly under Rename, ahead of Export/Sort/Move/Dissolve:
             // creating a group is a row of its own here, not tucked inside
             // "Move to…" the way a session's own "New group…" entry is (see
@@ -1082,21 +1164,13 @@ private struct SidebarGroupRow: View {
                 }
             }
             Button(L10n.string("sidebar.group.dissolve", "Dissolve group")) { onDissolve() }
+            Button(
+                L10n.string("sidebar.group.delete.menu", "Delete Group and Contents…"),
+                role: .destructive
+            ) { onDeleteRecursively() }
         }
     }
 
-    /// The payload a drag of this row carries — and the one moment the
-    /// sidebar can learn WHICH row is being carried, because a drop
-    /// destination is told only that something is over it.
-    ///
-    /// `draggable(_:)` takes its payload as an `@autoclosure @escaping`
-    /// closure, so this runs when a drag begins rather than when the body is
-    /// built. What happens if that ever stops holding is `SidebarDragOrigin`'s
-    /// doc comment, and it is the reason that type has the shape it has.
-    private func dragPayload() -> String {
-        dragOrigin.draggedItem = .group(group.id)
-        return SidebarDragPayload.text(for: .group(group.id))
-    }
 }
 
 /// A single session row: dot, name (or inline rename field),
@@ -1324,8 +1398,21 @@ private struct SessionRow: View {
         .help(connectionSummary)
         .accessibilityLabel(Text(session.name))
         .accessibilityValue(Text(connectionSummary))
-        .onTapGesture(count: 2) { _ = onInput(.doubleClick, session) }
-        .onTapGesture(count: 1) { _ = onInput(.singleClick, session) }
+        .onTapGesture(count: 2) { _ = onInput(SessionRowClickInput.input(for: 2), session) }
+        .onTapGesture(count: 1) { _ = onInput(SessionRowClickInput.input(for: 1), session) }
+        .overlay {
+            if !isRenaming {
+                SidebarDragSourceView(
+                    makePayload: {
+                        dragOrigin.draggedItem = .session(session.id)
+                        return SidebarDragPayload.text(for: .session(session.id))
+                    },
+                    onClick: { count in
+                        _ = onInput(SessionRowClickInput.input(for: count), session)
+                    })
+                .accessibilityHidden(true)
+            }
+        }
         // Focusable only while it is not being renamed: the inline rename
         // field inside this row owns the keyboard while it is up, and a
         // focusable row around it would compete for Return with the field
@@ -1338,11 +1425,9 @@ private struct SessionRow: View {
         .focused(focusedRowID, equals: session.id)
         .onKeyPress(.return) { onInput(.returnKey, session) ? .handled : .ignored }
         .onHover { isHovering = $0 }
-        // Reordering by dragging, in two halves: this row carries its own
-        // identity, and a row dropped on this one takes this one's place.
-        // No position travels either way — see `SidebarDragPayload` for what
-        // the payload says and `SidebarOrdering` for who derives the place.
-        .draggable(dragPayload())
+        // The AppKit overlay above starts this row's drag without enrolling
+        // the enclosing List cell as its source. The destination stays here:
+        // a row dropped on this one takes this one's place.
         .dropDestination(for: String.self) { payload, _ in
             onDrop(payload)
         } isTargeted: { isDropTargeted = $0 }
@@ -1450,12 +1535,4 @@ private struct SessionRow: View {
         }
     }
 
-    /// The payload a drag of this row carries — and the one moment the
-    /// sidebar can learn WHICH row is being carried, because a drop
-    /// destination is told only that something is over it. Same shape, and
-    /// the same `@autoclosure` reasoning, as `SidebarGroupRow`'s.
-    private func dragPayload() -> String {
-        dragOrigin.draggedItem = .session(session.id)
-        return SidebarDragPayload.text(for: .session(session.id))
-    }
 }

@@ -93,16 +93,16 @@ struct SessionAppearancePicker: View {
     @State private var choosingColor = false
 
     var body: some View {
-        HStack(alignment: .top, spacing: 24) {
-            VStack(alignment: .leading, spacing: 10) {
+        HStack(alignment: .top, spacing: 12) {
+            VStack(alignment: .leading, spacing: 6) {
                 Text(L10n.string("session.appearance.color", "Icon color")).foregroundStyle(.secondary)
-                LazyVGrid(columns: Array(repeating: GridItem(.fixed(30), spacing: 8), count: 6), spacing: 10) {
+                LazyVGrid(columns: Array(repeating: GridItem(.fixed(22), spacing: 6), count: 6), spacing: 6) {
                     ForEach(AppearancePalette.colors, id: \.self) { value in
                         Button { appearance.customColor = value } label: {
-                            Circle().fill(value.swiftUIColor).frame(width: 26, height: 26)
+                            Circle().fill(value.swiftUIColor).frame(width: 20, height: 20)
                                 .overlay {
                                     if appearance.customColor == value {
-                                        Circle().fill(.white).frame(width: 9, height: 9)
+                                        Circle().fill(.white).frame(width: 7, height: 7)
                                     }
                                 }
                                 .overlay { Circle().strokeBorder(.primary.opacity(0.15)) }
@@ -112,23 +112,30 @@ struct SessionAppearancePicker: View {
                         .accessibilityAddTraits(appearance.customColor == value ? .isSelected : [])
                     }
                 }
-                Button(L10n.string("group.color.custom", "Custom color…")) { choosingColor = true }
+                Button(L10n.string("session.appearance.customColor", "Custom color…")) {
+                    choosingColor = true
+                }
+                    .fixedSize(horizontal: true, vertical: false)
                     .popover(isPresented: $choosingColor) {
-                        ColorPicker(L10n.string("group.color.custom", "Custom color…"), selection: Binding(
-                            get: { appearance.displayColor },
-                            set: { if let color = GroupColor(color: $0) { appearance.customColor = color } }), supportsOpacity: false)
-                            .padding(16).frame(width: 250)
+                        CustomIconColorPicker(
+                            color: appearance.customColor ?? GroupColor(color: appearance.displayColor)
+                                ?? GroupColor(rgb: 0x007AFF),
+                            onCancel: { choosingColor = false },
+                            onUse: { color in
+                                appearance.customColor = color
+                                choosingColor = false
+                            })
                     }
 
             }
-            Divider().frame(height: 112)
-            VStack(alignment: .leading, spacing: 10) {
+            Divider().frame(height: 76)
+            VStack(alignment: .leading, spacing: 6) {
                 Text(L10n.string("session.appearance.icon", "Icon")).foregroundStyle(.secondary)
                 Button { choosingIcon = true } label: {
-                    AppearanceIcon(icon: appearance.icon, applicationLogo: appearance.applicationLogo, kind: kind, size: 30)
-                        .foregroundStyle(.white).frame(width: 56, height: 56)
+                    AppearanceIcon(icon: appearance.icon, applicationLogo: appearance.applicationLogo, kind: kind, size: 24)
+                        .foregroundStyle(.white).frame(width: 42, height: 42)
                         .background(appearance.displayColor, in: Circle())
-                        .padding(5).overlay { Circle().stroke(appearance.displayColor, lineWidth: 2) }
+                        .padding(4).overlay { Circle().stroke(appearance.displayColor, lineWidth: 2) }
                 }
                 .buttonStyle(.plain)
                 .help(ApplicationLogo.title(for: appearance))

@@ -150,6 +150,24 @@ public enum GroupTree {
         return chain
     }
 
+    /// `groupID` together with every group below it, regardless of depth.
+    ///
+    /// A malformed cycle is visited once and an unknown root names no
+    /// subtree. This makes the result safe for both portable export scope and
+    /// recursive group operations before an imported tree has been repaired.
+    public static func selfAndDescendants(of groupID: UUID, in groups: [StoredGroup]) -> Set<UUID> {
+        guard groups.contains(where: { $0.id == groupID }) else { return [] }
+        let childrenByParent = Dictionary(grouping: groups.compactMap { group in
+            group.parentID.map { ($0, group.id) }
+        }, by: \.0)
+        var result: Set<UUID> = []
+        var pending = [groupID]
+        while let id = pending.popLast(), result.insert(id).inserted {
+            pending.append(contentsOf: childrenByParent[id, default: []].map(\.1))
+        }
+        return result
+    }
+
     /// `parentID` by group id. The value is itself Optional — a group present
     /// with no parent maps to `.some(nil)` — which is how a lookup tells "top
     /// level" apart from "not in this list".

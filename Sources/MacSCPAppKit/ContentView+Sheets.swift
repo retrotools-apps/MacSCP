@@ -127,6 +127,8 @@ extension ContentView {
             SessionTransferExportSheet(
                 viewModel: sessionListViewModel,
                 scope: item.scope,
+                hasTunnelConfiguration: !TunnelManager.shared.allProfiles.isEmpty
+                    || !TunnelManager.shared.allGroups.isEmpty,
                 onExport: { options in performExport(scope: item.scope, options: options) }
             )
         }

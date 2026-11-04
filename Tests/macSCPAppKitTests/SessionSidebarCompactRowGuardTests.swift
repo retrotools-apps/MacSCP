@@ -28,8 +28,9 @@ struct SessionSidebarCompactRowGuardTests {
         #expect(!withoutDetails.contains("if let glyph = tunnelGlyph"))
         #expect(row.contains("isConnected: isConnected, isCompact: isCompact"))
         #expect(row.contains(".padding(.vertical, isCompact ? 2 : 5)"))
-        #expect(row.contains("onInput(.doubleClick, session)"))
-        #expect(row.contains("onInput(.singleClick, session)"))
+        #expect(row.contains("SessionRowClickInput.input(for: 2)"))
+        #expect(row.contains("SessionRowClickInput.input(for: 1)"))
+        #expect(row.contains("SidebarDragSourceView("))
     }
 
     @Test func groupColorControlsAreHiddenInBothCompactWorkspaces() throws {

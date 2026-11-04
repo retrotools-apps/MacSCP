@@ -157,6 +157,8 @@
 /* SessionListViewModel */
 "core.session.loadFailed %@" = "Échec du chargement des sessions : %@";
 "core.session.saveFailed %@" = "Échec de l'enregistrement de la session : %@";
+"core.session.sharedSecretSlot" = "Cette modification n’a pas été enregistrée, car l’identifiant du trousseau est aussi utilisé par une autre connexion.";
+"core.import.anonymousLocalCredential" = "La connexion locale n’a pas été remplacée, car son identifiant du trousseau n’est pas inclus dans ce fichier partagé.";
 "core.session.deleteFailed %@" = "Échec de la suppression de la session : %@";
 
 /* Session groups (M5f/T2) */

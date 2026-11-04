@@ -1150,6 +1150,238 @@ struct SessionListViewModelTests {
         #expect(exportedB.position == 1)
     }
 
+    @Test func groupExportCarriesNestedSessionsAndEmptySubgroups() throws {
+        let (vm, _, dir) = makeVM()
+        defer { try? FileManager.default.removeItem(at: dir) }
+        let ancestor = vm.createGroup(named: "Ancestor")!
+        let selected = vm.createGroup(named: "Selected")!
+        let nested = vm.createGroup(named: "Nested")!
+        let empty = vm.createGroup(named: "Empty")!
+        #expect(vm.move(.group(selected.id), intoGroup: ancestor.id) == nil)
+        #expect(vm.move(.group(nested.id), intoGroup: selected.id) == nil)
+        #expect(vm.move(.group(empty.id), intoGroup: nested.id) == nil)
+        _ = vm.save(
+            name: "direct", values: sshValues(host: "direct", port: 22, username: "u"),
+            password: "", groupID: selected.id)!
+        _ = vm.save(
+            name: "nested", values: sshValues(host: "nested", port: 22, username: "u"),
+            password: "", groupID: nested.id)!
+        _ = vm.save(
+            name: "outside", values: sshValues(host: "outside", port: 22, username: "u"),
+            password: "", groupID: ancestor.id)!
+
+        let (payload, _) = vm.exportPayload(
+            for: .group(selected), includeGroups: true, includePasswords: false)
+
+        #expect(Set(payload.sessions.map(\.name)) == ["direct", "nested"])
+        #expect(Set(payload.groups.map(\.name)) == ["Ancestor", "Selected", "Nested", "Empty"])
+    }
+
+    @Test func groupExportIncludesAnExternalRelayReferencedByItsDefaults() throws {
+        let (vm, _, dir) = makeVM()
+        defer { try? FileManager.default.removeItem(at: dir) }
+        let group = try #require(vm.createGroup(named: "Targets"))
+        let relay = try #require(vm.save(
+            name: "Bastion", values: sshValues(
+                host: "bastion.invalid", port: 22, username: "operator"),
+            password: ""))
+        _ = try #require(vm.save(
+            name: "Target", values: sshValues(
+                host: "target.invalid", port: 22, username: "operator"),
+            password: "", groupID: group.id))
+        #expect(vm.setGroupDefaults(
+            group, loginSetID: nil, sshRelaySessionID: relay.id))
+
+        let payload = vm.exportPayload(
+            for: .group(group), includeGroups: true, includePasswords: false).payload
+
+        #expect(Set(payload.sessions.map(\.id)).contains(relay.id))
+        #expect(payload.groups.first { $0.id == group.id }?.sshRelaySessionID == relay.id)
+    }
+
+    @Test func recursiveGroupDeletionRemovesDescendantsSessionsAndCredentials() throws {
+        let (vm, secrets, dir) = makeVM()
+        defer { try? FileManager.default.removeItem(at: dir) }
+        let root = vm.createGroup(named: "Root")!
+        let child = vm.createGroup(named: "Child", inGroup: root.id)!
+        let nested = vm.save(
+            name: "nested", values: sshValues(host: "nested", port: 22, username: "u"),
+            password: "nested-password", groupID: child.id)!
+        let direct = vm.save(
+            name: "direct", values: sshValues(host: "direct", port: 22, username: "u"),
+            password: "direct-password", groupID: root.id)!
+        let outside = vm.save(
+            name: "outside", values: sshValues(host: "outside", port: 22, username: "u"),
+            password: "outside-password")!
+
+        let result = vm.deleteGroupRecursively(root)
+
+        #expect(result.secretFailures == 0)
+        #expect(vm.groups.allSatisfy { $0.id != root.id && $0.id != child.id })
+        #expect(vm.sessions.map(\.id) == [outside.id])
+        let nestedSecretWasRemoved = try secrets.password(for: nested.id) == nil
+        let directSecretWasRemoved = try secrets.password(for: direct.id) == nil
+        let outsideSecretWasKept = try secrets.password(for: outside.id) == "outside-password"
+        #expect(nestedSecretWasRemoved)
+        #expect(directSecretWasRemoved)
+        #expect(outsideSecretWasKept)
+    }
+
+    @Test func recursiveGroupDeletionPreservesASecretSlotUsedOutsideTheSubtree() throws {
+        let (vm, secrets, dir) = makeVM()
+        defer { try? FileManager.default.removeItem(at: dir) }
+        let group = vm.createGroup(named: "Delete")!
+        let sharedSlot = UUID()
+        let inside = StoredSession(
+            name: "inside", groupID: group.id,
+            ssh: StoredSSHConfig(
+                host: "inside", username: "u",
+                jump: StoredSession.JumpSpec(
+                    host: "jump", username: "u", secretID: sharedSlot)))
+        let outside = StoredSession(
+            name: "outside",
+            ssh: StoredSSHConfig(
+                host: "outside", username: "u",
+                jump: StoredSession.JumpSpec(
+                    host: "jump", username: "u", secretID: sharedSlot)))
+        #expect(vm.updateSession(inside, newSecret: nil))
+        #expect(vm.updateSession(outside, newSecret: nil))
+        try secrets.savePassword("shared-jump-password", for: sharedSlot)
+
+        _ = vm.deleteGroupRecursively(group)
+
+        let sharedSecretWasKept = try secrets.password(for: sharedSlot) == "shared-jump-password"
+        #expect(sharedSecretWasKept)
+        #expect(vm.sessions.contains { $0.id == outside.id })
+        #expect(!vm.sessions.contains { $0.id == inside.id })
+    }
+
+    @Test func recursiveGroupDeletionNeverDeletesASharedLoginSetSecret() throws {
+        let (vm, secrets, dir) = makeVM()
+        defer { try? FileManager.default.removeItem(at: dir) }
+        let group = vm.createGroup(named: "Delete")!
+        let set = LoginSet(name: "Shared", username: "shared")
+        #expect(vm.saveLoginSet(set, secret: "shared-set-password"))
+        _ = vm.save(
+            name: "inside", values: sshValues(host: "inside", port: 22, username: "ignored"),
+            password: "", groupID: group.id, loginSetID: set.id)!
+        let outside = vm.save(
+            name: "outside", values: sshValues(host: "outside", port: 22, username: "ignored"),
+            password: "", loginSetID: set.id)!
+
+        _ = vm.deleteGroupRecursively(group)
+
+        let sharedSetSecretWasKept = try secrets.password(for: set.id) == "shared-set-password"
+        #expect(sharedSetSecretWasKept)
+        #expect(vm.sessions.contains { $0.id == outside.id && $0.loginSetID == set.id })
+        #expect(vm.loginSets.contains { $0.id == set.id })
+    }
+
+    @Test func individualDeletionPreservesAJumpSecretSharedByAnotherConnection() throws {
+        let (vm, secrets, dir) = makeVM()
+        defer { try? FileManager.default.removeItem(at: dir) }
+        let sharedSlot = UUID()
+        let first = StoredSession(
+            name: "first",
+            ssh: StoredSSHConfig(
+                host: "first", username: "u",
+                jump: StoredSession.JumpSpec(
+                    host: "jump", username: "u", secretID: sharedSlot)))
+        let second = StoredSession(
+            name: "second",
+            ssh: StoredSSHConfig(
+                host: "second", username: "u",
+                jump: StoredSession.JumpSpec(
+                    host: "jump", username: "u", secretID: sharedSlot)))
+        #expect(vm.updateSession(first, newSecret: nil))
+        #expect(vm.updateSession(second, newSecret: nil))
+        try secrets.savePassword("shared-password", for: sharedSlot)
+
+        _ = vm.delete(first)
+
+        #expect(try secrets.password(for: sharedSlot) == "shared-password")
+        #expect(vm.sessions.contains { $0.id == second.id })
+    }
+
+    @Test func removingAJumpPreservesItsSecretWhenAnotherConnectionUsesTheSlot() throws {
+        let (vm, secrets, dir) = makeVM()
+        defer { try? FileManager.default.removeItem(at: dir) }
+        let sharedSlot = UUID()
+        let first = StoredSession(
+            name: "first",
+            ssh: StoredSSHConfig(
+                host: "first", username: "u",
+                jump: StoredSession.JumpSpec(
+                    host: "jump", username: "u", secretID: sharedSlot)))
+        let second = StoredSession(
+            name: "second",
+            ssh: StoredSSHConfig(
+                host: "second", username: "u",
+                jump: StoredSession.JumpSpec(
+                    host: "jump", username: "u", secretID: sharedSlot)))
+        #expect(vm.updateSession(first, newSecret: nil))
+        #expect(vm.updateSession(second, newSecret: nil))
+        try secrets.savePassword("shared-password", for: sharedSlot)
+        var withoutJump = first
+        withoutJump.ssh?.jump = nil
+
+        #expect(vm.updateSession(withoutJump, newSecret: nil))
+        #expect(try secrets.password(for: sharedSlot) == "shared-password")
+    }
+
+    @Test func importRefusesToReplaceASecretSlotUsedByAnotherConnection() throws {
+        let (vm, secrets, dir) = makeVM()
+        defer { try? FileManager.default.removeItem(at: dir) }
+        let existing = try #require(vm.save(
+            name: "existing", values: sshValues(host: "old", port: 22, username: "u"),
+            password: "shared-password"))
+        let other = StoredSession(
+            name: "other",
+            ssh: StoredSSHConfig(
+                host: "other", username: "u",
+                jump: StoredSession.JumpSpec(
+                    host: "jump", username: "u", secretID: existing.id)))
+        #expect(vm.updateSession(other, newSecret: nil))
+        let sameID = StoredSession(
+            id: existing.id, name: "replacement",
+            ssh: StoredSSHConfig(host: "new", username: "u"))
+        let plan = SessionImportPlan(sessionsToImport: [
+            PlannedSession(
+                session: sameID, password: "replacement-password", replacesExisting: true)
+        ])
+
+        let result = vm.applyImport(plan)
+
+        #expect(result.imported == 0)
+        #expect(result.storeFailures == 1)
+        #expect(vm.sessions.first { $0.id == existing.id }?.ssh?.host == "old")
+        #expect(try secrets.password(for: existing.id) == "shared-password")
+    }
+
+    @Test func anonymousReplacementCannotReuseALocalKeychainCredential() throws {
+        let (vm, secrets, dir) = makeVM()
+        defer { try? FileManager.default.removeItem(at: dir) }
+        let existing = try #require(vm.save(
+            name: "existing", values: sshValues(host: "old", port: 22, username: "u"),
+            password: "local-password"))
+        let replacement = StoredSession(
+            id: existing.id, name: "shared configuration",
+            ssh: StoredSSHConfig(host: "untrusted-new-host", username: ""))
+        let plan = AnonymousConnectionImportPlan(
+            groups: [], sessions: [replacement], sessionIDMap: [:], replaced: [replacement.name])
+        var refused = false
+
+        do {
+            try vm.applyAnonymousArchive(plan)
+        } catch {
+            refused = true
+        }
+
+        #expect(refused)
+        #expect(vm.sessions.first { $0.id == existing.id }?.ssh?.host == "old")
+        #expect(try secrets.password(for: existing.id) == "local-password")
+    }
+
     @Test func applyImportCreatesEverythingAdditively() throws {
         let (vm, secrets, dir) = makeVM()
         defer { try? FileManager.default.removeItem(at: dir) }
@@ -1625,6 +1857,54 @@ struct SessionListViewModelTests {
         }
         #expect(vm.loginSets.isEmpty)
         #expect(try secrets.password(for: set.id) == nil)
+    }
+
+    @Test func deletingAGroupLoginSetMaterializesMembersAndClearsTheGroupReference() throws {
+        let (vm, secrets, dir) = makeVM()
+        defer { try? FileManager.default.removeItem(at: dir) }
+        let set = LoginSet(
+            name: "Shared", username: "inherited", authKind: .privateKey,
+            keyPath: "/group-key")
+        #expect(vm.saveLoginSet(set, secret: "group-passphrase"))
+        let group = try #require(vm.createGroup(named: "Targets"))
+        let session = try #require(vm.save(
+            name: "target", values: sshValues(
+                host: "target.invalid", port: 22, username: "local"),
+            password: "", groupID: group.id))
+        #expect(vm.setGroupDefaults(
+            group, loginSetID: set.id, sshRelaySessionID: nil))
+        #expect(vm.sessionsUsing(setID: set.id).map(\.id) == [session.id])
+
+        let result = vm.deleteLoginSet(set)
+
+        #expect(result.restored == 1)
+        let restored = try #require(vm.sessions.first { $0.id == session.id })
+        #expect(restored.ssh?.username == "inherited")
+        #expect(restored.ssh?.authKind == .privateKey)
+        #expect(restored.ssh?.keyPath == "/group-key")
+        #expect(vm.groups.first { $0.id == group.id }?.loginSetID == nil)
+        let secretWasMaterialized = try secrets.password(for: session.id) == "group-passphrase"
+        #expect(secretWasMaterialized)
+    }
+
+    @Test func deletingARelayClearsEveryGroupReferenceInTheSameStoreWrite() throws {
+        let (vm, _, dir) = makeVM()
+        defer { try? FileManager.default.removeItem(at: dir) }
+        let relay = try #require(vm.save(
+            name: "relay", values: sshValues(
+                host: "relay.invalid", port: 22, username: "operator"),
+            password: ""))
+        let first = try #require(vm.createGroup(named: "First"))
+        let second = try #require(vm.createGroup(named: "Second"))
+        #expect(vm.setGroupDefaults(
+            first, loginSetID: nil, sshRelaySessionID: relay.id))
+        #expect(vm.setGroupDefaults(
+            second, loginSetID: nil, sshRelaySessionID: relay.id))
+
+        _ = vm.delete(relay)
+
+        #expect(vm.groups.allSatisfy { $0.sshRelaySessionID == nil })
+        #expect(!vm.sessions.contains { $0.id == relay.id })
     }
 
     @Test func deleteLoginSetCountsSecretFailure() throws {

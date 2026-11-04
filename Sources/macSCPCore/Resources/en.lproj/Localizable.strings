@@ -166,6 +166,8 @@
 /* SessionListViewModel */
 "core.session.loadFailed %@" = "Failed to load sessions: %@";
 "core.session.saveFailed %@" = "Failed to save session: %@";
+"core.session.sharedSecretSlot" = "This change was not saved because the Keychain credential is also used by another connection.";
+"core.import.anonymousLocalCredential" = "The local connection was not replaced because its Keychain credential is not included in this shared file.";
 "core.session.deleteFailed %@" = "Failed to delete session: %@";
 
 /* Session groups (M5f/T2) */

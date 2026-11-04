@@ -1,3 +1,4 @@
+import AppKit
 import SwiftUI
 import macSCPCore
 
@@ -47,6 +48,102 @@ enum SidebarDragPayload {
     }
 }
 
+/// AppKit drag source for a row inside a SwiftUI `List`.
+///
+/// A SwiftUI `onDrag` attached to a row in `List` leaves AppKit's source cell
+/// participating in the table's move animation. Moving the same connection
+/// into a folder and then back can consequently leave that source cell as an
+/// empty row. Starting the dragging session from a child `NSView` keeps the
+/// list out of the source side of the transaction: the drop still reaches
+/// SwiftUI's `dropDestination`, but no table row is retained as a placeholder.
+///
+/// The overlay claims only ordinary left-button events. Pointer movement and
+/// secondary clicks still reach the SwiftUI row, preserving hover help and
+/// both forms of the context menu. A press that does not cross the drag
+/// threshold is forwarded as the row's ordinary single or double click.
+struct SidebarDragSourceView: NSViewRepresentable {
+    let makePayload: () -> String
+    let onClick: (Int) -> Void
+
+    func makeNSView(context: Context) -> SidebarDragSourceNSView {
+        let view = SidebarDragSourceNSView()
+        apply(to: view)
+        return view
+    }
+
+    func updateNSView(_ nsView: SidebarDragSourceNSView, context: Context) {
+        apply(to: nsView)
+    }
+
+    private func apply(to view: SidebarDragSourceNSView) {
+        view.makePayload = makePayload
+        view.onClick = onClick
+    }
+}
+
+final class SidebarDragSourceNSView: NSView, NSDraggingSource {
+    private static let dragThreshold: CGFloat = 3
+
+    var makePayload: (() -> String)?
+    var onClick: ((Int) -> Void)?
+    private var pressEvent: NSEvent?
+
+    override func hitTest(_ point: NSPoint) -> NSView? {
+        let event = NSApp.currentEvent
+        guard
+            TabDragHitTestDecision.claims(
+                eventType: event?.type, modifiers: event?.modifierFlags ?? [])
+        else { return nil }
+        return super.hitTest(point)
+    }
+
+    override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
+
+    override func mouseDown(with event: NSEvent) {
+        pressEvent = event
+    }
+
+    override func mouseDragged(with event: NSEvent) {
+        guard let press = pressEvent else { return }
+        let dx = event.locationInWindow.x - press.locationInWindow.x
+        let dy = event.locationInWindow.y - press.locationInWindow.y
+        guard (dx * dx + dy * dy).squareRoot() > Self.dragThreshold else { return }
+        pressEvent = nil
+        beginDrag(startedBy: press)
+    }
+
+    override func mouseUp(with event: NSEvent) {
+        guard pressEvent != nil else { return }
+        pressEvent = nil
+        onClick?(event.clickCount)
+    }
+
+    private func beginDrag(startedBy event: NSEvent) {
+        guard let payload = makePayload?() else { return }
+        let draggingItem = NSDraggingItem(
+            pasteboardWriter: payload as NSString)
+        draggingItem.setDraggingFrame(bounds, contents: dragImage())
+        beginDraggingSession(with: [draggingItem], event: event, source: self)
+    }
+
+    private func dragImage() -> NSImage? {
+        guard let content = superview else { return nil }
+        let region = convert(bounds, to: content)
+        guard let representation = content.bitmapImageRepForCachingDisplay(in: region)
+        else { return nil }
+        content.cacheDisplay(in: region, to: representation)
+        let image = NSImage(size: region.size)
+        image.addRepresentation(representation)
+        return image
+    }
+
+    func draggingSession(
+        _ session: NSDraggingSession, sourceOperationMaskFor context: NSDraggingContext
+    ) -> NSDragOperation {
+        TabDragOperationMask.offered(for: context)
+    }
+}
+
 extension String {
     /// The rest of the string after `prefix`, or `nil` when it does not start
     /// with it — the presence check and the removal in one step, so the two
@@ -64,13 +161,12 @@ extension String {
 /// being carried is the drag's own payload, so that is where it is written
 /// down.
 ///
-/// **Why a box and not `@State`.** `draggable(_:)` takes its payload as an
-/// `@autoclosure @escaping` closure and calls it when the drag begins, not
-/// when the body is built. If that ever stopped holding, a `@State` write
-/// there would invalidate the body that just made it, and two rows writing
-/// two different values would keep invalidating each other. Writing to a
-/// plain reference invalidates nothing, which turns that whole class of
-/// failure into at worst a wrong answer for one row's highlight.
+/// **Why a box and not `@State`.** `SidebarDragSourceView` asks its payload
+/// closure when the AppKit drag begins, not when the SwiftUI body is built.
+/// Writing `@State` at that moment would invalidate the body whose child is
+/// starting the drag. Writing to a plain reference invalidates nothing,
+/// which turns that whole class of failure into at worst a wrong answer for
+/// one row's highlight.
 ///
 /// **What it is worth.** The value is never cleared: a cancelled drag leaves
 /// the last dragged row named here. That is harmless for the question it is

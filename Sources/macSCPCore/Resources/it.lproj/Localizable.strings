@@ -90,6 +90,8 @@
 "core.s3.redirectRefused %@ %@" = "La connessione rifiutata — il punto finale S3 %1$@ ha reindirizzato questa richiesta a %2$@, un server diverso. Non e' stato mandato niente. Se ti fidi di quel server, inseriscilo come endpoint.";
 "core.session.loadFailed %@" = "Non caricate le sessioni: %@";
 "core.session.saveFailed %@" = "Non riuscito a salvare la sessione: %@";
+"core.session.sharedSecretSlot" = "Questa modifica non è stata salvata perché la credenziale del portachiavi è usata anche da un’altra connessione.";
+"core.import.anonymousLocalCredential" = "La connessione locale non è stata sostituita perché la sua credenziale del portachiavi non è inclusa in questo file condiviso.";
 "core.session.deleteFailed %@" = "Non eliminato la sessione: %@";
 "core.session.groupSaveFailed %@" = "Non poteva salvare il gruppo: %@";
 "core.session.groupParentMissing" = "la cartella selezionata non esiste più";

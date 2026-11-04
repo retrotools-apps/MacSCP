@@ -18,7 +18,8 @@ struct SessionTransferMenuTests {
         }
         let export = try code("SessionTransferExportSheet.swift")
         #expect(export.contains("@State private var format: Format = .macscp"))
-        #expect(export.contains("SessionExportSheet(viewModel:"))
+        #expect(export.contains("SessionExportSheet("))
+        #expect(export.contains("hasTunnelConfiguration: hasTunnelConfiguration"))
         #expect(export.contains("WinSCPTransferSheet(action: .exportFile"))
         #expect(export.contains(".tag(Format.macscp)"))
         #expect(export.contains(".tag(Format.winscp)"))

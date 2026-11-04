@@ -218,11 +218,14 @@ struct SidebarOrderingTests {
                 == .refused(.wouldCycle))
     }
 
-    @Test func aFolderCannotBeDroppedIntoItself() {
+    @Test func droppingAFolderBackOnItselfCancelsWithoutAnError() throws {
         let folder = StoredGroup(name: "Folder", position: 0)
-        #expect(
-            SidebarOrdering.moved(.group(folder.id), intoGroup: folder.id, in: tree(groups: [folder]))
-                == .refused(.wouldCycle))
+        let start = tree(groups: [folder])
+
+        let result = try moved(
+            SidebarOrdering.moved(.group(folder.id), intoGroup: folder.id, in: start))
+
+        #expect(result == start)
     }
 
     /// A stale drop, on either side, is an ordinary outcome rather than a

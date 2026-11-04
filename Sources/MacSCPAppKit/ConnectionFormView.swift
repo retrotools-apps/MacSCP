@@ -2,6 +2,11 @@ import AppKit
 import SwiftUI
 import macSCPCore
 
+private enum ConnectionFormMetrics {
+    static let credentialFieldWidth: CGFloat = 350
+    static let hostFieldWidth: CGFloat = 460
+}
+
 struct ConnectionFormView: View {
     @Bindable var viewModel: ConnectionViewModel
     /// Full view model (M10b/T3), not an array of its lists: the group
@@ -419,7 +424,7 @@ struct ConnectionFormView: View {
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 16) {
+        VStack(alignment: .leading, spacing: 12) {
             // While the host-key prompt is pending, the form is hidden
             // entirely — the trust decision is the only thing on screen.
             if let prompt = viewModel.hostKeyPrompt {
@@ -435,17 +440,27 @@ struct ConnectionFormView: View {
                 // the ScrollView itself, so it takes whatever the window
                 // gives it.
                 ScrollView(.vertical) {
-                    VStack(alignment: .leading, spacing: 16) {
+                    VStack(alignment: .leading, spacing: 12) {
                         Text(isEditMode
                             ? L10n.string("connection.editTitle", "Edit session")
                             : L10n.string("connection.title", "New connection"))
                             .font(.title2.bold())
 
-                        VStack(alignment: .leading, spacing: 10) {
-                            // Type switcher (M12/T7b): the only row shown regardless of
-                            // `viewModel.kind` — it's what flips the rest of the form
-                            // between the SSH sections below (unchanged from before this
-                            // feature) and the schema-driven S3 section.
+                        VStack(alignment: .leading, spacing: 8) {
+                            if !isEditMode {
+                                FormRow(label: "") {
+                                    Toggle(
+                                        L10n.string("connection.saveToggle", "Save as session"),
+                                        isOn: $viewModel.shouldSaveSession)
+                                }
+                            }
+
+                            if isEditMode || viewModel.shouldSaveSession {
+                                sessionIdentityAndAppearanceSection
+
+                                Divider().padding(.vertical, 3)
+                            }
+
                             let typeLabel = L10n.string("connection.type.label", "Connection type")
                             FormRow(label: typeLabel) {
                                 Picker(typeLabel, selection: $viewModel.kind) {
@@ -457,67 +472,19 @@ struct ConnectionFormView: View {
                                 }
                                 .pickerStyle(.segmented)
                                 .labelsHidden()
-                                // Connection type is fixed after creation — editing a
-                                // session never changes its protocol.
+                                // Connection type is fixed after creation.
                                 .disabled(isEditMode)
                             }
+                            .frame(maxWidth: 560, alignment: .leading)
 
                             backendSection
-
-                            if !isEditMode {
-                                FormRow(label: "") {
-                                    Toggle(
-                                        L10n.string("connection.saveToggle", "Save as session"),
-                                        isOn: $viewModel.shouldSaveSession)
-                                }
-                            }
-
-                            if isEditMode || viewModel.shouldSaveSession {
-                                let saveNameLabel = L10n.string("connection.field.saveName", "Session name")
-                                FormRow(label: saveNameLabel) {
-                                    TextField(
-                                        saveNameLabel, text: $viewModel.saveName,
-                                        prompt: Text(L10n.string("connection.field.saveName.placeholder", "e.g. hetzner-web"))
-                                    )
-                                }
-                                .errorHighlight(failedField == .saveName)
-
-                                // Names the stored session of this name and says what
-                                // saving would do to it — which is not the same on the
-                                // two paths, so the sentence is the conflict's own and
-                                // not spelled here. Drawn like this form's other inline
-                                // message under a field (the jump summary row): a
-                                // label-less `FormRow` so it sits under the field it is
-                                // about, same size, in amber rather than the red this
-                                // form reserves for a refusal — saving onto a stored
-                                // name stays allowed and stays one click away, which is
-                                // why nothing here disables the buttons below.
-                                if let conflict = nameConflict {
-                                    FormRow(label: "") {
-                                        Text(String(
-                                            format: L10n.string(
-                                                conflict.messageKey, conflict.messageDefault),
-                                            conflict.session.name))
-                                            .font(.system(size: 12.5))
-                                            .foregroundStyle(DesignTokens.statusAmber)
-                                    }
-                                }
-
-                                SessionAppearancePicker(appearance: $viewModel.appearance, kind: viewModel.kind)
-
-                                let groupLabel = L10n.string("connection.field.group", "Group")
-                                FormRow(label: groupLabel) {
-                                    SessionEditorGroupPicker(
-                                        viewModel: viewModel,
-                                        sessionList: sessionList, label: groupLabel)
-                                }
-                            }
                         }
                         .textFieldStyle(.roundedBorder)
                         .disabled(isConnecting)
                     }
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .padding(.trailing, 12)
+                    .background(PersistentVerticalScroller())
                 }
                 .scrollIndicators(.visible)
 
@@ -636,8 +603,8 @@ struct ConnectionFormView: View {
                 }
             }
         }
-        .padding(24)
-        .frame(minWidth: 500, maxWidth: 760)
+        .padding(18)
+        .frame(minWidth: 500, maxWidth: 780)
         .alert(
             L10n.string("connection.error.title", "Connection failed"),
             isPresented: Binding(
@@ -730,6 +697,53 @@ struct ConnectionFormView: View {
         }
     }
 
+    private var sessionIdentityAndAppearanceSection: some View {
+        ViewThatFits(in: .horizontal) {
+            HStack(alignment: .top, spacing: 16) {
+                sessionIdentityFields
+                    .frame(minWidth: 300, maxWidth: .infinity, alignment: .topLeading)
+                SessionAppearancePicker(
+                    appearance: $viewModel.appearance, kind: viewModel.kind)
+                    .frame(width: 250, alignment: .leading)
+            }
+            VStack(alignment: .leading, spacing: 8) {
+                sessionIdentityFields
+                SessionAppearancePicker(
+                    appearance: $viewModel.appearance, kind: viewModel.kind)
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var sessionIdentityFields: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            let saveNameLabel = L10n.string("connection.field.saveName", "Session name")
+            FormRow(label: saveNameLabel) {
+                TextField(
+                    saveNameLabel, text: $viewModel.saveName,
+                    prompt: Text(L10n.string(
+                        "connection.field.saveName.placeholder", "e.g. hetzner-web")))
+            }
+            .errorHighlight(failedField == .saveName)
+
+            if let conflict = nameConflict {
+                FormRow(label: "") {
+                    Text(String(
+                        format: L10n.string(conflict.messageKey, conflict.messageDefault),
+                        conflict.session.name))
+                        .font(.system(size: 12.5))
+                        .foregroundStyle(DesignTokens.statusAmber)
+                }
+            }
+
+            let groupLabel = L10n.string("connection.field.group", "Group")
+            FormRow(label: groupLabel) {
+                SessionEditorGroupPicker(
+                    viewModel: viewModel, sessionList: sessionList, label: groupLabel)
+            }
+        }
+    }
+
     /// The secret the edit-mode Save path should write, or `nil` for "leave
     /// the stored one alone".
     ///
@@ -766,24 +780,118 @@ struct ConnectionFormView: View {
     @ViewBuilder
     private var backendSection: some View {
         let descriptor = BackendDescriptor.descriptor(for: viewModel.kind)
-        ForEach(
-            Array(descriptor.formBlocks(
-                usingLoginSet: viewModel.loginMode == .set).enumerated()),
-            id: \.offset
-        ) { _, block in
-            formBlock(block, kind: descriptor.kind, namespace: descriptor.fieldNamespace)
+        if viewModel.kind == .ssh {
+            sshDestinationSection(schema: descriptor.connectionSchema)
+            ForEach(
+                Array(descriptor.formBlocks(
+                    usingLoginSet: viewModel.loginMode == .set).dropFirst().enumerated()),
+                id: \.offset
+            ) { _, block in
+                formBlock(
+                    block, kind: descriptor.kind, namespace: descriptor.fieldNamespace,
+                    segmentedPickerFieldIDs: [SSHField.authKind.rawValue],
+                    rowGroups: [[SSHField.username.rawValue, SSHField.authKind.rawValue]],
+                    preferredFieldWidths: [
+                        SSHField.username.rawValue: ConnectionFormMetrics.credentialFieldWidth,
+                        SSHField.authKind.rawValue: ConnectionFormMetrics.credentialFieldWidth,
+                        SSHField.password.rawValue: ConnectionFormMetrics.credentialFieldWidth,
+                        SSHField.passphrase.rawValue: ConnectionFormMetrics.credentialFieldWidth,
+                        SSHField.keyPath.rawValue: 640,
+                        SSHField.managedKeyID.rawValue: ConnectionFormMetrics.credentialFieldWidth,
+                    ])
+            }
+            // The key-path actions and optional new login set both belong to
+            // the destination's credentials, before transport is configured.
+            sshKeyFileRow
+            if viewModel.loginMode == .manual {
+                saveAsNewLoginSetRows
+            }
+
+            Divider().padding(.vertical, 3)
+            tlsTunnelSection(schema: descriptor.connectionSchema)
+
+            Divider().padding(.vertical, 3)
+            Label(
+                L10n.string("connection.section.sshRelay", "SSH relay (ProxyJump)"),
+                systemImage: "point.3.connected.trianglepath.dotted")
+                .font(.headline)
+                .help(L10n.string(
+                    "connection.section.sshRelay.help",
+                    "An SSH relay authenticates to an intermediate SSH server before reaching the destination."))
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.top, 2)
+            sshJumpSection
+        } else {
+            ForEach(
+                Array(descriptor.formBlocks(
+                    usingLoginSet: viewModel.loginMode == .set).enumerated()),
+                id: \.offset
+            ) { _, block in
+                formBlock(block, kind: descriptor.kind, namespace: descriptor.fieldNamespace)
+            }
+            // Every backend (M22/T9): `ContentView.maybeCreateNewLoginSet` asks
+            // the descriptor to build the set, so it carries the right kind.
+            if viewModel.loginMode == .manual {
+                saveAsNewLoginSetRows
+            }
         }
-        // Immediately after the credential block — the last one Core emits, and
-        // the one carrying the key-path row these two buttons fill.
-        if viewModel.kind == .ssh { sshKeyFileRow }
-        // Every backend (M22/T9): `ContentView.maybeCreateNewLoginSet` now
-        // asks the descriptor to build the set, so it carries the form's own
-        // kind instead of `LoginSet.init`'s `.ssh` default — the latent bug
-        // that kept this control S3-and-SSH-only.
-        if viewModel.loginMode == .manual {
-            saveAsNewLoginSetRows
+    }
+
+    private func sshDestinationSection(schema: ConnectionFieldSchema) -> some View {
+        let destinationIDs = Set([SSHField.host.rawValue, SSHField.port.rawValue])
+        let destination = ConnectionFieldSchema(
+            fields: schema.fields.filter { destinationIDs.contains($0.id) },
+            presets: schema.presets)
+
+        return VStack(alignment: .leading, spacing: 8) {
+            Label(
+                L10n.string("connection.section.sshDestination", "SSH destination"),
+                systemImage: "server.rack")
+                .font(.headline)
+                .help(L10n.string(
+                    "connection.section.sshDestination.help",
+                    "The final SSH server reached after any TLS tunnel or SSH relay."))
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.top, 2)
+            formBlock(
+                .schema(destination), kind: .ssh, namespace: SSHField.namespace,
+                rowGroups: [[SSHField.host.rawValue, SSHField.port.rawValue]],
+                preferredFieldWidths: [
+                    SSHField.host.rawValue: ConnectionFormMetrics.hostFieldWidth,
+                    SSHField.port.rawValue: 190,
+                ])
         }
-        if viewModel.kind == .ssh { sshJumpSection }
+    }
+
+    private func tlsTunnelSection(schema: ConnectionFieldSchema) -> some View {
+        let tlsIDs = Set([
+            SSHField.tlsEnabled.rawValue, SSHField.tlsHost.rawValue,
+            SSHField.tlsPort.rawValue, SSHField.tlsServerName.rawValue,
+            SSHField.tlsVerify.rawValue,
+        ])
+        let tls = ConnectionFieldSchema(
+            fields: schema.fields.filter { tlsIDs.contains($0.id) },
+            presets: [])
+
+        return VStack(alignment: .leading, spacing: 8) {
+            Label(
+                L10n.string("connection.section.tlsTunnel", "TLS tunnel"),
+                systemImage: "lock.shield")
+                .font(.headline)
+                .help(L10n.string(
+                    "connection.section.tlsTunnel.help",
+                    "Wraps the first SSH hop in TLS; it is not an SSH relay."))
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.top, 2)
+            formBlock(
+                .schema(tls), kind: .ssh, namespace: SSHField.namespace,
+                rowGroups: [[SSHField.tlsHost.rawValue, SSHField.tlsPort.rawValue]],
+                preferredFieldWidths: [
+                    SSHField.tlsHost.rawValue: ConnectionFormMetrics.hostFieldWidth,
+                    SSHField.tlsPort.rawValue: 200,
+                    SSHField.tlsServerName.rawValue: ConnectionFormMetrics.hostFieldWidth,
+                ])
+        }
     }
 
     /// What a field's value was UNDERSTOOD as, drawn under the field by
@@ -819,14 +927,6 @@ struct ConnectionFormView: View {
     /// in Core, over a `KEY:SECRET@host` endpoint
     /// (`noCredentialInTheEndpointReachesTheOriginOrTheCanonicalSpelling`).
     private func fieldFootnote(_ field: ConnectionField, _ value: String) -> String? {
-        if viewModel.kind == .ssh, viewModel.values[bool: SSHField.tlsEnabled] {
-            if field.id == SSHField.host.rawValue {
-                return L10n.string("connection.tls.targetHelp", "Enter the final SSH host here, not the TLS gateway. Configure the gateway separately below.")
-            }
-            if field.id == SSHField.tlsVerify.rawValue {
-                return L10n.string("connection.tls.verifyHelp", "Unlike an openssl s_client script without verification options, MacSCP checks the certificate and server name by default. Only disable this if you explicitly need that script's behavior.")
-            }
-        }
         if HostResolveModel.isOffered(for: viewModel.kind), field.id == SSHField.host.rawValue {
             return HostResolveModel.footnote(for: hostResolve.presentation(forHost: value))
         }
@@ -951,7 +1051,6 @@ struct ConnectionFormView: View {
     /// cannot drift.
     @ViewBuilder
     private var sshJumpSection: some View {
-                let portLabel = L10n.string("connection.field.port", "Port")
                 let loginModeLabel = L10n.string("form.loginMode.label", "Login")
                 // Jump host block (M10c/T3, mockup section 2): a toggle below
                 // the target's own auth block; enabled, it reuses the SAME
@@ -986,6 +1085,7 @@ struct ConnectionFormView: View {
                         .pickerStyle(.segmented)
                         .labelsHidden()
                     }
+                    .frame(maxWidth: 500, alignment: .leading)
 
                     if viewModel.jumpSourceMode == .session {
                         FormRow(label: "") {
@@ -999,6 +1099,7 @@ struct ConnectionFormView: View {
                             .labelsHidden()
                         }
                         .errorHighlight(failedField == .jumpSession)
+                        .frame(maxWidth: 650, alignment: .leading)
 
                         if let summary = jumpSessionSummary {
                             FormRow(label: "") {
@@ -1006,17 +1107,7 @@ struct ConnectionFormView: View {
                             }
                         }
                     } else {
-                        FormRow(label: "") {
-                            TextField(
-                                jumpLabel, text: $viewModel.jumpHost,
-                                prompt: Text(L10n.string("form.jump.host.placeholder", "bastion.example.com")))
-                        }
-                        .errorHighlight(failedField == .jumpHost)
-
-                        FormRow(label: "") {
-                            TextField(portLabel, text: $viewModel.jumpPort, prompt: Text(verbatim: ""))
-                        }
-                        .errorHighlight(failedField == .jumpPort)
+                        jumpEndpointFields
 
                         FormRow(label: loginModeLabel) {
                             // Through the switcher, not a raw binding (M28
@@ -1037,6 +1128,7 @@ struct ConnectionFormView: View {
                             .pickerStyle(.segmented)
                             .labelsHidden()
                         }
+                        .frame(width: 420, alignment: .leading)
 
                         if viewModel.jumpLoginMode == .set {
                             FormRow(label: "") {
@@ -1061,29 +1153,9 @@ struct ConnectionFormView: View {
                                     .foregroundStyle(DesignTokens.inkTertiary)
                                 }
                             }
+                            .frame(maxWidth: 650, alignment: .leading)
                         } else {
-                            let jumpUsernameLabel = L10n.string("connection.field.username", "Username")
-                            FormRow(label: jumpUsernameLabel) {
-                                TextField(jumpUsernameLabel, text: $viewModel.jumpUsername, prompt: Text(verbatim: ""))
-                            }
-                            .errorHighlight(failedField == .jumpUsername)
-
-                            let jumpAuthMethodLabel = L10n.string("connection.field.authMethod", "Authentication")
-                            FormRow(label: jumpAuthMethodLabel) {
-                                Picker(jumpAuthMethodLabel, selection: Binding(
-                                    get: { viewModel.jumpAuthChoice },
-                                    set: { viewModel.selectJumpAuthChoice($0) }
-                                )) {
-                                    Text(L10n.string("connection.auth.password", "Password"))
-                                        .tag(ConnectionViewModel.AuthChoice.password)
-                                    Text(L10n.string("connection.auth.privateKey", "SSH key"))
-                                        .tag(ConnectionViewModel.AuthChoice.privateKey)
-                                    Text(L10n.string("connection.auth.agent", "Agent"))
-                                        .tag(ConnectionViewModel.AuthChoice.agent)
-                                }
-                                .pickerStyle(.segmented)
-                                .labelsHidden()
-                            }
+                            jumpIdentityFields
 
                             if viewModel.jumpAuthChoice == .password {
                                 let jumpPasswordLabel = L10n.string("connection.auth.password", "Password")
@@ -1095,6 +1167,9 @@ struct ConnectionFormView: View {
                                             : Text(verbatim: ""))
                                 }
                                 .errorHighlight(failedField == .jumpPassword)
+                                .frame(
+                                    width: ConnectionFormMetrics.credentialFieldWidth,
+                                    alignment: .leading)
                             } else if viewModel.jumpAuthChoice == .privateKey {
                                 let jumpKeyPathLabel = L10n.string("connection.field.keyPath", "Key path")
                                 FormRow(label: jumpKeyPathLabel) {
@@ -1109,6 +1184,7 @@ struct ConnectionFormView: View {
                                     }
                                 }
                                 .errorHighlight(failedField == .jumpKeyPath)
+                                .frame(maxWidth: 640, alignment: .leading)
 
                                 let jumpPassphraseLabel = L10n.string(
                                     "connection.field.passphrase", "Passphrase (optional)")
@@ -1120,6 +1196,9 @@ struct ConnectionFormView: View {
                                             : Text(verbatim: ""))
                                 }
                                 .errorHighlight(failedField == .jumpPassword)
+                                .frame(
+                                    width: ConnectionFormMetrics.credentialFieldWidth,
+                                    alignment: .leading)
                             }
                             // .agent (M10d/T4): same as the target block above —
                             // no secret/key row for the jump's own agent auth.
@@ -1127,6 +1206,83 @@ struct ConnectionFormView: View {
                     }
                 }
 
+    }
+
+    private var jumpEndpointFields: some View {
+        let hostLabel = L10n.string("connection.field.host", "Host")
+        let portLabel = L10n.string("connection.field.port", "Port")
+        return ViewThatFits(in: .horizontal) {
+            HStack(alignment: .top, spacing: 16) {
+                FormRow(label: hostLabel) {
+                    TextField(
+                        hostLabel, text: $viewModel.jumpHost,
+                        prompt: Text(L10n.string("form.jump.host.placeholder", "bastion.example.com")))
+                }
+                .frame(width: ConnectionFormMetrics.hostFieldWidth)
+                .errorHighlight(failedField == .jumpHost)
+                FormRow(label: portLabel) {
+                    TextField(portLabel, text: $viewModel.jumpPort, prompt: Text(verbatim: ""))
+                }
+                .frame(width: 190)
+                .errorHighlight(failedField == .jumpPort)
+            }
+            VStack(alignment: .leading, spacing: 10) {
+                FormRow(label: hostLabel) {
+                    TextField(
+                        hostLabel, text: $viewModel.jumpHost,
+                        prompt: Text(L10n.string("form.jump.host.placeholder", "bastion.example.com")))
+                }
+                .errorHighlight(failedField == .jumpHost)
+                FormRow(label: portLabel) {
+                    TextField(portLabel, text: $viewModel.jumpPort, prompt: Text(verbatim: ""))
+                }
+                .errorHighlight(failedField == .jumpPort)
+            }
+        }
+    }
+
+    private var jumpIdentityFields: some View {
+        let usernameLabel = L10n.string("connection.field.username", "Username")
+        let authLabel = L10n.string("connection.field.authMethod", "Authentication")
+        return ViewThatFits(in: .horizontal) {
+            HStack(alignment: .top, spacing: 16) {
+                jumpUsernameField(label: usernameLabel)
+                    .frame(width: ConnectionFormMetrics.credentialFieldWidth)
+                jumpAuthenticationField(label: authLabel)
+                    .frame(width: ConnectionFormMetrics.credentialFieldWidth)
+            }
+            VStack(alignment: .leading, spacing: 10) {
+                jumpUsernameField(label: usernameLabel)
+                    .frame(width: ConnectionFormMetrics.credentialFieldWidth)
+                jumpAuthenticationField(label: authLabel)
+                    .frame(width: ConnectionFormMetrics.credentialFieldWidth)
+            }
+        }
+    }
+
+    private func jumpUsernameField(label: String) -> some View {
+        FormRow(label: label) {
+            TextField(label, text: $viewModel.jumpUsername, prompt: Text(verbatim: ""))
+        }
+        .errorHighlight(failedField == .jumpUsername)
+    }
+
+    private func jumpAuthenticationField(label: String) -> some View {
+        FormRow(label: label) {
+            Picker(label, selection: Binding(
+                get: { viewModel.jumpAuthChoice },
+                set: { viewModel.selectJumpAuthChoice($0) }
+            )) {
+                Text(L10n.string("connection.auth.password", "Password"))
+                    .tag(ConnectionViewModel.AuthChoice.password)
+                Text(L10n.string("connection.auth.privateKey", "SSH key"))
+                    .tag(ConnectionViewModel.AuthChoice.privateKey)
+                Text(L10n.string("connection.auth.agent", "Agent"))
+                    .tag(ConnectionViewModel.AuthChoice.agent)
+            }
+            .pickerStyle(.segmented)
+            .labelsHidden()
+        }
     }
 
     /// Turns a schema-declared `OptionSource` into the options a picker shows
@@ -1167,7 +1323,9 @@ struct ConnectionFormView: View {
     /// adapted.
     @ViewBuilder
     private func formBlock(
-        _ block: FormBlock, kind: ConnectionKind, namespace: String
+        _ block: FormBlock, kind: ConnectionKind, namespace: String,
+        segmentedPickerFieldIDs: Set<String> = [],
+        rowGroups: [[String]] = [], preferredFieldWidths: [String: CGFloat] = [:]
     ) -> some View {
         switch block {
         case .schema(let schema):
@@ -1176,7 +1334,11 @@ struct ConnectionFormView: View {
                 isEditMode: isEditMode, resolve: resolveOptions,
                 failedFieldID: failedFieldID, skipping: Self.customRenderedFields,
                 interceptEdit: interceptEdit, footnote: fieldFootnote,
-                accessory: fieldAccessory, forcedValues: forcedFieldValues)
+                accessory: fieldAccessory,
+                segmentedPickerFieldIDs: segmentedPickerFieldIDs,
+                rowGroups: rowGroups,
+                preferredFieldWidths: preferredFieldWidths,
+                forcedValues: forcedFieldValues)
         case .loginModeSwitcher:
             loginModeSwitcher
         case .loginSetPicker:
@@ -1198,6 +1360,7 @@ struct ConnectionFormView: View {
             .pickerStyle(.segmented)
             .labelsHidden()
         }
+        .frame(width: 420, alignment: .leading)
     }
 
     /// The kind-filtered login-set picker that substitutes the credential
@@ -1230,6 +1393,7 @@ struct ConnectionFormView: View {
                 .foregroundStyle(DesignTokens.inkTertiary)
             }
         }
+        .frame(maxWidth: 650, alignment: .leading)
     }
 
     /// "name — identity", where the identity is whichever one the set carries:
@@ -1355,6 +1519,47 @@ struct FormRow<Content: View>: View {
                 .frame(maxWidth: .infinity, alignment: .leading)
         }
     }
+}
+
+/// SwiftUI respects the system's automatic scroll-bar preference, which can
+/// leave a long form looking complete even while controls continue below the
+/// fold. This zero-size bridge configures only the enclosing form scroll view
+/// with a persistent macOS scroll bar; scrolling itself remains fully native.
+struct PersistentVerticalScroller: NSViewRepresentable {
+    final class ProbeView: NSView {
+        override func viewDidMoveToSuperview() {
+            super.viewDidMoveToSuperview()
+            configureEnclosingScrollView()
+        }
+
+        override func viewDidMoveToWindow() {
+            super.viewDidMoveToWindow()
+            configureEnclosingScrollView()
+        }
+
+        private func configureEnclosingScrollView() {
+            DispatchQueue.main.async { [weak self] in
+                var candidate = self?.superview
+                while let view = candidate {
+                    if let scrollView = view as? NSScrollView {
+                        PersistentVerticalScroller.configure(scrollView)
+                        return
+                    }
+                    candidate = view.superview
+                }
+            }
+        }
+    }
+
+    static func configure(_ scrollView: NSScrollView) {
+        scrollView.hasVerticalScroller = true
+        scrollView.autohidesScrollers = false
+        scrollView.scrollerStyle = .legacy
+        scrollView.verticalScroller?.controlSize = .small
+    }
+
+    func makeNSView(context: Context) -> ProbeView { ProbeView(frame: .zero) }
+    func updateNSView(_ nsView: ProbeView, context: Context) {}
 }
 
 extension View {

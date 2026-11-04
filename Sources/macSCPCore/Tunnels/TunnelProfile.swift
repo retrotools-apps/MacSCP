@@ -23,6 +23,7 @@ public struct TunnelProfile: Codable, Hashable, Identifiable, Sendable {
     public var groupID: UUID?
     /// Optional so existing tunnels decode without a display-preference migration.
     public var appearance: TunnelAppearance?
+    public var portableID: UUID?
 
     public enum Service: String, Codable, CaseIterable, Sendable {
         case tcp, http, https
@@ -32,7 +33,7 @@ public struct TunnelProfile: Codable, Hashable, Identifiable, Sendable {
         id: UUID = UUID(), sessionID: UUID, name: String, kind: Kind,
         autoStart: AutoStart = .off, reconnects: Bool = false,
         service: Service? = nil, jumpSessionID: UUID? = nil, groupID: UUID? = nil,
-        appearance: TunnelAppearance? = nil
+        appearance: TunnelAppearance? = nil, portableID: UUID? = nil
     ) {
         self.id = id
         self.sessionID = sessionID
@@ -44,6 +45,7 @@ public struct TunnelProfile: Codable, Hashable, Identifiable, Sendable {
         self.jumpSessionID = jumpSessionID
         self.groupID = groupID
         self.appearance = appearance
+        self.portableID = portableID
     }
 
     /// The three forwarding shapes, in the user's own words from the

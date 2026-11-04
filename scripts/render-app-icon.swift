@@ -42,7 +42,8 @@ try png(size: 1024) { artwork.draw(in: $0) }.write(to: output.appendingPathCompo
 // Keep the status-item silhouette in sync, without the plate or color.
 guard let start = svg.range(of: "  <g id=\"mark\""),
       let end = svg.range(of: "  </g>", options: .backwards, range: start.upperBound..<svg.endIndex) else { fatalError("Missing mark") }
-let mark = String(svg[start.lowerBound..<end.upperBound]).replacingOccurrences(of: "#70D333", with: "#000000")
+let mark = String(svg[start.lowerBound..<end.upperBound]).replacingOccurrences(of: "#68D86B", with: "#000000")
+    .replacingOccurrences(of: "#F5F8F7", with: "#000000")
     .replacingOccurrences(of: "#ffffff", with: "#000000")
     .replacingOccurrences(of: "#FFFFFF", with: "#000000")
 let template = "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"74\" height=\"74\" viewBox=\"11 11 74 74\">" + mark + "</svg>"

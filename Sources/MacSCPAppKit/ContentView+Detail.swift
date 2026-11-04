@@ -85,6 +85,11 @@ extension ContentView {
             // instead of an empty form. `nil` arrives from the two "New
             // connection" entries and from an `~/.ssh/config` row.
             onSelectSession: { selected in
+                if SidebarOverviewTabPlan.needsNewTab(
+                    selectedSessionID: selected, activeTabConnected: activeTab.isConnected)
+                {
+                    addTabRegistering(makeTab())
+                }
                 activeTab.overviewGroupID = nil
                 overviewSessionID = selected
                 // A click on a row is the user pointing the FRONT tab

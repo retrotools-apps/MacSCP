@@ -249,7 +249,8 @@ struct TabRegistrationWiringGuardTests {
     }
 
     /// POSITIVE beside it: the route that replaced those calls exists and is
-    /// used. Recounted 2026-10-24 after the single-new-connection-tab repair, in the
+    /// used. Recounted 2026-11-04 after sidebar selection began opening an
+    /// overview tab beside a connected tab, in the
     /// COMMENT-AND-STRING-BLANKED view this suite reads
     /// (`contentViewFiles()`), which is the only count the numbers below
     /// can mean — a raw `grep` sees more, including the doc comments in
@@ -258,7 +259,8 @@ struct TabRegistrationWiringGuardTests {
     /// declaration, `showNewConnectionTab()`'s admission, the `after:`
     /// overload, the claim, the restoration rebuild, and
     /// `duplicateTab(_:)`'s two calls), and `ContentView.swift` 1
-    /// (`formTarget()`) — eight occurrences, six of them calls. Both ⌘N and
+    /// (`formTarget()`), and `ContentView+Detail.swift` 1 (the connected-tab
+    /// overview handoff) — nine occurrences, seven of them calls. Both ⌘N and
     /// the strip's ⊕ button now call `showNewConnectionTab()` and therefore
     /// do not admit a second draft themselves.
     @Test func everyTabThisWindowMakesGoesThroughTheOneDoor() throws {
@@ -268,10 +270,10 @@ struct TabRegistrationWiringGuardTests {
         }
         #expect(counts["ContentView+Lifecycle.swift"] == 7)
         #expect(counts["ContentView.swift"] == 1)
-        #expect(counts["ContentView+Detail.swift"] == 0)
-        #expect(counts.values.reduce(0, +) == 8, """
-            expected 8 `addTabRegistering(` occurrences across ContentView*.swift (two \
-            declarations and six calls), found \(counts.values.reduce(0, +)). A new tab \
+        #expect(counts["ContentView+Detail.swift"] == 1)
+        #expect(counts.values.reduce(0, +) == 9, """
+            expected 9 `addTabRegistering(` occurrences across ContentView*.swift (two \
+            declarations and seven calls), found \(counts.values.reduce(0, +)). A new tab \
             site is not a problem — count it here and say what it does.
             """)
     }

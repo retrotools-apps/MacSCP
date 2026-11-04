@@ -34,14 +34,20 @@ public struct ExportedGroup: Codable, Equatable, Sendable {
     public var position: Int?
     public var colorHue: Double?
     public var color: GroupColor?
+    public var portableID: UUID?
+    public var loginSetID: UUID?
+    public var sshRelaySessionID: UUID?
 
-    public init(id: UUID, name: String, parentID: UUID? = nil, position: Int? = nil, colorHue: Double? = nil, color: GroupColor? = nil) {
+    public init(id: UUID, name: String, parentID: UUID? = nil, position: Int? = nil, colorHue: Double? = nil, color: GroupColor? = nil, portableID: UUID? = nil, loginSetID: UUID? = nil, sshRelaySessionID: UUID? = nil) {
         self.id = id
         self.name = name
         self.parentID = parentID
         self.position = position
         self.colorHue = colorHue
         self.color = color
+        self.portableID = portableID
+        self.loginSetID = loginSetID
+        self.sshRelaySessionID = sshRelaySessionID
     }
 }
 
@@ -50,6 +56,13 @@ public struct ExportedSession: Codable, Equatable, Sendable {
     public let id: UUID
     public var name: String
     public var groupID: UUID?
+    /// File-local references into the archive's login-set and connection
+    /// catalogs. They are optional for backward compatibility and are only
+    /// restored when the referenced object is part of the same import plan;
+    /// otherwise the resolved values below remain the safe fallback.
+    public var loginSetID: UUID?
+    public var jumpLoginSetID: UUID?
+    public var jumpSessionID: UUID?
     /// The protocol this session speaks (M12). `nil` on legacy payloads
     /// written before M12, which the import side maps to `.ssh`.
     public var kind: ConnectionKind?
@@ -84,10 +97,11 @@ public struct ExportedSession: Codable, Equatable, Sendable {
     /// Present only when the export included secrets AND the keychain had
     /// one for this session at export time.
     public var password: String?
-    /// Jump host fields (M10c), always RESOLVED (a set reference becomes the
-    /// set's own values at export time — sets themselves are never
-    /// exported). `nil` when the session has no jump, or on legacy payloads
-    /// written before M10c.
+    /// Jump host fields (M10c), always RESOLVED so the configuration remains
+    /// usable when its referenced login set is outside the selected scope.
+    /// A full archive also carries `jumpLoginSetID`, allowing the importer to
+    /// restore that relationship when the set is present. `nil` when the
+    /// session has no jump, or on legacy payloads written before M10c.
     ///
     /// NOT part of `fields`, and deliberately so: the jump is a second login
     /// with its own Keychain slot, which is exactly why
@@ -116,6 +130,9 @@ public struct ExportedSession: Codable, Equatable, Sendable {
     public var importSource: String?
     public var importID: String?
     public var importedAt: Date?
+    /// Cross-machine object identity. Unlike `id`, this survives import
+    /// re-keying and is persisted for strict repeated-import detection.
+    public var portableID: UUID?
 
     /// The STORED record this entry updates, if it updates one rather than
     /// creating a session (external import, 2026-09-03). `nil` — the default —
@@ -191,6 +208,9 @@ public struct ExportedSession: Codable, Equatable, Sendable {
         kind: ConnectionKind? = nil,
         fields: [String: String] = [:],
         groupID: UUID? = nil,
+        loginSetID: UUID? = nil,
+        jumpLoginSetID: UUID? = nil,
+        jumpSessionID: UUID? = nil,
 
         appearance: SessionAppearance? = nil,
         position: Int? = nil,
@@ -203,6 +223,7 @@ public struct ExportedSession: Codable, Equatable, Sendable {
         importSource: String? = nil,
         importID: String? = nil,
         importedAt: Date? = nil,
+        portableID: UUID? = nil,
         replaces: UUID? = nil
     ) {
         self.id = id
@@ -210,6 +231,9 @@ public struct ExportedSession: Codable, Equatable, Sendable {
         self.kind = kind
         self.fields = fields
         self.groupID = groupID
+        self.loginSetID = loginSetID
+        self.jumpLoginSetID = jumpLoginSetID
+        self.jumpSessionID = jumpSessionID
         self.appearance = appearance
         self.position = position
         self.password = password
@@ -224,17 +248,19 @@ public struct ExportedSession: Codable, Equatable, Sendable {
         self.importSource = importSource
         self.importID = importID
         self.importedAt = importedAt
+        self.portableID = portableID
         self.replaces = replaces
     }
 
     /// The `legacy*` cases keep v1's original key names, so a v1 file decodes
     /// unchanged while the property names say what they are.
     private enum CodingKeys: String, CodingKey {
-        case id, name, groupID, kind, fields, appearance, position, password
+        case id, name, groupID, loginSetID, jumpLoginSetID, jumpSessionID
+        case kind, fields, appearance, position, password
         case jumpHost, jumpPort, jumpUsername, jumpAuthKind, jumpKeyPath, jumpPassword
         case jumpTLSTunnel
         case s3SecretAccessKey
-        case importSource, importID, importedAt
+        case importSource, importID, importedAt, portableID
         case legacyHost = "host"
         case legacyPort = "port"
         case legacyUsername = "username"
@@ -258,6 +284,9 @@ public struct ExportedSession: Codable, Equatable, Sendable {
         id = try c.decode(UUID.self, forKey: .id)
         name = try c.decode(String.self, forKey: .name)
         groupID = try c.decodeIfPresent(UUID.self, forKey: .groupID)
+        loginSetID = try c.decodeIfPresent(UUID.self, forKey: .loginSetID)
+        jumpLoginSetID = try c.decodeIfPresent(UUID.self, forKey: .jumpLoginSetID)
+        jumpSessionID = try c.decodeIfPresent(UUID.self, forKey: .jumpSessionID)
         kind = try c.decodeIfPresent(ConnectionKind.self, forKey: .kind)
         appearance = try c.decodeIfPresent(SessionAppearance.self, forKey: .appearance)
         position = try c.decodeIfPresent(Int.self, forKey: .position)
@@ -275,6 +304,7 @@ public struct ExportedSession: Codable, Equatable, Sendable {
         importSource = try c.decodeIfPresent(String.self, forKey: .importSource)
         importID = try c.decodeIfPresent(String.self, forKey: .importID)
         importedAt = try c.decodeIfPresent(Date.self, forKey: .importedAt)
+        portableID = try c.decodeIfPresent(UUID.self, forKey: .portableID)
         // NEVER decoded — there is no `.replaces` key to decode from, and
         // that is the whole point (see the property's own doc comment).
         // A file's `"replaces"`, if one is there, is ignored like any
@@ -311,6 +341,9 @@ public struct ExportedSession: Codable, Equatable, Sendable {
         try c.encode(id, forKey: .id)
         try c.encode(name, forKey: .name)
         try c.encodeIfPresent(groupID, forKey: .groupID)
+        try c.encodeIfPresent(loginSetID, forKey: .loginSetID)
+        try c.encodeIfPresent(jumpLoginSetID, forKey: .jumpLoginSetID)
+        try c.encodeIfPresent(jumpSessionID, forKey: .jumpSessionID)
         try c.encodeIfPresent(kind, forKey: .kind)
         try c.encodeIfPresent(appearance, forKey: .appearance)
         try c.encodeIfPresent(position, forKey: .position)
@@ -327,6 +360,7 @@ public struct ExportedSession: Codable, Equatable, Sendable {
         try c.encodeIfPresent(importSource, forKey: .importSource)
         try c.encodeIfPresent(importID, forKey: .importID)
         try c.encodeIfPresent(importedAt, forKey: .importedAt)
+        try c.encodeIfPresent(portableID, forKey: .portableID)
     }
 
     /// Folds a v1 file's columns into `fields` and clears them. A no-op on a

@@ -7,6 +7,9 @@ public struct PlannedSession: Equatable, Sendable {
     /// File-local id of the entry that produced this record. The generic
     /// `.macscp` importer uses it to reconnect tunnel references.
     public var sourceID: UUID?
+    /// File-local saved-session reference for a jump. It is resolved after
+    /// every accepted connection has received its final local id.
+    public var sourceJumpSessionID: UUID?
     public var session: StoredSession
     public var password: String?
     /// Carried-along secret for `session.jump`, if any (M10c) — stored under
@@ -43,10 +46,12 @@ public struct PlannedSession: Equatable, Sendable {
     public var keepsExistingSecret: Bool
 
     public init(
-        sourceID: UUID? = nil, session: StoredSession, password: String?, jumpPassword: String? = nil,
+        sourceID: UUID? = nil, sourceJumpSessionID: UUID? = nil,
+        session: StoredSession, password: String?, jumpPassword: String? = nil,
         replacesExisting: Bool = false, keepsExistingSecret: Bool = false
     ) {
         self.sourceID = sourceID
+        self.sourceJumpSessionID = sourceJumpSessionID
         self.session = session
         self.password = password
         self.jumpPassword = jumpPassword
@@ -61,6 +66,11 @@ public struct PlannedSession: Equatable, Sendable {
 public struct SessionImportPlan: Equatable, Sendable {
     public var groupsToCreate: [StoredGroup]
     public var sessionsToImport: [PlannedSession]
+    /// File-local session id to the final local id, including sessions the
+    /// user chose to keep local. Archive relationships (saved jumps, group
+    /// relays, and tunnels) must use this map rather than only the sessions
+    /// written by this import.
+    public var referenceIDMap: [UUID: UUID]
     /// Duplicates the user chose to skip. Still the whole `ExportedSession`
     /// (not just a name) so `applyImport`'s count and the M9a result alert
     /// keep working unchanged.
@@ -96,11 +106,13 @@ public struct SessionImportPlan: Equatable, Sendable {
 
     public init(
         groupsToCreate: [StoredGroup] = [], sessionsToImport: [PlannedSession] = [],
+        referenceIDMap: [UUID: UUID] = [:],
         skipped: [ExportedSession] = [], replaced: [String] = [], renamed: [String] = [],
         rejected: [String] = [], liftedGroups: [String] = [], cancelled: Bool = false
     ) {
         self.groupsToCreate = groupsToCreate
         self.sessionsToImport = sessionsToImport
+        self.referenceIDMap = referenceIDMap
         self.skipped = skipped
         self.replaced = replaced
         self.renamed = renamed
@@ -132,10 +144,12 @@ public enum SessionImportPlanner {
     /// text (Core has no UI language). The app maps this to its localized
     /// string.
     public static let kindLabel = "session"
+    public static let groupKindLabel = "sessionGroup"
 
     public static func plan(
         existing: [StoredSession], existingGroups: [StoredGroup],
-        incoming: SessionExportPayload, arbiter: ImportConflictArbiter
+        incoming: SessionExportPayload, arbiter: ImportConflictArbiter,
+        loginSetIDMap: [UUID: UUID] = [:], preserveEmptyGroups: Bool = false
     ) async -> SessionImportPlan {
         // The file's own tree is repaired BEFORE anything is taken over
         // (D1). A foreign file can name a parent it does not carry, or close
@@ -155,16 +169,20 @@ public enum SessionImportPlanner {
         // `repaired` returns the same groups in the same order, differing
         // only in `parentID`, which is what makes the index walk below sound.
         let repairedNodes = GroupTree.repaired(incoming.groups.map {
-            StoredGroup(id: $0.id, name: $0.name, parentID: $0.parentID, position: $0.position ?? 0)
+            StoredGroup(
+                id: $0.id, name: $0.name, parentID: $0.parentID,
+                position: $0.position ?? 0, loginSetID: $0.loginSetID,
+                sshRelaySessionID: $0.sshRelaySessionID)
         })
         var incomingGroups = incoming.groups
         for index in incomingGroups.indices {
             incomingGroups[index].parentID = repairedNodes[index].parentID
         }
 
-        // Resolve groups first: exact name match against existing groups,
-        // otherwise a fresh group is prepared. A local mapping tracks
-        // file-local group id -> resolved (existing or freshly created) id.
+        // Resolve groups first, parent before child. Portable identity wins;
+        // otherwise only a same-name sibling is a collision. Every collision
+        // goes through the same arbiter as sessions and login sets.
+        // A local mapping tracks file-local group id -> resolved id.
         // Freshly-created groups are held in `freshGroupsByFileID` rather
         // than committed to `groupsToCreate` immediately — a file whose only
         // sessions referencing a group are all skipped as duplicates must
@@ -174,31 +192,59 @@ public enum SessionImportPlanner {
         // the ancestors those hang from.
         var groupIDMap: [UUID: UUID] = [:]
         var freshGroupsByFileID: [UUID: StoredGroup] = [:]
-        for fileGroup in incomingGroups {
-            if let match = existingGroups.first(where: { $0.name == fileGroup.name }) {
-                groupIDMap[fileGroup.id] = match.id
+        var pendingGroups = incomingGroups
+        while !pendingGroups.isEmpty {
+            guard let index = pendingGroups.firstIndex(where: {
+                $0.parentID == nil || groupIDMap[$0.parentID!] != nil
+            }) else { break }
+            let fileGroup = pendingGroups.remove(at: index)
+            let parentID = fileGroup.parentID.flatMap { groupIDMap[$0] }
+            let portableID = fileGroup.portableID ?? fileGroup.id
+            let match = existingGroups.first(where: { $0.portableID == portableID })
+                ?? existingGroups.first(where: {
+                    $0.parentID == parentID
+                        && normalizedName($0.name) == normalizedName(fileGroup.name)
+                })
+            if let match {
+                guard let resolution = await arbiter.resolve(ImportConflict(
+                    itemName: fileGroup.name, kindLabel: groupKindLabel, reason: .name))
+                else { return SessionImportPlan(cancelled: true) }
+                switch resolution {
+                case .skip:
+                    groupIDMap[fileGroup.id] = match.id
+                case .replace:
+                    let replacement = StoredGroup(
+                        id: match.id, name: fileGroup.name, parentID: parentID,
+                        position: fileGroup.position ?? 0,
+                        colorHue: fileGroup.colorHue.flatMap { (0..<1).contains($0) ? $0 : nil },
+                        color: fileGroup.color, portableID: portableID,
+                        loginSetID: fileGroup.loginSetID,
+                        sshRelaySessionID: fileGroup.sshRelaySessionID)
+                    freshGroupsByFileID[fileGroup.id] = replacement
+                    groupIDMap[fileGroup.id] = replacement.id
+                case .rename:
+                    let name = uniqueGroupName(
+                        fileGroup.name, parentID: parentID,
+                        existing: existingGroups + Array(freshGroupsByFileID.values))
+                    let created = StoredGroup(
+                        name: name, parentID: parentID, position: fileGroup.position ?? 0,
+                        colorHue: fileGroup.colorHue.flatMap { (0..<1).contains($0) ? $0 : nil },
+                        color: fileGroup.color, portableID: portableID,
+                        loginSetID: fileGroup.loginSetID,
+                        sshRelaySessionID: fileGroup.sshRelaySessionID)
+                    freshGroupsByFileID[fileGroup.id] = created
+                    groupIDMap[fileGroup.id] = created.id
+                }
             } else {
-                // The rank travels as a value (`?? 0` for a file written
-                // before the field existed); the parent is a REFERENCE and
-                // waits for the second pass.
-                let created = StoredGroup(name: fileGroup.name, position: fileGroup.position ?? 0,
-                    colorHue: fileGroup.colorHue.flatMap { (0..<1).contains($0) ? $0 : nil }, color: fileGroup.color)
+                let created = StoredGroup(
+                    name: fileGroup.name, parentID: parentID, position: fileGroup.position ?? 0,
+                    colorHue: fileGroup.colorHue.flatMap { (0..<1).contains($0) ? $0 : nil },
+                    color: fileGroup.color, portableID: portableID,
+                    loginSetID: fileGroup.loginSetID,
+                    sshRelaySessionID: fileGroup.sshRelaySessionID)
                 freshGroupsByFileID[fileGroup.id] = created
                 groupIDMap[fileGroup.id] = created.id
             }
-        }
-        // Parents in a SECOND pass, through the very same `groupIDMap` that
-        // resolves `ExportedSession.groupID` below — one mapping, not two.
-        // It has to be a second pass because a `parentID` may name a group
-        // the first pass had not reached yet, and the id it maps to is
-        // minted there. Every `parentID` still present resolves: `repaired`
-        // above cleared exactly the ones that did not. A parent that matched
-        // an EXISTING group resolves to that group's id, so an imported
-        // folder can nest under one the store already has — without the
-        // existing group itself being touched.
-        for fileGroup in incomingGroups {
-            guard let fileParentID = fileGroup.parentID else { continue }
-            freshGroupsByFileID[fileGroup.id]?.parentID = groupIDMap[fileParentID]
         }
 
         // Then sessions, in file order. The duplicate key is per BACKEND (see
@@ -239,6 +285,7 @@ public enum SessionImportPlanner {
         // fresh-id-and-unique-name fallback instead.
         var replacedExistingIDs: Set<UUID> = []
         var sessionsToImport: [PlannedSession] = []
+        var referenceIDMap: [UUID: UUID] = [:]
         var skipped: [ExportedSession] = []
         var replaced: [String] = []
         var renamed: [String] = []
@@ -302,13 +349,56 @@ public enum SessionImportPlanner {
             // imports with no config block — a pre-existing, deliberately
             // kept exception (see `isUnusable`'s doc comment), not a gap this
             // guard introduces.
-            let probe = makePlanned(from: fileSession, id: UUID(), name: "", groupID: nil)
+            let probe = makePlanned(
+                from: fileSession, id: UUID(), name: "", groupID: nil,
+                loginSetIDMap: loginSetIDMap)
             guard !wouldBeDroppedByStore(probe), !isUnusable(fileSession, probe: probe) else {
                 rejected.append(trimmedName)
                 continue
             }
 
             let key = duplicateKey(for: fileSession)
+
+            // A portable identity survives the fresh local id assigned by a
+            // previous import. Resolve that collision before endpoint
+            // matching so a changed host is still recognised as the same
+            // exported object and cannot silently create "(2)" copies.
+            if let portableID = fileSession.portableID,
+               let match = existing.first(where: {
+                   $0.portableID == portableID && !replacedExistingIDs.contains($0.id)
+               }) {
+                guard let resolution = await arbiter.resolve(ImportConflict(
+                    itemName: trimmedName, kindLabel: kindLabel,
+                    reason: .sameConnection(existing: displaySummary(for: match))))
+                else { return SessionImportPlan(cancelled: true) }
+                switch resolution {
+                case .skip:
+                    skipped.append(fileSession)
+                    referenceIDMap[fileSession.id] = match.id
+                case .replace:
+                    replacedExistingIDs.insert(match.id)
+                    summaryByKey[key] = displaySummary(for: fileSession)
+                    takenNames.insert(normalizedName(trimmedName))
+                    let planned = makePlanned(
+                        from: fileSession, id: match.id, name: trimmedName,
+                        groupID: resolvedGroupID, replacing: match,
+                        loginSetIDMap: loginSetIDMap)
+                    sessionsToImport.append(planned)
+                    referenceIDMap[fileSession.id] = planned.session.id
+                    replaced.append(trimmedName)
+                case .rename:
+                    let name = uniqueName(for: trimmedName, avoiding: takenNames)
+                    takenNames.insert(normalizedName(name))
+                    summaryByKey[key] = displaySummary(for: fileSession)
+                    let planned = makePlanned(
+                        from: fileSession, id: UUID(), name: name,
+                        groupID: resolvedGroupID, loginSetIDMap: loginSetIDMap)
+                    sessionsToImport.append(planned)
+                    referenceIDMap[fileSession.id] = planned.session.id
+                    if name != trimmedName { renamed.append(name) }
+                }
+                continue
+            }
 
             // An entry that NAMES the record it updates (2026-09-03): it is
             // that record, so the connection question below is not asked — the
@@ -354,10 +444,12 @@ public enum SessionImportPlanner {
                 // hide a genuine collision.
                 summaryByKey[key] = displaySummary(for: fileSession)
                 takenNames.insert(normalizedName(trimmedName))
-                sessionsToImport.append(makePlanned(
+                let planned = makePlanned(
                     from: fileSession, id: match.id, name: trimmedName,
                     groupID: resolvedGroupID, replacing: match,
-                    keepsExistingSecret: true))
+                    keepsExistingSecret: true, loginSetIDMap: loginSetIDMap)
+                sessionsToImport.append(planned)
+                referenceIDMap[fileSession.id] = planned.session.id
                 replaced.append(trimmedName)
                 continue
             }
@@ -365,8 +457,11 @@ public enum SessionImportPlanner {
             guard let collidingSummary = summaryByKey[key] else {
                 summaryByKey[key] = displaySummary(for: fileSession)
                 takenNames.insert(normalizedName(trimmedName))
-                sessionsToImport.append(makePlanned(
-                    from: fileSession, id: UUID(), name: trimmedName, groupID: resolvedGroupID))
+                let planned = makePlanned(
+                    from: fileSession, id: UUID(), name: trimmedName,
+                    groupID: resolvedGroupID, loginSetIDMap: loginSetIDMap)
+                sessionsToImport.append(planned)
+                referenceIDMap[fileSession.id] = planned.session.id
                 continue
             }
 
@@ -398,6 +493,13 @@ public enum SessionImportPlanner {
             switch resolution {
             case .skip:
                 skipped.append(fileSession)
+                if let match = existing.first(where: { duplicateKey(for: $0) == key }) {
+                    referenceIDMap[fileSession.id] = match.id
+                } else if let planned = sessionsToImport.first(where: {
+                    duplicateKey(for: $0.session) == key
+                }) {
+                    referenceIDMap[fileSession.id] = planned.session.id
+                }
 
             case .replace:
                 if let match = existing.first(where: {
@@ -405,9 +507,11 @@ public enum SessionImportPlanner {
                 }) {
                     replacedExistingIDs.insert(match.id)
                     takenNames.insert(normalizedName(trimmedName))
-                    sessionsToImport.append(makePlanned(
+                    let planned = makePlanned(
                         from: fileSession, id: match.id, name: trimmedName, groupID: resolvedGroupID,
-                        replacing: match))
+                        replacing: match, loginSetIDMap: loginSetIDMap)
+                    sessionsToImport.append(planned)
+                    referenceIDMap[fileSession.id] = planned.session.id
                     replaced.append(trimmedName)
                 } else {
                     // Either the collision was against a triple first seen in
@@ -419,8 +523,11 @@ public enum SessionImportPlanner {
                     // double-binding two incoming sessions to one id.
                     let name = uniqueName(for: trimmedName, avoiding: takenNames)
                     takenNames.insert(normalizedName(name))
-                    sessionsToImport.append(makePlanned(
-                        from: fileSession, id: UUID(), name: name, groupID: resolvedGroupID))
+                    let planned = makePlanned(
+                        from: fileSession, id: UUID(), name: name, groupID: resolvedGroupID,
+                        loginSetIDMap: loginSetIDMap)
+                    sessionsToImport.append(planned)
+                    referenceIDMap[fileSession.id] = planned.session.id
                     // `uniqueName` returns the name unchanged when nothing
                     // else uses it (the collision key here is the endpoint
                     // triple, not the name) — only report an actual rename.
@@ -430,10 +537,26 @@ public enum SessionImportPlanner {
             case .rename:
                 let name = uniqueName(for: trimmedName, avoiding: takenNames)
                 takenNames.insert(normalizedName(name))
-                sessionsToImport.append(makePlanned(
-                    from: fileSession, id: UUID(), name: name, groupID: resolvedGroupID))
+                let planned = makePlanned(
+                    from: fileSession, id: UUID(), name: name, groupID: resolvedGroupID,
+                    loginSetIDMap: loginSetIDMap)
+                sessionsToImport.append(planned)
+                referenceIDMap[fileSession.id] = planned.session.id
                 if name != trimmedName { renamed.append(name) }
             }
+        }
+
+        // Saved-session jumps can only be reconnected after all accepted
+        // entries have their final ids (fresh, replacement, or a local
+        // connection deliberately kept during conflict resolution).
+        for index in sessionsToImport.indices {
+            guard let sourceJumpID = sessionsToImport[index].sourceJumpSessionID,
+                  let resolvedJumpID = referenceIDMap[sourceJumpID],
+                  var ssh = sessionsToImport[index].session.ssh,
+                  var jump = ssh.jump else { continue }
+            jump.sessionID = resolvedJumpID
+            ssh.jump = jump
+            sessionsToImport[index].session.ssh = ssh
         }
 
         // Only commit a freshly-created group if an actually-imported
@@ -444,7 +567,9 @@ public enum SessionImportPlanner {
         // rule excludes. File order is preserved.
         let createdByID = Dictionary(
             freshGroupsByFileID.values.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
-        var keptGroupIDs = Set(sessionsToImport.compactMap(\.session.groupID))
+        var keptGroupIDs = preserveEmptyGroups
+            ? Set(freshGroupsByFileID.values.map(\.id))
+            : Set(sessionsToImport.compactMap(\.session.groupID))
         for group in createdByID.values where keptGroupIDs.contains(group.id) {
             // Walks the whole chain up, stopping at the first ancestor
             // already kept (everything above it was walked then). The chain
@@ -455,10 +580,19 @@ public enum SessionImportPlanner {
                 cursor = createdByID[id]?.parentID
             }
         }
-        let groupsToCreate = incomingGroups.compactMap { fileGroup -> StoredGroup? in
+        var groupsToCreate = incomingGroups.compactMap { fileGroup -> StoredGroup? in
             guard let created = freshGroupsByFileID[fileGroup.id],
                   keptGroupIDs.contains(created.id) else { return nil }
             return created
+        }
+        // Group defaults are references into the same portable catalogs.
+        // Resolve them only after sessions have their final IDs. A reference
+        // whose target was kept local resolves to that existing local record.
+        for index in groupsToCreate.indices {
+            groupsToCreate[index].loginSetID = groupsToCreate[index].loginSetID
+                .flatMap { loginSetIDMap[$0] }
+            groupsToCreate[index].sshRelaySessionID = groupsToCreate[index].sshRelaySessionID
+                .flatMap { referenceIDMap[$0] }
         }
 
         // What the repair straightened, in file order. `repaired` returns
@@ -481,8 +615,24 @@ public enum SessionImportPlanner {
 
         return SessionImportPlan(
             groupsToCreate: groupsToCreate, sessionsToImport: sessionsToImport,
+            referenceIDMap: referenceIDMap,
             skipped: skipped, replaced: replaced, renamed: renamed, rejected: rejected,
             liftedGroups: liftedGroups, cancelled: false)
+    }
+
+    private static func uniqueGroupName(
+        _ requested: String, parentID: UUID?, existing: [StoredGroup]
+    ) -> String {
+        let base = requested.trimmingCharacters(in: .whitespacesAndNewlines)
+        var candidate = base
+        var suffix = 2
+        while existing.contains(where: {
+            $0.parentID == parentID && normalizedName($0.name) == normalizedName(candidate)
+        }) {
+            candidate = "\(base) (\(suffix))"
+            suffix += 1
+        }
+        return candidate
     }
 
     /// True when `probe` — a record this file entry would build — is one the
@@ -599,15 +749,16 @@ public enum SessionImportPlanner {
 
     private static func makePlanned(
         from fileSession: ExportedSession, id: UUID, name: String, groupID: UUID?,
-        replacing: StoredSession? = nil, keepsExistingSecret: Bool = false
+        replacing: StoredSession? = nil, keepsExistingSecret: Bool = false,
+        loginSetIDMap: [UUID: UUID] = [:]
     ) -> PlannedSession {
         let replacesExisting = replacing != nil
         // Jump fields are only present together (all-or-nothing from
         // `exportPayload`) -- `jumpHost`/`jumpUsername` gate construction.
-        // `secretID` is left at its default, generating a FRESH slot;
-        // `loginSetID` is always nil -- login sets are never imported, so
-        // a jump that referenced one becomes plain manual mode with the
-        // resolved values baked in at export time.
+        // `secretID` is left at its default, generating a FRESH slot. A jump
+        // login-set reference is restored when that set is part of the same
+        // archive plan; otherwise the resolved values carried by the file
+        // remain the portable manual fallback.
         var jump: StoredSession.JumpSpec?
         if let jumpHost = fileSession.jumpHost, let jumpUsername = fileSession.jumpUsername {
             jump = StoredSession.JumpSpec(
@@ -615,7 +766,9 @@ public enum SessionImportPlanner {
                 port: fileSession.jumpPort ?? 22,
                 username: jumpUsername,
                 authKind: fileSession.jumpAuthKind ?? .password,
-                keyPath: fileSession.jumpKeyPath, tlsTunnel: fileSession.jumpTLSTunnel)
+                keyPath: fileSession.jumpKeyPath,
+                loginSetID: fileSession.jumpLoginSetID.flatMap { loginSetIDMap[$0] },
+                tlsTunnel: fileSession.jumpTLSTunnel)
         }
         // Kind (M12): absent on legacy payloads -> `.ssh`, same
         // legacy-safe default as `StoredSession.kind` itself.
@@ -696,7 +849,9 @@ public enum SessionImportPlanner {
         // rather than being folded into it: "would the store discard this
         // record on load" is the store's own rule, and for this one shape it
         // is the ONLY rule doing any rejecting.
-        var session = StoredSession(id: id, name: name, groupID: groupID, kind: kind)
+        var session = StoredSession(
+            id: id, name: name, groupID: groupID,
+            loginSetID: fileSession.loginSetID.flatMap { loginSetIDMap[$0] }, kind: kind)
         session.appearance = fileSession.appearance
         // `?? 0`: a rank is a value, not a reference.
         // a rank is the file's own, needs no remapping (unlike `groupID` and
@@ -712,6 +867,7 @@ public enum SessionImportPlanner {
         session.importSource = fileSession.importSource
         session.importID = fileSession.importID
         session.importedAt = fileSession.importedAt
+        session.portableID = fileSession.portableID ?? fileSession.id
         if !fileSession.fields.isEmpty {
             var values = FieldValues()
             for (key, value) in fileSession.fields { values.setRaw(key, to: value) }
@@ -728,7 +884,8 @@ public enum SessionImportPlanner {
         }
         let secret = kind == .s3 ? fileSession.s3SecretAccessKey : fileSession.password
         return PlannedSession(
-            sourceID: fileSession.id, session: session, password: secret,
+            sourceID: fileSession.id, sourceJumpSessionID: fileSession.jumpSessionID,
+            session: session, password: secret,
             // Keyed on the jump that actually landed on the session, not the
             // one parsed out of the file: a non-SSH session keeps no jump
             // since M23/T8, and a password for a hop nobody dials is an

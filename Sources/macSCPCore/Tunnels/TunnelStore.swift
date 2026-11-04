@@ -211,14 +211,25 @@ public struct TunnelStore: Sendable {
         try persist(file)
     }
 
-    /// Appends a re-keyed portable import in one atomic write. Imported
-    /// profiles have already been forced to `autoStart == .off`.
+    /// Appends a re-keyed portable import in one atomic write.
     public func appendPortable(groups: [TunnelGroup], profiles: [TunnelProfile]) throws {
         var file = try writableFile()
         var storedGroups = file.groups ?? []
-        storedGroups.append(contentsOf: groups)
+        for group in groups {
+            if let index = storedGroups.firstIndex(where: { $0.id == group.id }) {
+                storedGroups[index] = group
+            } else {
+                storedGroups.append(group)
+            }
+        }
         file.groups = storedGroups
-        file.profiles.append(contentsOf: profiles)
+        for profile in profiles {
+            if let index = file.profiles.firstIndex(where: { $0.id == profile.id }) {
+                file.profiles[index] = profile
+            } else {
+                file.profiles.append(profile)
+            }
+        }
         try persist(file)
     }
 

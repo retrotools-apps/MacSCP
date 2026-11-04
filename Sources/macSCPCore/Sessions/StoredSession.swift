@@ -119,6 +119,11 @@ public struct StoredSession: Codable, Equatable, Identifiable, Sendable {
     /// When this session was imported (or last re-imported). `nil` exactly
     /// when `importSource` is `nil`.
     public var importedAt: Date?
+    /// Stable identity used only by the portable `.macscp` format. It lets a
+    /// later import recognise the same exported object even though local
+    /// store ids are always re-keyed. It is not a credential or a local
+    /// record reference.
+    public var portableID: UUID?
 
     public init(
         id: UUID = UUID(),
@@ -134,6 +139,7 @@ public struct StoredSession: Codable, Equatable, Identifiable, Sendable {
         importSource: String? = nil,
         importID: String? = nil,
         importedAt: Date? = nil,
+        portableID: UUID? = nil,
         appearance: SessionAppearance? = nil
     ) {
         self.id = id
@@ -149,11 +155,12 @@ public struct StoredSession: Codable, Equatable, Identifiable, Sendable {
         self.importSource = importSource
         self.importID = importID
         self.importedAt = importedAt
+        self.portableID = portableID
     }
 
     private enum CodingKeys: String, CodingKey {
         case id, name, groupID, loginSetID, kind, ssh, s3, webdav
-        case position, importSource, importID, importedAt, appearance
+        case position, importSource, importID, importedAt, portableID, appearance
     }
 
     public init(from decoder: Decoder) throws {
@@ -171,6 +178,7 @@ public struct StoredSession: Codable, Equatable, Identifiable, Sendable {
         importSource = try c.decodeIfPresent(String.self, forKey: .importSource)
         importID = try c.decodeIfPresent(String.self, forKey: .importID)
         importedAt = try c.decodeIfPresent(Date.self, forKey: .importedAt)
+        portableID = try c.decodeIfPresent(UUID.self, forKey: .portableID)
     }
 
     // DEPRECATION INTENT: these exist to keep M23 Phase 1 reviewable. Phase 3

@@ -30,11 +30,30 @@ entries, Cyberduck SFTP/S3 bookmarks, WinSCP INI files and MacSCP exports.
 Review the imported settings before connecting: some options from other clients
 are not supported.
 
+MacSCP export and Share both create a `.macscp` file. Exports may include
+connections, nested groups, tunnels and login sets; Share removes login
+identities and secrets. When an imported item already exists, choose whether
+to replace it, keep the local item or import a renamed copy. The choice can be
+applied to the remaining conflicts.
+
 ## Organize your connections
+
+In the connection editor, the session name and group appear above the connection
+settings. SSH destination, optional TLS tunneling, and SSH relay settings are
+separate compact sections. On a wide window, the icon and its color appear next
+to the session name and group; on a narrow window they move below those fields.
+Short related fields, such as host and port, share a row when space permits.
+Custom icon colors use the compact hue and saturation/brightness picker. Choose
+**Use color** to apply the preview, or **Cancel** to keep the existing color.
 
 Use groups and subgroups to keep related connections together. Click a group's
 chevron to expand or collapse it, and use its color dot to choose a color.
 Dissolving a group keeps the connections it contains.
+Use a group's context menu to configure default credentials or an SSH relay for
+its subtree. A connection's own setting wins; otherwise the nearest group
+setting is used, followed by parent groups. Deleting a group and its contents
+requires confirmation and removes the entire subtree. The Delete key also
+opens the confirmation for a selected connection.
 
 Open several connections to work in separate tabs. Choose **Disconnect** to
 end a file session while keeping its tab available, or press **⌘W** to close
@@ -239,8 +258,10 @@ from source, rebuild it to update, or install a GitHub package.
 ## Compatibility and help
 
 MacSCP supports SFTP over SSH, S3-compatible storage and WebDAV. FTP, SMB and AFP
-are not supported. SSH connections can use one jump host and supported TLS-gateway
-settings; multi-hop jump chains are not supported. RSA authentication requires
+are not supported. SSH connections can use one SSH relay and supported TLS
+transport settings. TLS changes the transport to the SSH destination; ProxyJump
+authenticates to an intermediate SSH server. Multi-hop jump chains are not
+supported. RSA authentication requires
 SHA-512 signature support. If SSH agent authentication is rejected after several
 attempts, reduce the identities offered by your agent. Route tracing supports
 IPv4 only.

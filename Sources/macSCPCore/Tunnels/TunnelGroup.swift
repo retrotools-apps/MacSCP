@@ -7,13 +7,15 @@ public struct TunnelGroup: Codable, Hashable, Identifiable, Sendable {
     public var parentID: UUID?
     public var colorHue: Double?
     public var color: GroupColor?
+    public var portableID: UUID?
 
-    public init(id: UUID = UUID(), name: String, parentID: UUID? = nil, colorHue: Double? = nil, color: GroupColor? = nil) {
+    public init(id: UUID = UUID(), name: String, parentID: UUID? = nil, colorHue: Double? = nil, color: GroupColor? = nil, portableID: UUID? = nil) {
         self.id = id
         self.name = name
         self.parentID = parentID
         self.colorHue = colorHue
         self.color = color
+        self.portableID = portableID
     }
 
     /// Includes the selected group; a visited set also bounds malformed legacy trees.

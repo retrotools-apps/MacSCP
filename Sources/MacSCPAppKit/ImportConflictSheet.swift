@@ -69,9 +69,7 @@ private struct ImportConflictSheet: View {
                     .foregroundStyle(.secondary)
             }
             .font(.caption)
-            Text(L10n.string(
-                "import.conflict.replaceNote",
-                "Replacing also overwrites the stored password or key passphrase."))
+            Text(replaceNote)
                 .font(.caption)
                 .foregroundStyle(.secondary)
             Toggle(
@@ -143,8 +141,29 @@ private struct ImportConflictSheet: View {
             return L10n.string("import.conflict.kind.loginSet", "login set")
         case SessionImportPlanner.kindLabel:
             return L10n.string("import.conflict.kind.session", "session")
+        case MacSCPArchiveImportPlanner.anonymousSessionKindLabel:
+            return L10n.string("import.conflict.kind.session", "session")
+        case SessionImportPlanner.groupKindLabel:
+            return L10n.string("import.conflict.kind.sessionGroup", "connection group")
+        case MacSCPArchiveImportPlanner.tunnelGroupKindLabel:
+            return L10n.string("import.conflict.kind.tunnelGroup", "tunnel group")
+        case MacSCPArchiveImportPlanner.tunnelKindLabel:
+            return L10n.string("import.conflict.kind.tunnel", "tunnel")
         default:
             return L10n.string("import.conflict.kind.other", "item")
+        }
+    }
+
+    private var replaceNote: String {
+        switch conflict.kindLabel {
+        case LoginSetImportPlanner.kindLabel, SessionImportPlanner.kindLabel:
+            L10n.string(
+                "import.conflict.replaceNote",
+                "Replacing also overwrites the stored password or key passphrase.")
+        default:
+            L10n.string(
+                "import.conflict.replaceSettingsNote",
+                "Replacing overwrites the local item’s settings.")
         }
     }
 }

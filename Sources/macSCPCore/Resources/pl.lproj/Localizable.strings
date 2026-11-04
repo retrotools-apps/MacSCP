@@ -156,6 +156,8 @@
 /* SessionListViewModel */
 "core.session.loadFailed %@" = "Nie udało się wczytać sesji: %@";
 "core.session.saveFailed %@" = "Nie udało się zapisać sesji: %@";
+"core.session.sharedSecretSlot" = "Zmiana nie została zapisana, ponieważ dane z pęku kluczy są również używane przez inne połączenie.";
+"core.import.anonymousLocalCredential" = "Lokalne połączenie nie zostało zastąpione, ponieważ jego dane z pęku kluczy nie są zawarte w udostępnionym pliku.";
 "core.session.deleteFailed %@" = "Nie udało się usunąć sesji: %@";
 
 /* Session groups (M5f/T2) */

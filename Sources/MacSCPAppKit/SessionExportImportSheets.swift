@@ -63,6 +63,7 @@ struct SessionExportOptions {
 struct SessionExportSheet: View {
     let viewModel: SessionListViewModel
     let scope: SessionListViewModel.ExportScope
+    let hasTunnelConfiguration: Bool
     /// Runs the actual export (payload build + encode + arms `ContentView`'s
     /// `fileExporter`) in `ContentView`. Returns an error message to show
     /// inline and keep the sheet open, or `nil` on success — `ContentView`
@@ -97,7 +98,7 @@ struct SessionExportSheet: View {
     private var scopedCount: Int {
         switch scope {
         case .single: return 1
-        case .group(let group): return viewModel.sessions(inGroup: group.id).count
+        case .group(let group): return viewModel.sessions(inSubtreeOf: group.id).count
         case .all: return viewModel.sessions.count
         }
     }
@@ -123,7 +124,19 @@ struct SessionExportSheet: View {
     }
 
     private var canExport: Bool {
-        guard scopedCount >= 1 else { return false }
+        let hasContent: Bool
+        switch scope {
+        case .single:
+            hasContent = true
+        case .group:
+            hasContent = scopedCount > 0 || includeGroups
+        case .all:
+            hasContent = scopedCount > 0
+                || (includeGroups && !viewModel.groups.isEmpty)
+                || (includeLoginSets && !viewModel.loginSets.isEmpty)
+                || (includeTunnels && hasTunnelConfiguration)
+        }
+        guard hasContent else { return false }
         if encryptionMode == .encrypted { return passwordsMatchAndPresent }
         return true
     }

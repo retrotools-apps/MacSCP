@@ -20,7 +20,7 @@ struct PortableConfigurationShareItem {
     ) -> PortableConfigurationShareItem? {
         let connections = viewModel.exportPayload(
             for: scope, includeGroups: true, includePasswords: false).payload
-        guard !connections.sessions.isEmpty else { return nil }
+        guard !connections.sessions.isEmpty || !connections.groups.isEmpty else { return nil }
         let archive = MacSCPArchiveBuilder.build(
             scope: manifestScope(scope), connections: connections,
             includeIdentities: false, tunnels: tunnels, tunnelGroups: tunnelGroups)

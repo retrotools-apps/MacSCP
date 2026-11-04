@@ -25,18 +25,30 @@ public struct StoredGroup: Codable, Equatable, Identifiable, Sendable {
     public var colorHue: Double?
     /// Optional opaque sRGB identifier. Nil uses the automatic group treatment.
     public var color: GroupColor?
+    /// Stable identity for repeated portable imports; local `id` remains
+    /// installation-specific and is always re-keyed.
+    public var portableID: UUID?
+    /// Optional defaults inherited by sessions in this subtree. They are
+    /// references only: credentials remain in the login set's Keychain slot,
+    /// and the relay keeps owning its own SSH connection data.
+    public var loginSetID: UUID?
+    public var sshRelaySessionID: UUID?
 
-    public init(id: UUID = UUID(), name: String, parentID: UUID? = nil, position: Int = 0, colorHue: Double? = nil, color: GroupColor? = nil) {
+    public init(id: UUID = UUID(), name: String, parentID: UUID? = nil, position: Int = 0, colorHue: Double? = nil, color: GroupColor? = nil, portableID: UUID? = nil, loginSetID: UUID? = nil, sshRelaySessionID: UUID? = nil) {
         self.id = id
         self.name = name
         self.parentID = parentID
         self.position = position
         self.colorHue = colorHue
         self.color = color
+        self.portableID = portableID
+        self.loginSetID = loginSetID
+        self.sshRelaySessionID = sshRelaySessionID
     }
 
     private enum CodingKeys: String, CodingKey {
-        case id, name, parentID, position, colorHue, color
+        case id, name, parentID, position, colorHue, color, portableID
+        case loginSetID, sshRelaySessionID
     }
 
     public init(from decoder: Decoder) throws {
@@ -49,5 +61,8 @@ public struct StoredGroup: Codable, Equatable, Identifiable, Sendable {
             (0..<1).contains($0) ? $0 : nil
         }
         color = try c.decodeIfPresent(GroupColor.self, forKey: .color)
+        portableID = try c.decodeIfPresent(UUID.self, forKey: .portableID)
+        loginSetID = try c.decodeIfPresent(UUID.self, forKey: .loginSetID)
+        sshRelaySessionID = try c.decodeIfPresent(UUID.self, forKey: .sshRelaySessionID)
     }
 }

@@ -52,6 +52,7 @@ struct HostResolveWiringGuardTests {
     private static let accessoryDeclaration = "private func fieldAccessory("
     private static let footnoteDeclaration = "private func fieldFootnote("
     private static let jumpDeclaration = "private var sshJumpSection: some View"
+    private static let jumpEndpointDeclaration = "private var jumpEndpointFields: some View"
     private static let chooseDeclaration = "func choose("
 
     private static func code(_ relativePath: String) throws -> String {
@@ -120,16 +121,21 @@ struct HostResolveWiringGuardTests {
     @Test func theJumpHostRowCarriesNoResolveAction() throws {
         let form = try Self.code(Self.formPath)
         let jump = try Self.body(of: Self.jumpDeclaration, in: form)
-        #expect(jump.contains("viewModel.jumpHost"), """
-            sshJumpSection no longer binds the jump host's field — the \
+        #expect(jump.contains("jumpEndpointFields"), """
+            sshJumpSection no longer mounts the jump endpoint fields — the \
+            negative checks below would be reading an unrelated span.
+            """)
+        let endpoint = try Self.body(of: Self.jumpEndpointDeclaration, in: form)
+        #expect(endpoint.contains("viewModel.jumpHost"), """
+            jumpEndpointFields no longer binds the jump host's field — the \
             negative check below would be reading a span without it.
             """)
-        #expect(!jump.contains("\(Self.control)("), """
-            sshJumpSection draws \(Self.control) — the jump host got the \
+        #expect(!endpoint.contains("\(Self.control)("), """
+            jumpEndpointFields draws \(Self.control) — the jump host got the \
             action, which this task leaves out.
             """)
-        #expect(!jump.contains(Self.model), """
-            sshJumpSection reads \(Self.model).
+        #expect(!endpoint.contains(Self.model), """
+            jumpEndpointFields reads \(Self.model).
             """)
     }
 

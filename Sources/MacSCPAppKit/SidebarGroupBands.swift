@@ -600,3 +600,40 @@ struct GroupColorPicker: View {
         .accessibilityAddTraits(selected == value ? .isSelected : [])
     }
 }
+
+/// Compact custom-color editor shared by connection and tunnel icons.
+/// Edits remain local until the user applies the color.
+struct CustomIconColorPicker: View {
+    @State private var color: GroupColorHSB
+    let onCancel: () -> Void
+    let onUse: (GroupColor) -> Void
+
+    init(color: GroupColor, onCancel: @escaping () -> Void,
+         onUse: @escaping (GroupColor) -> Void) {
+        _color = State(initialValue: GroupColorHSB(color: color))
+        self.onCancel = onCancel
+        self.onUse = onUse
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text(L10n.string("session.appearance.color", "Icon color")).font(.headline)
+            HStack(spacing: 8) {
+                Circle().fill(color.color.swiftUIColor).frame(width: 22, height: 22)
+                    .overlay { Circle().strokeBorder(Color.primary.opacity(0.2), lineWidth: 1) }
+                Text(color.color.hex).font(.system(.caption, design: .monospaced))
+                    .foregroundStyle(.secondary)
+            }
+            GroupSaturationBrightnessField(color: $color).frame(height: 126)
+            GroupHueStrip(hue: $color.hue).frame(height: 18)
+            HStack {
+                Button(L10n.string("common.cancel", "Cancel"), action: onCancel)
+                Spacer()
+                Button(L10n.string("group.color.use", "Use color")) { onUse(color.color) }
+                    .keyboardShortcut(.defaultAction)
+            }
+        }
+        .padding(14).frame(width: 252)
+        .onExitCommand(perform: onCancel)
+    }
+}

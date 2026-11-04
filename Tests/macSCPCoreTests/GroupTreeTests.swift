@@ -60,6 +60,55 @@ struct GroupTreeTests {
         #expect(GroupTree.repaired([a, b]) == [a, b])
     }
 
+    @Test func groupDefaultsResolveIndependentlyFromTheNearestAncestor() {
+        let parentLogin = UUID()
+        let parentRelay = UUID()
+        let childLogin = UUID()
+        let parent = StoredGroup(
+            name: "Parent", loginSetID: parentLogin,
+            sshRelaySessionID: parentRelay)
+        let child = StoredGroup(
+            name: "Child", parentID: parent.id, loginSetID: childLogin)
+        let session = StoredSession(
+            name: "Target", groupID: child.id,
+            ssh: .init(host: "target.invalid", username: ""))
+
+        let resolved = GroupSessionDefaults.resolve(for: session, groups: [parent, child])
+
+        #expect(resolved.loginSetID == childLogin)
+        #expect(resolved.sshRelaySessionID == parentRelay)
+    }
+
+    @Test func explicitSessionSettingsOverrideEveryGroupDefault() throws {
+        let group = StoredGroup(
+            name: "Group", loginSetID: UUID(), sshRelaySessionID: UUID())
+        let sessionLogin = UUID()
+        let sessionRelay = UUID()
+        let session = StoredSession(
+            name: "Target", groupID: group.id, loginSetID: sessionLogin,
+            ssh: .init(
+                host: "target.invalid", username: "",
+                jump: .init(host: "", username: "", sessionID: sessionRelay)))
+
+        let effective = GroupSessionDefaults.applying(to: session, groups: [group])
+
+        #expect(effective.loginSetID == sessionLogin)
+        #expect(try #require(effective.jump).sessionID == sessionRelay)
+    }
+
+    @Test func nonSSHConnectionsNeverInheritAnSSHRelay() {
+        let group = StoredGroup(name: "Group", sshRelaySessionID: UUID())
+        let session = StoredSession(
+            name: "Bucket", groupID: group.id, kind: .s3,
+            s3: .init(
+                accessKeyID: "key", region: "eu-west-1",
+                endpoint: "https://s3.invalid", bucket: "bucket",
+                usePathStyle: true))
+
+        #expect(GroupSessionDefaults.resolve(for: session, groups: [group]).sshRelaySessionID == nil)
+        #expect(GroupSessionDefaults.applying(to: session, groups: [group]).jump == nil)
+    }
+
     @Test func childrenComeBackInPositionOrder() {
         let parent = group("p")
         let second = group("second", parent: parent.id, at: 1)
@@ -96,6 +145,23 @@ struct GroupTreeTests {
         #expect(GroupTree.selfAndAncestors(of: a.id, in: [a, b]) == [a.id, b.id])
 
         #expect(GroupTree.selfAndAncestors(of: UUID(), in: [a, b]).isEmpty)
+    }
+
+    @Test func selfAndDescendantsWalkTheWholeSubtreeAndStopAtCycles() {
+        let root = group("root")
+        var child = group("child", parent: root.id)
+        let grandchild = group("grandchild", parent: child.id)
+        let unrelated = group("unrelated")
+        #expect(
+            GroupTree.selfAndDescendants(
+                of: root.id, in: [root, child, grandchild, unrelated])
+                == [root.id, child.id, grandchild.id])
+
+        child.parentID = grandchild.id
+        #expect(
+            GroupTree.selfAndDescendants(of: child.id, in: [child, grandchild])
+                == [child.id, grandchild.id])
+        #expect(GroupTree.selfAndDescendants(of: UUID(), in: [root]).isEmpty)
     }
 }
 

@@ -82,6 +82,18 @@ struct LoginSetImportPlannerTests {
         #expect(await log.names == ["PROD"])
     }
 
+    @Test func keepingLocalStillMapsPortableReferencesToTheLocalSet() async {
+        let existing = LoginSet(name: "Prod", username: "local")
+        let incoming = fileSet(name: "Prod", username: "portable")
+        let plan = await LoginSetImportPlanner.plan(
+            existing: [existing], incoming: payload([incoming]),
+            arbiter: ImportConflictArbiter { _ in (.skip, true) })
+
+        #expect(plan.setsToImport.isEmpty)
+        #expect(plan.referenceIDMap[incoming.id] == existing.id)
+        #expect(plan.skipped == ["Prod"])
+    }
+
     /// Everything else about the incoming item is trimmed before it is
     /// stored or reported; the conflict shown to the user must not be the
     /// one place a padded name leaks through.

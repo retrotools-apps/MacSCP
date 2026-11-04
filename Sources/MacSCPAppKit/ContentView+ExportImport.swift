@@ -217,15 +217,27 @@ extension ContentView {
         }
         let plan: SessionImportPlan?
         if let connections = pending.payload {
+            let loginSetIDMap = loginPlan?.referenceIDMap ?? [:]
             let planned = await SessionImportPlanner.plan(
                 existing: sessionListViewModel.sessions,
                 existingGroups: sessionListViewModel.groups,
                 incoming: connections,
-                arbiter: arbiter)
+                arbiter: arbiter,
+                loginSetIDMap: loginSetIDMap,
+                preserveEmptyGroups: pending.archive != nil)
             guard !planned.cancelled else { return }
             plan = planned
         } else {
             plan = nil
+        }
+        let tunnelPlan: MacSCPTunnelImportPlan?
+        if let archive = pending.archive, let plan {
+            let planned = await TunnelManager.shared.planArchiveImport(
+                archive, sessionIDMap: plan.referenceIDMap, arbiter: arbiter)
+            guard !planned.cancelled else { return }
+            tunnelPlan = planned
+        } else {
+            tunnelPlan = nil
         }
         importFileData = nil
         var messages: [String] = []
@@ -254,17 +266,15 @@ extension ContentView {
                         secretsNotRead: notRead)
                 }))
         }
-        if let archive = pending.archive, let plan {
-            let sessionIDMap = Dictionary(uniqueKeysWithValues: plan.sessionsToImport.compactMap {
-                planned in planned.sourceID.map { ($0, planned.session.id) }
-            })
+        if let tunnelPlan {
             do {
-                let tunnelPlan = try TunnelManager.shared.importArchive(
-                    archive, sessionIDMap: sessionIDMap)
+                try TunnelManager.shared.applyArchiveImport(tunnelPlan)
                 messages.append(String(
                     format: L10n.string(
-                        "archive.import.tunnels %lld", "Imported tunnels: %lld"),
-                    tunnelPlan.tunnels.count))
+                        "archive.import.tunnels %lld %lld %lld %lld",
+                        "Tunnels: %lld imported, %lld replaced, %lld renamed, %lld kept local"),
+                    tunnelPlan.tunnels.count, tunnelPlan.replaced.count,
+                    tunnelPlan.renamed.count, tunnelPlan.skipped.count))
             } catch {
                 importErrorMessage = String(
                     format: L10n.string(
@@ -279,20 +289,28 @@ extension ContentView {
     }
 
     /// Imports an anonymous archive without reading or writing the Keychain.
-    /// Connections are committed first because every tunnel must point at a
-    /// stored connection; a tunnel-store failure is surfaced as a partial
-    /// import instead of pretending the already-written connections vanished.
+    /// Both halves are planned before either store is changed, so cancelling a
+    /// tunnel conflict leaves the connection store untouched.
     func applyAnonymousArchive(_ archive: MacSCPArchivePayload) async {
+        let bridge = importConflictBridge
+        let arbiter = ImportConflictArbiter { conflict in await bridge.ask(conflict) }
+        let connections = await sessionListViewModel.planAnonymousArchive(
+            archive, arbiter: arbiter)
+        guard !connections.cancelled else { return }
+        let tunnels = await TunnelManager.shared.planArchiveImport(
+            archive, sessionIDMap: connections.sessionIDMap, arbiter: arbiter)
+        guard !tunnels.cancelled else { return }
         do {
-            let connections = try sessionListViewModel.importAnonymousArchive(archive)
+            try sessionListViewModel.applyAnonymousArchive(connections)
             do {
-                let tunnels = try TunnelManager.shared.importArchive(
-                    archive, sessionIDMap: connections.sessionIDMap)
+                try TunnelManager.shared.applyArchiveImport(tunnels)
                 importResultMessage = String(
                     format: L10n.string(
-                        "share.import.result %lld %lld",
-                        "Imported connections: %lld\nImported tunnels: %lld\nLogins must be entered on this Mac."),
-                    connections.sessions.count, tunnels.tunnels.count)
+                        "share.import.result %lld %lld %lld %lld %lld",
+                        "Connections: %lld imported, %lld replaced, %lld renamed, %lld kept local\nImported tunnels: %lld\nLogins must be entered on this Mac."),
+                    connections.sessions.count, connections.replaced.count,
+                    connections.renamed.count, connections.skipped.count,
+                    tunnels.tunnels.count)
                 showImportResultAlert = true
             } catch {
                 importErrorMessage = String(

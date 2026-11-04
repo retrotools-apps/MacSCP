@@ -180,6 +180,35 @@ public struct SessionStore: Sendable {
     public func delete(id: UUID) throws {
         var file = try load()
         file.sessions.removeAll { $0.id == id }
+        for index in file.groups.indices where file.groups[index].sshRelaySessionID == id {
+            file.groups[index].sshRelaySessionID = nil
+        }
+        try persist(file)
+    }
+
+    /// Clears group references to a login set in the same atomic write as a
+    /// regular sessions-file update. Returns the affected group IDs so a
+    /// caller coordinating with the separate login-set store can restore the
+    /// references if that second write fails.
+    public func clearGroupLoginSetReferences(_ setID: UUID) throws -> Set<UUID> {
+        var file = try load()
+        var affected: Set<UUID> = []
+        for index in file.groups.indices where file.groups[index].loginSetID == setID {
+            affected.insert(file.groups[index].id)
+            file.groups[index].loginSetID = nil
+        }
+        try persist(file)
+        return affected
+    }
+
+    public func restoreGroupLoginSetReferences(
+        _ setID: UUID, groupIDs: Set<UUID>
+    ) throws {
+        guard !groupIDs.isEmpty else { return }
+        var file = try load()
+        for index in file.groups.indices where groupIDs.contains(file.groups[index].id) {
+            file.groups[index].loginSetID = setID
+        }
         try persist(file)
     }
 
@@ -197,8 +226,16 @@ public struct SessionStore: Sendable {
     /// The caller has already removed every credential-bearing field.
     func appendPortable(groups: [StoredGroup], sessions: [StoredSession]) throws {
         var file = try load()
-        file.groups.append(contentsOf: groups)
-        file.sessions.append(contentsOf: sessions)
+        for group in groups {
+            if let index = file.groups.firstIndex(where: { $0.id == group.id }) {
+                file.groups[index] = group
+            } else { file.groups.append(group) }
+        }
+        for session in sessions {
+            if let index = file.sessions.firstIndex(where: { $0.id == session.id }) {
+                file.sessions[index] = session
+            } else { file.sessions.append(session) }
+        }
         try persist(file)
     }
 

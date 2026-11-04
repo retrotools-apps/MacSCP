@@ -512,16 +512,21 @@ final class TunnelManager {
         reload()
     }
 
-    /// Imports only stopped, freshly-keyed profiles. Nothing in this path
-    /// creates a runner or reaches a host.
-    func importArchive(
-        _ archive: MacSCPArchivePayload, sessionIDMap: [UUID: UUID]
-    ) throws -> MacSCPTunnelImportPlan {
-        let plan = MacSCPArchiveImportPlanner.tunnels(
-            from: archive, sessionIDMap: sessionIDMap, existingGroups: allGroups)
+    /// Imports freshly-keyed profiles. Nothing in this path creates a runner
+    /// or reaches a host; an imported auto-start preference only takes effect
+    /// at its next normal lifecycle trigger.
+    func planArchiveImport(
+        _ archive: MacSCPArchivePayload, sessionIDMap: [UUID: UUID],
+        arbiter: ImportConflictArbiter
+    ) async -> MacSCPTunnelImportPlan {
+        await MacSCPArchiveImportPlanner.tunnels(
+            from: archive, sessionIDMap: sessionIDMap, existingGroups: allGroups,
+            existingTunnels: allProfiles, arbiter: arbiter)
+    }
+
+    func applyArchiveImport(_ plan: MacSCPTunnelImportPlan) throws {
         try store.appendPortable(groups: plan.groups, profiles: plan.tunnels)
         reload()
-        return plan
     }
 
     func removeGroup(_ group: TunnelGroup) throws {

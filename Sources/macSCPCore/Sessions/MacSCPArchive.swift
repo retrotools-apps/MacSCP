@@ -54,7 +54,7 @@ public struct MacSCPArchivePayload: Codable, Equatable, Sendable {
 public enum MacSCPArchiveCodec {
     public static let fileExtension = "macscp"
     private static let format = "macscp"
-    private static let currentVersion = 1
+    private static let currentVersion = 2
 
     public static func encode(
         _ payload: MacSCPArchivePayload, password: String?
@@ -123,6 +123,13 @@ public enum MacSCPArchiveBuilder {
         tunnels allTunnels: [TunnelProfile], tunnelGroups: [TunnelGroup]
     ) -> MacSCPArchivePayload {
         var connections = source
+        let sourceSessionIDs = Set(connections.sessions.map(\.id))
+        for index in connections.groups.indices {
+            if !includeIdentities { connections.groups[index].loginSetID = nil }
+            if connections.groups[index].sshRelaySessionID.map(sourceSessionIDs.contains) != true {
+                connections.groups[index].sshRelaySessionID = nil
+            }
+        }
         if !includeIdentities {
             connections.includesSecrets = false
             connections.sessions = connections.sessions.map(redacted)
@@ -132,22 +139,30 @@ public enum MacSCPArchiveBuilder {
             guard sessionIDs.contains(profile.sessionID) else { return nil }
             return TunnelProfile(
                 id: profile.id, sessionID: profile.sessionID, name: profile.name,
-                kind: profile.kind, autoStart: .off, reconnects: profile.reconnects,
+                kind: profile.kind, autoStart: profile.autoStart, reconnects: profile.reconnects,
                 service: profile.service,
                 jumpSessionID: profile.jumpSessionID.flatMap {
                     sessionIDs.contains($0) ? $0 : nil
                 },
-                groupID: profile.groupID, appearance: profile.appearance)
+                groupID: profile.groupID, appearance: profile.appearance,
+                portableID: profile.portableID ?? profile.id)
         }
-        let includedTunnelGroups = referencedTunnelGroups(
-            Set(tunnels.compactMap(\.groupID)), in: tunnelGroups)
+        let selectedTunnelGroups = scope == .all
+            ? tunnelGroups
+            : referencedTunnelGroups(Set(tunnels.compactMap(\.groupID)), in: tunnelGroups)
+        let includedTunnelGroups = selectedTunnelGroups.map { group in
+                TunnelGroup(
+                    id: group.id, name: group.name, parentID: group.parentID,
+                    colorHue: group.colorHue, color: group.color,
+                    portableID: group.portableID ?? group.id)
+            }
         return MacSCPArchivePayload(
             manifest: MacSCPArchiveManifest(
                 scope: scope, includesConnections: true, includesLoginSets: false,
                 includesIdentities: includeIdentities,
                 includesSecrets: connections.includesSecrets,
                 includesPrivateKeys: false,
-                includesTunnels: !tunnels.isEmpty),
+                includesTunnels: !tunnels.isEmpty || !includedTunnelGroups.isEmpty),
             connections: connections,
             tunnelGroups: includedTunnelGroups,
             tunnels: tunnels)
@@ -188,6 +203,8 @@ public enum MacSCPArchiveBuilder {
         values[WebDAVField.baseURL] = removingURLCredentials(from: values[WebDAVField.baseURL])
         session.fields = values.raw
         session.password = nil
+        session.loginSetID = nil
+        session.jumpLoginSetID = nil
         session.jumpUsername = session.jumpHost == nil ? nil : ""
         session.jumpKeyPath = nil
         session.jumpPassword = nil
@@ -228,36 +245,158 @@ public struct AnonymousConnectionImportPlan: Sendable {
     public var groups: [StoredGroup]
     public var sessions: [StoredSession]
     public var sessionIDMap: [UUID: UUID]
+    public var skipped: [String] = []
+    public var replaced: [String] = []
+    public var renamed: [String] = []
+    public var cancelled = false
 }
 
 public struct MacSCPTunnelImportPlan: Sendable {
     public var groups: [TunnelGroup]
     public var tunnels: [TunnelProfile]
+    public var skipped: [String]
+    public var replaced: [String]
+    public var renamed: [String]
+    public var cancelled: Bool
+
+    public init(
+        groups: [TunnelGroup] = [], tunnels: [TunnelProfile] = [],
+        skipped: [String] = [], replaced: [String] = [], renamed: [String] = [],
+        cancelled: Bool = false
+    ) {
+        self.groups = groups
+        self.tunnels = tunnels
+        self.skipped = skipped
+        self.replaced = replaced
+        self.renamed = renamed
+        self.cancelled = cancelled
+    }
 }
 
 public enum MacSCPArchiveImportPlanner {
+    public static let anonymousSessionKindLabel = "anonymousSession"
+    public static let tunnelGroupKindLabel = "tunnelGroup"
+    public static let tunnelKindLabel = "tunnel"
     /// Redacted sessions intentionally fail the ordinary importer's
     /// dialability check. They are stored as editable configurations with
     /// blank identity fields so the recipient can fill those locally.
     public static func anonymousConnections(
         from archive: MacSCPArchivePayload,
-        existingSessions: [StoredSession], existingGroups: [StoredGroup]
-    ) -> AnonymousConnectionImportPlan {
+        existingSessions: [StoredSession], existingGroups: [StoredGroup],
+        arbiter: ImportConflictArbiter
+    ) async -> AnonymousConnectionImportPlan {
         guard let connections = archive.connections else {
             return AnonymousConnectionImportPlan(groups: [], sessions: [], sessionIDMap: [:])
         }
         let source = connections.sessions.map(MacSCPArchiveBuilder.redacted)
-        let groupPlan = rekeyGroups(connections.groups, existing: existingGroups)
-        let sessionIDMap = Dictionary(uniqueKeysWithValues: source.map { ($0.id, UUID()) })
+        var groupMap: [UUID: UUID] = [:]
+        var groups: [StoredGroup] = []
+        var pendingGroups = connections.groups
+        while !pendingGroups.isEmpty {
+            guard let index = pendingGroups.firstIndex(where: {
+                $0.parentID == nil || groupMap[$0.parentID!] != nil
+            }) else { break }
+            let item = pendingGroups.remove(at: index)
+            let parentID = item.parentID.flatMap { groupMap[$0] }
+            let portableID = item.portableID ?? item.id
+            let match = existingGroups.first { $0.portableID == portableID }
+                ?? existingGroups.first {
+                    $0.parentID == parentID && normalized($0.name) == normalized(item.name)
+                }
+            if let match {
+                guard let resolution = await arbiter.resolve(ImportConflict(
+                    itemName: item.name, kindLabel: SessionImportPlanner.groupKindLabel,
+                    reason: .name)) else {
+                    return AnonymousConnectionImportPlan(
+                        groups: [], sessions: [], sessionIDMap: [:], cancelled: true)
+                }
+                switch resolution {
+                case .skip:
+                    groupMap[item.id] = match.id
+                case .replace:
+                    let replacement = StoredGroup(
+                        id: match.id, name: item.name, parentID: parentID,
+                        position: item.position ?? 0, colorHue: item.colorHue,
+                        color: item.color, portableID: portableID,
+                        sshRelaySessionID: item.sshRelaySessionID)
+                    groups.append(replacement)
+                    groupMap[item.id] = replacement.id
+                case .rename:
+                    var occupied = (existingGroups + groups).map {
+                        ($0.parentID, normalized($0.name))
+                    }
+                    let name = uniqueGroupName(item.name, parent: parentID, occupied: &occupied)
+                    let created = StoredGroup(
+                        name: name, parentID: parentID, position: item.position ?? 0,
+                        colorHue: item.colorHue, color: item.color,
+                        portableID: portableID, sshRelaySessionID: item.sshRelaySessionID)
+                    groups.append(created)
+                    groupMap[item.id] = created.id
+                }
+            } else {
+                let created = StoredGroup(
+                    name: item.name, parentID: parentID, position: item.position ?? 0,
+                    colorHue: item.colorHue, color: item.color,
+                    portableID: portableID, sshRelaySessionID: item.sshRelaySessionID)
+                groups.append(created)
+                groupMap[item.id] = created.id
+            }
+        }
+        var sessionIDMap: [UUID: UUID] = [:]
         var takenNames = Set(existingSessions.map { normalized($0.name) })
         var sessions: [StoredSession] = []
+        var skipped: [String] = []
+        var replaced: [String] = []
+        var renamed: [String] = []
+        var claimedExisting: Set<UUID> = []
+        var prospectiveGroups = existingGroups
+        for group in groups {
+            if let index = prospectiveGroups.firstIndex(where: { $0.id == group.id }) {
+                prospectiveGroups[index] = group
+            } else {
+                prospectiveGroups.append(group)
+            }
+        }
+        let importedGroupIDs = Set(groups.map(\.id))
         for item in source {
-            let name = uniqueName(item.name, taken: &takenNames)
             let kind = item.kind ?? .ssh
+            let portableID = item.portableID ?? item.id
+            let match = existingSessions.first {
+                $0.portableID == portableID && !claimedExisting.contains($0.id)
+            } ?? existingSessions.first {
+                $0.kind == kind && normalized($0.name) == normalized(item.name)
+                    && !claimedExisting.contains($0.id)
+            }
+            var id = UUID()
+            var name = item.name
+            if let match {
+                guard let resolution = await arbiter.resolve(ImportConflict(
+                    itemName: item.name, kindLabel: anonymousSessionKindLabel,
+                    reason: .name)) else {
+                    return AnonymousConnectionImportPlan(
+                        groups: [], sessions: [], sessionIDMap: [:], cancelled: true)
+                }
+                switch resolution {
+                case .skip:
+                    sessionIDMap[item.id] = match.id
+                    skipped.append(item.name)
+                    continue
+                case .replace:
+                    id = match.id
+                    claimedExisting.insert(match.id)
+                    replaced.append(item.name)
+                case .rename:
+                    name = uniqueName(item.name, taken: &takenNames)
+                    renamed.append(name)
+                }
+            } else {
+                name = uniqueName(item.name, taken: &takenNames)
+            }
+            sessionIDMap[item.id] = id
             var stored = StoredSession(
-                id: sessionIDMap[item.id] ?? UUID(), name: name,
-                groupID: item.groupID.flatMap { groupPlan.map[$0] }, kind: kind,
-                position: item.position ?? 0, appearance: item.appearance)
+                id: id, name: name, groupID: item.groupID.flatMap { groupMap[$0] }, kind: kind,
+                position: item.position ?? 0, portableID: portableID,
+                appearance: item.appearance)
             if !item.fields.isEmpty {
                 BackendDescriptor.descriptor(for: kind).apply(
                     FieldValues(raw: item.fields), &stored)
@@ -268,103 +407,156 @@ public enum MacSCPArchiveImportPlanner {
                     authKind: item.jumpAuthKind ?? .password,
                     tlsTunnel: item.jumpTLSTunnel)
             }
+            if inheritsLocalGroupDefault(
+                stored, groups: prospectiveGroups, importedGroupIDs: importedGroupIDs) {
+                // Anonymous shares carry no credential. Keeping this group
+                // assignment would silently attach a local login set or SSH
+                // relay from a group the user chose to keep local.
+                stored.groupID = nil
+            }
             sessions.append(stored)
         }
+        for index in groups.indices {
+            groups[index].sshRelaySessionID = groups[index].sshRelaySessionID
+                .flatMap { sessionIDMap[$0] }
+        }
         return AnonymousConnectionImportPlan(
-            groups: groupPlan.groups, sessions: sessions, sessionIDMap: sessionIDMap)
+            groups: groups, sessions: sessions, sessionIDMap: sessionIDMap,
+            skipped: skipped, replaced: replaced, renamed: renamed)
     }
 
     public static func tunnels(
         from archive: MacSCPArchivePayload, sessionIDMap: [UUID: UUID],
-        existingGroups: [TunnelGroup]
-    ) -> MacSCPTunnelImportPlan {
+        existingGroups: [TunnelGroup], existingTunnels: [TunnelProfile],
+        arbiter: ImportConflictArbiter
+    ) async -> MacSCPTunnelImportPlan {
         guard archive.manifest.includesTunnels else {
             return MacSCPTunnelImportPlan(groups: [], tunnels: [])
         }
-        let groupPlan = rekeyTunnelGroups(archive.tunnelGroups, existing: existingGroups)
-        let tunnels = archive.tunnels.compactMap { source -> TunnelProfile? in
-            guard let sessionID = sessionIDMap[source.sessionID] else { return nil }
-            return TunnelProfile(
-                sessionID: sessionID, name: source.name, kind: source.kind,
-                autoStart: .off, reconnects: source.reconnects, service: source.service,
+        var groupMap: [UUID: UUID] = [:]
+        var plannedGroups: [TunnelGroup] = []
+        var pendingGroups = archive.tunnelGroups
+        while !pendingGroups.isEmpty {
+            guard let index = pendingGroups.firstIndex(where: {
+                $0.parentID == nil || groupMap[$0.parentID!] != nil
+            }) else { break }
+            let source = pendingGroups.remove(at: index)
+            let parentID = source.parentID.flatMap { groupMap[$0] }
+            let portableID = source.portableID ?? source.id
+            let match = existingGroups.first(where: { $0.portableID == portableID })
+                ?? existingGroups.first(where: {
+                    $0.parentID == parentID && normalized($0.name) == normalized(source.name)
+                })
+            if let match {
+                guard let resolution = await arbiter.resolve(ImportConflict(
+                    itemName: source.name, kindLabel: tunnelGroupKindLabel, reason: .name))
+                else { return MacSCPTunnelImportPlan(cancelled: true) }
+                switch resolution {
+                case .skip:
+                    groupMap[source.id] = match.id
+                case .replace:
+                    let replacement = TunnelGroup(
+                        id: match.id, name: source.name, parentID: parentID,
+                        colorHue: source.colorHue, color: source.color, portableID: portableID)
+                    plannedGroups.append(replacement)
+                    groupMap[source.id] = replacement.id
+                case .rename:
+                    var occupied = (existingGroups + plannedGroups).map {
+                        ($0.parentID, normalized($0.name))
+                    }
+                    let name = uniqueGroupName(source.name, parent: parentID, occupied: &occupied)
+                    let created = TunnelGroup(
+                        name: name, parentID: parentID, colorHue: source.colorHue,
+                        color: source.color, portableID: portableID)
+                    plannedGroups.append(created)
+                    groupMap[source.id] = created.id
+                }
+            } else {
+                let created = TunnelGroup(
+                    name: source.name, parentID: parentID, colorHue: source.colorHue,
+                    color: source.color, portableID: portableID)
+                plannedGroups.append(created)
+                groupMap[source.id] = created.id
+            }
+        }
+
+        var plannedTunnels: [TunnelProfile] = []
+        var skipped: [String] = []
+        var replaced: [String] = []
+        var renamed: [String] = []
+        var claimedExistingIDs: Set<UUID> = []
+        for source in archive.tunnels {
+            guard let sessionID = sessionIDMap[source.sessionID] else { continue }
+            let groupID = source.groupID.flatMap { groupMap[$0] }
+            let portableID = source.portableID ?? source.id
+            let match = existingTunnels.first(where: {
+                $0.portableID == portableID && !claimedExistingIDs.contains($0.id)
+            }) ?? existingTunnels.first(where: {
+                $0.groupID == groupID && normalized($0.name) == normalized(source.name)
+                    && !claimedExistingIDs.contains($0.id)
+            })
+            var id = UUID()
+            var name = source.name
+            if let match {
+                guard let resolution = await arbiter.resolve(ImportConflict(
+                    itemName: source.name, kindLabel: tunnelKindLabel, reason: .name))
+                else { return MacSCPTunnelImportPlan(cancelled: true) }
+                switch resolution {
+                case .skip:
+                    skipped.append(source.name)
+                    continue
+                case .replace:
+                    id = match.id
+                    claimedExistingIDs.insert(match.id)
+                    replaced.append(source.name)
+                case .rename:
+                    var suffix = 2
+                    let base = source.name
+                    let names = Set((existingTunnels + plannedTunnels).map { normalized($0.name) })
+                    while names.contains(normalized(name)) {
+                        name = "\(base) (\(suffix))"
+                        suffix += 1
+                    }
+                    renamed.append(name)
+                }
+            }
+            plannedTunnels.append(TunnelProfile(
+                id: id, sessionID: sessionID, name: name, kind: source.kind,
+                autoStart: source.autoStart, reconnects: source.reconnects, service: source.service,
                 jumpSessionID: source.jumpSessionID.flatMap { sessionIDMap[$0] },
-                groupID: source.groupID.flatMap { groupPlan.map[$0] },
-                appearance: source.appearance)
+                groupID: groupID, appearance: source.appearance, portableID: portableID))
         }
-        return MacSCPTunnelImportPlan(groups: groupPlan.groups, tunnels: tunnels)
-    }
-
-    private static func rekeyGroups(
-        _ source: [ExportedGroup], existing: [StoredGroup]
-    ) -> (groups: [StoredGroup], map: [UUID: UUID]) {
-        var pending = source
-        var result: [StoredGroup] = []
-        var map: [UUID: UUID] = [:]
-        var occupied = existing.map { ($0.parentID, normalized($0.name)) }
-        while !pending.isEmpty {
-            var progressed = false
-            for index in pending.indices.reversed() {
-                let group = pending[index]
-                guard group.parentID == nil || map[group.parentID!] != nil else { continue }
-                let parent = group.parentID.flatMap { map[$0] }
-                let name = uniqueGroupName(group.name, parent: parent, occupied: &occupied)
-                let id = UUID()
-                map[group.id] = id
-                result.append(StoredGroup(
-                    id: id, name: name, parentID: parent, position: group.position ?? 0,
-                    colorHue: group.colorHue, color: group.color))
-                pending.remove(at: index)
-                progressed = true
-            }
-            if !progressed {
-                let group = pending.removeFirst()
-                let name = uniqueGroupName(group.name, parent: nil, occupied: &occupied)
-                let id = UUID()
-                map[group.id] = id
-                result.append(StoredGroup(
-                    id: id, name: name, position: group.position ?? 0,
-                    colorHue: group.colorHue, color: group.color))
-            }
-        }
-        return (result, map)
-    }
-
-    private static func rekeyTunnelGroups(
-        _ source: [TunnelGroup], existing: [TunnelGroup]
-    ) -> (groups: [TunnelGroup], map: [UUID: UUID]) {
-        var pending = source
-        var result: [TunnelGroup] = []
-        var map: [UUID: UUID] = [:]
-        var occupied = existing.map { ($0.parentID, normalized($0.name)) }
-        while !pending.isEmpty {
-            var progressed = false
-            for index in pending.indices.reversed() {
-                let group = pending[index]
-                guard group.parentID == nil || map[group.parentID!] != nil else { continue }
-                let parent = group.parentID.flatMap { map[$0] }
-                let name = uniqueGroupName(group.name, parent: parent, occupied: &occupied)
-                let id = UUID()
-                map[group.id] = id
-                result.append(TunnelGroup(
-                    id: id, name: name, parentID: parent,
-                    colorHue: group.colorHue, color: group.color))
-                pending.remove(at: index)
-                progressed = true
-            }
-            if !progressed {
-                let group = pending.removeFirst()
-                let name = uniqueGroupName(group.name, parent: nil, occupied: &occupied)
-                let id = UUID()
-                map[group.id] = id
-                result.append(TunnelGroup(
-                    id: id, name: name, colorHue: group.colorHue, color: group.color))
-            }
-        }
-        return (result, map)
+        return MacSCPTunnelImportPlan(
+            groups: plannedGroups, tunnels: plannedTunnels, skipped: skipped,
+            replaced: replaced, renamed: renamed)
     }
 
     private static func normalized(_ value: String) -> String {
         value.folding(options: [.caseInsensitive, .diacriticInsensitive], locale: .current)
+    }
+
+    private static func inheritsLocalGroupDefault(
+        _ session: StoredSession, groups: [StoredGroup], importedGroupIDs: Set<UUID>
+    ) -> Bool {
+        let byID = Dictionary(
+            groups.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
+        var needsLogin = session.loginSetID == nil
+        var needsRelay = session.kind == .ssh && session.jump == nil
+        var cursor = session.groupID
+        var visited: Set<UUID> = []
+        while let id = cursor, visited.insert(id).inserted, let group = byID[id] {
+            if needsLogin, group.loginSetID != nil {
+                if !importedGroupIDs.contains(id) { return true }
+                needsLogin = false
+            }
+            if needsRelay, group.sshRelaySessionID != nil {
+                if !importedGroupIDs.contains(id) { return true }
+                needsRelay = false
+            }
+            if !needsLogin, !needsRelay { return false }
+            cursor = group.parentID
+        }
+        return false
     }
 
     private static func uniqueName(_ requested: String, taken: inout Set<String>) -> String {

@@ -58,6 +58,8 @@ MacSCP supports SFTP over SSH, S3-compatible storage and WebDAV.
 Group related endpoints, choose recognizable icons and colors, and reuse login
 sets backed by passwords, private keys or the local SSH agent. Import selected
 OpenSSH, Cyberduck and WinSCP configurations, then review them before connecting.
+Groups can inherit a login set and an SSH relay, with per-connection settings
+taking priority over the nearest group and its parents.
 
 Export and Share use the same portable `.macscp` archive. A global export can
 contain connections, groups, tunnels and login sets in one self-describing file,

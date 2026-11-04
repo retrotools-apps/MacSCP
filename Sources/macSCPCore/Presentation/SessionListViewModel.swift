@@ -21,6 +21,13 @@ private struct CreateGroupParentMissing: Error, CustomStringConvertible {
     var description: String { CoreL10n.string("core.session.groupParentMissing") }
 }
 
+/// A credential-free archive must never inherit a password merely because a
+/// collision reused the local session id. A failed Keychain read has the same
+/// safe outcome: no store write and no guess that the slot was empty.
+private struct AnonymousImportLocalCredential: Error, CustomStringConvertible {
+    var description: String { CoreL10n.string("core.import.anonymousLocalCredential") }
+}
+
 /// A seam for a Core store that must react to a session going away without
 /// `SessionStore` or `SessionListViewModel` naming that store's concrete
 /// type. `SessionStore.delete(id:)` itself is a plain file write — no
@@ -145,14 +152,32 @@ public final class SessionListViewModel {
 
     /// Imports the connection half of a credential-free `.macscp` file.
     /// Fresh IDs keep the source machine's Keychain namespace unreachable.
-    public func importAnonymousArchive(
-        _ archive: MacSCPArchivePayload
-    ) throws -> AnonymousConnectionImportPlan {
-        let plan = MacSCPArchiveImportPlanner.anonymousConnections(
-            from: archive, existingSessions: sessions, existingGroups: groups)
+    public func planAnonymousArchive(
+        _ archive: MacSCPArchivePayload, arbiter: ImportConflictArbiter
+    ) async -> AnonymousConnectionImportPlan {
+        await MacSCPArchiveImportPlanner.anonymousConnections(
+            from: archive, existingSessions: sessions, existingGroups: groups,
+            arbiter: arbiter)
+    }
+
+    /// Applies an already-computed credential-free import plan. Keeping this
+    /// separate from planning lets every conflict, including tunnel conflicts,
+    /// be resolved before the first persistent write.
+    public func applyAnonymousArchive(
+        _ plan: AnonymousConnectionImportPlan
+    ) throws {
+        let existingIDs = Set(sessions.map(\.id))
+        for session in plan.sessions where existingIDs.contains(session.id) {
+            do {
+                guard ((try secrets.password(for: session.id)) ?? "").isEmpty else {
+                    throw AnonymousImportLocalCredential()
+                }
+            } catch {
+                throw AnonymousImportLocalCredential()
+            }
+        }
         try store.appendPortable(groups: plan.groups, sessions: plan.sessions)
         reload()
-        return plan
     }
 
     /// Clears `errorMessage` — the sidebar's close button on the red caption,
@@ -174,6 +199,15 @@ public final class SessionListViewModel {
     /// `groupID` is `nil`.
     public func sessions(inGroup groupID: UUID?) -> [StoredSession] {
         sessions.filter { $0.groupID == groupID }
+    }
+
+    /// Sessions in `groupID` and every nested subgroup. The group itself must
+    /// exist; an unknown id deliberately selects nothing.
+    public func sessions(inSubtreeOf groupID: UUID) -> [StoredSession] {
+        let groupIDs = GroupTree.selfAndDescendants(of: groupID, in: groups)
+        return sessions.filter { session in
+            session.groupID.map(groupIDs.contains) ?? false
+        }
     }
 
     /// `loginSetID`, when non-nil, makes the session reference a login set
@@ -276,6 +310,18 @@ public final class SessionListViewModel {
         // is correctly a no-op there rather than storing a hop nothing dials.
         session.ssh?.jump = jump
 
+        if loginSetID == nil, descriptor.requiresSecret(values),
+           secretSlotIsUsedElsewhere(session.id, excluding: session.id) {
+            errorMessage = CoreL10n.string("core.session.sharedSecretSlot")
+            return nil
+        }
+        if let jump, jump.loginSetID == nil, jump.sessionID == nil,
+           jump.authKind != .agent, let jumpSecret, !jumpSecret.isEmpty,
+           secretSlotIsUsedElsewhere(jump.secretID, excluding: session.id) {
+            errorMessage = CoreL10n.string("core.session.sharedSecretSlot")
+            return nil
+        }
+
         do {
             try store.upsert(session)
             if loginSetID == nil {
@@ -288,7 +334,7 @@ public final class SessionListViewModel {
                 // cleaned up (M10d).
                 if descriptor.requiresSecret(values) {
                     try secrets.savePassword(password, for: session.id)
-                } else {
+                } else if !secretSlotIsUsedElsewhere(session.id, excluding: session.id) {
                     try? secrets.deletePassword(for: session.id)
                 }
             }
@@ -307,7 +353,7 @@ public final class SessionListViewModel {
                jumpSecret != filledJumpPassphrase {
                 try secrets.savePassword(jumpSecret, for: jump.secretID)
             }
-            cleanOrphanedJumpSlot(previous: previousJump, new: jump)
+            cleanOrphanedJumpSlot(previous: previousJump, new: jump, ownerID: session.id)
             reload()
             return session
         } catch {
@@ -360,7 +406,7 @@ public final class SessionListViewModel {
     /// `sessionsUsing(setID:)` applies — so a session-mode jump keeps
     /// deleting, as it did before.
     private func cleanOrphanedJumpSlot(
-        previous: StoredSession.JumpSpec?, new: StoredSession.JumpSpec?
+        previous: StoredSession.JumpSpec?, new: StoredSession.JumpSpec?, ownerID: UUID
     ) {
         guard let previous, previous.loginSetID == nil else { return }
         if let new, new.loginSetID == nil, new.authKind != .agent, new.sessionID == nil,
@@ -371,7 +417,20 @@ public final class SessionListViewModel {
            !jumpSetDemonstrablyCoversItsLogin(setID) {
             return // The new set cannot be shown to serve this jump -- keep it.
         }
+        guard !secretSlotIsUsedElsewhere(previous.secretID, excluding: ownerID) else { return }
         try? secrets.deletePassword(for: previous.secretID)
+    }
+
+    /// Whether a Keychain slot is still owned by another stored object.
+    /// Fresh UI-created jumps have unique ids, but imported and legacy stores
+    /// may contain shared slots. Cleanup must preserve those values rather
+    /// than breaking a connection in another group.
+    private func secretSlotIsUsedElsewhere(_ slot: UUID, excluding sessionID: UUID?) -> Bool {
+        if loginSets.contains(where: { $0.id == slot }) { return true }
+        return sessions.contains { session in
+            session.id != sessionID
+                && (session.secretSlot == slot || session.jump?.secretID == slot)
+        }
     }
 
     /// Whether the login set a jump has just been bound to is a set a jump can
@@ -489,7 +548,9 @@ public final class SessionListViewModel {
     /// either fully restored or (if nothing referenced this session)
     /// untouched, regardless of what happens to the deletion itself.
     @discardableResult
-    public func delete(_ session: StoredSession) -> JumpRestoreResult {
+    public func delete(
+        _ session: StoredSession, preservingSecretSlots: Set<UUID> = []
+    ) -> JumpRestoreResult {
         // Restoration copies the deleted session's host, port and login into
         // every jump that referenced it. Only an SSH session HAS those, which
         // is why `affected` below is computed only for `.ssh` -- copying a
@@ -572,8 +633,12 @@ public final class SessionListViewModel {
 
         do {
             try store.delete(id: session.id)
-            try secrets.deletePassword(for: session.id)
-            if let jump = session.jump {
+            if !preservingSecretSlots.contains(session.id),
+               !secretSlotIsUsedElsewhere(session.id, excluding: session.id) {
+                try secrets.deletePassword(for: session.id)
+            }
+            if let jump = session.jump, !preservingSecretSlots.contains(jump.secretID),
+               !secretSlotIsUsedElsewhere(jump.secretID, excluding: session.id) {
                 // Throw-free: a stray jump secret is a harmless residual,
                 // never a reason to fail the session deletion itself.
                 try? secrets.deletePassword(for: jump.secretID)
@@ -645,6 +710,7 @@ public final class SessionListViewModel {
     /// that refuses the delete, is a residual and never a reason to report a
     /// failure to the user. Does NOT `reload()` — no stored data changed.
     public func dropSessionSecret(for sessionID: UUID) {
+        guard !secretSlotIsUsedElsewhere(sessionID, excluding: sessionID) else { return }
         try? secrets.deletePassword(for: sessionID)
     }
 
@@ -707,6 +773,17 @@ public final class SessionListViewModel {
         filledJumpPassphrase: String? = nil
     ) -> Bool {
         let previousJump = sessions.first(where: { $0.id == updated.id })?.jump
+        if updated.loginSetID == nil, let newSecret, !newSecret.isEmpty,
+           secretSlotIsUsedElsewhere(updated.id, excluding: updated.id) {
+            errorMessage = CoreL10n.string("core.session.sharedSecretSlot")
+            return false
+        }
+        if let jump = updated.jump, jump.loginSetID == nil, jump.sessionID == nil,
+           jump.authKind != .agent, let jumpSecret, !jumpSecret.isEmpty,
+           secretSlotIsUsedElsewhere(jump.secretID, excluding: updated.id) {
+            errorMessage = CoreL10n.string("core.session.sharedSecretSlot")
+            return false
+        }
         do {
             try store.upsert(updated)
             // No secret field on screen means this login needs none, which
@@ -717,7 +794,8 @@ public final class SessionListViewModel {
             // declaration instead of by the accident that its SSH auth kind
             // (were it read at all) is not `.agent`.
             if BackendDescriptor.descriptor(for: updated.kind)
-                .visibleSecretField(for: updated) == nil {
+                .visibleSecretField(for: updated) == nil,
+               !secretSlotIsUsedElsewhere(updated.id, excluding: updated.id) {
                 try? secrets.deletePassword(for: updated.id)
             } else if let newSecret, !newSecret.isEmpty,
                       !SessionSecretPolicy.usesStoredManagedPassphrase(
@@ -742,7 +820,8 @@ public final class SessionListViewModel {
                jumpSecret != filledJumpPassphrase {
                 try secrets.savePassword(jumpSecret, for: jump.secretID)
             }
-            cleanOrphanedJumpSlot(previous: previousJump, new: updated.jump)
+            cleanOrphanedJumpSlot(
+                previous: previousJump, new: updated.jump, ownerID: updated.id)
             reload()
             return true
         } catch {
@@ -828,6 +907,34 @@ public final class SessionListViewModel {
         }
     }
 
+    /// Persists subtree defaults as references only. No credential is copied
+    /// into the group or into any member session; resolution reads the login
+    /// set's canonical Keychain slot when a member actually connects.
+    @discardableResult
+    public func setGroupDefaults(
+        _ group: StoredGroup, loginSetID: UUID?, sshRelaySessionID: UUID?
+    ) -> Bool {
+        guard var updated = groups.first(where: { $0.id == group.id }) else { return false }
+        if let loginSetID, !loginSets.contains(where: { $0.id == loginSetID }) { return false }
+        if let sshRelaySessionID,
+           !sessions.contains(where: { $0.id == sshRelaySessionID && $0.kind == .ssh }) {
+            return false
+        }
+        updated.loginSetID = loginSetID
+        updated.sshRelaySessionID = sshRelaySessionID
+        do {
+            try store.upsertGroup(updated)
+            reload()
+            return true
+        } catch {
+            reload()
+            errorMessage = String(
+                format: CoreL10n.string("core.session.groupSaveFailed %@"),
+                String(describing: error))
+            return false
+        }
+    }
+
     /// Renames a group in place (trims whitespace; an empty result is a
     /// no-op).
     public func renameGroup(_ group: StoredGroup, to newName: String) {
@@ -858,6 +965,65 @@ public final class SessionListViewModel {
                 format: CoreL10n.string("core.session.groupSaveFailed %@"),
                 String(describing: error))
         }
+    }
+
+    /// Deletes a group subtree through the ordinary session-deletion path,
+    /// so Keychain cleanup, jump restoration, audit cleanup and deletion
+    /// observers retain exactly the same ownership as a one-row deletion.
+    /// The folders are removed deepest-first only after every contained
+    /// session has actually disappeared from the store.
+    @discardableResult
+    public func deleteGroupRecursively(_ group: StoredGroup) -> JumpRestoreResult {
+        let groupIDs = GroupTree.selfAndDescendants(of: group.id, in: groups)
+        guard !groupIDs.isEmpty else { return JumpRestoreResult(restored: 0, secretFailures: 0) }
+        let contained = sessions.filter { session in
+            session.groupID.map(groupIDs.contains) ?? false
+        }
+        let containedIDs = Set(contained.map(\.id))
+        let survivors = sessions.filter { !containedIDs.contains($0.id) }
+        // Login-set slots are shared by definition and survive group
+        // deletion. Survivor-owned slots are protected as well, including a
+        // legacy/imported manual-jump `secretID` that happens to be shared.
+        // This is deliberately explicit even though current UI creation
+        // gives every manual jump a fresh id: old or crafted stores must not
+        // turn group deletion into credential deletion elsewhere.
+        var protectedSecretSlots = Set(loginSets.map(\.id))
+        for survivor in survivors {
+            protectedSecretSlots.insert(survivor.secretSlot)
+            if let jump = survivor.jump { protectedSecretSlots.insert(jump.secretID) }
+        }
+        var result = JumpRestoreResult(restored: 0, secretFailures: 0)
+        for session in contained {
+            let deletion = delete(session, preservingSecretSlots: protectedSecretSlots)
+            result.restored += deletion.restored
+            result.secretFailures += deletion.secretFailures
+            guard !sessions.contains(where: { $0.id == session.id }) else { return result }
+        }
+
+        let byID = Dictionary(groups.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
+        func depth(of id: UUID) -> Int {
+            var depth = 0
+            var cursor = byID[id]?.parentID
+            var seen: Set<UUID> = [id]
+            while let current = cursor, groupIDs.contains(current), seen.insert(current).inserted {
+                depth += 1
+                cursor = byID[current]?.parentID
+            }
+            return depth
+        }
+        for id in groupIDs.sorted(by: { depth(of: $0) > depth(of: $1) }) {
+            do {
+                try store.dissolveGroup(id: id)
+            } catch {
+                reload()
+                errorMessage = String(
+                    format: CoreL10n.string("core.session.groupSaveFailed %@"),
+                    String(describing: error))
+                return result
+            }
+        }
+        reload()
+        return result
     }
 
     // MARK: - Nesting and order (D1/D2)
@@ -936,8 +1102,11 @@ public final class SessionListViewModel {
     /// `ConnectionViewModel.buildJumpSpec`'s doc comment) -- so a stale
     /// leftover value there must not inflate this usage count.
     public func sessionsUsing(setID: UUID) -> [StoredSession] {
-        sessions.filter {
-            $0.loginSetID == setID || ($0.jump?.loginSetID == setID && $0.jump?.sessionID == nil)
+        let expectedKind = loginSets.first { $0.id == setID }?.kind
+        return sessions.filter {
+            (GroupSessionDefaults.resolve(for: $0, groups: groups).loginSetID == setID
+                && (expectedKind == nil || $0.kind == expectedKind))
+                || ($0.jump?.loginSetID == setID && $0.jump?.sessionID == nil)
         }
     }
 
@@ -974,7 +1143,10 @@ public final class SessionListViewModel {
     private func jumpHopReadsSet(of session: StoredSession, _ setID: UUID) -> Bool {
         guard let jump = session.jump else { return false }
         guard let referencedID = jump.sessionID else { return jump.loginSetID == setID }
-        return sessions.contains { $0.id == referencedID && $0.loginSetID == setID }
+        return sessions.contains {
+            $0.id == referencedID
+                && GroupSessionDefaults.resolve(for: $0, groups: groups).loginSetID == setID
+        }
     }
 
     /// Every session that depends on the set (technical backlog of 2026-09-16,
@@ -988,7 +1160,10 @@ public final class SessionListViewModel {
     /// and what "Update login set"'s question counts as "used by N sessions,
     /// directly or as their jump host".
     public func sessionsDependingOn(setID: UUID) -> [StoredSession] {
-        sessions.filter { $0.loginSetID == setID || jumpHopReadsSet(of: $0, setID) }
+        sessions.filter {
+            GroupSessionDefaults.resolve(for: $0, groups: groups).loginSetID == setID
+                || jumpHopReadsSet(of: $0, setID)
+        }
     }
 
     /// `sessionsDependingOn(setID:)`'s count.
@@ -1144,7 +1319,8 @@ public final class SessionListViewModel {
             var restored = session
             var sessionHadSecretFailure = false
 
-            if restored.loginSetID == set.id {
+            if GroupSessionDefaults.resolve(for: restored, groups: groups).loginSetID == set.id,
+               restored.kind == set.kind {
                 // Only an SSH session actually gets its login restored here:
                 // `restored.ssh?.username = …` is a silent no-op for an S3
                 // session (`restored.ssh` is nil), and nothing below restores
@@ -1157,9 +1333,8 @@ public final class SessionListViewModel {
                 // slot below, yet no access key ID of its own to pair it
                 // with. `beginEditing`/`SessionImportPlanner` are the later
                 // phases that would need to close this.
-                restored.ssh?.username = set.username
-                restored.ssh?.authKind = set.authKind
-                restored.ssh?.keyPath = set.keyPath
+                BackendDescriptor.descriptor(for: restored.kind).apply(
+                    LoginResolver.credentials(of: set, secrets: secrets), &restored)
                 restored.loginSetID = nil
                 if let setSecret {
                     do {
@@ -1199,6 +1374,17 @@ public final class SessionListViewModel {
             }
         }
 
+        let groupsUsingSet: Set<UUID>
+        do {
+            groupsUsingSet = try store.clearGroupLoginSetReferences(set.id)
+        } catch {
+            reload()
+            errorMessage = String(
+                format: CoreL10n.string("core.login.deleteFailed %@"),
+                String(describing: error))
+            return LoginSetDeleteResult(restored: 0, secretFailures: secretFailures)
+        }
+
         do {
             try loginSetStore.delete(id: set.id)
             // Only wipe the set's own keychain secret once the store record
@@ -1207,6 +1393,7 @@ public final class SessionListViewModel {
             try? secrets.deletePassword(for: set.id)
             reload()
         } catch {
+            try? store.restoreGroupLoginSetReferences(set.id, groupIDs: groupsUsingSet)
             reload()
             errorMessage = String(
                 format: CoreL10n.string("core.login.deleteFailed %@"), String(describing: error))
@@ -1388,7 +1575,9 @@ public final class SessionListViewModel {
                 unlinkedCount += 1
                 continue
             }
-            try? secrets.deletePassword(for: session.id)
+            if !secretSlotIsUsedElsewhere(session.id, excluding: session.id) {
+                try? secrets.deletePassword(for: session.id)
+            }
         }
         if unlinkedCount > 0 {
             errorMessage = CoreL10n.string("core.login.mergePartial")
@@ -1425,7 +1614,9 @@ public final class SessionListViewModel {
     /// `resolvedLogin(for:)` and the S3-only `resolvedS3Login(for:)`, which
     /// is why a WebDAV session can be bound to a login set at all.
     public func resolvedCredentials(for session: StoredSession) throws -> FieldValues? {
-        try LoginResolver.resolve(session: session, sets: loginSets, secrets: secrets)
+        try LoginResolver.resolve(
+            session: GroupSessionDefaults.applying(to: session, groups: groups),
+            sets: loginSets, secrets: secrets)
     }
 
     /// The credential values a login set supplies, secret included (M22/T9) —
@@ -1443,7 +1634,8 @@ public final class SessionListViewModel {
     /// neither path may abort, they fall back to the session's own values.
     private func resolvedSSHLogin(for session: StoredSession) -> ResolvedLogin? {
         (try? LoginResolver.sshLogin(
-            session: session, sets: loginSets, secrets: secrets)) ?? nil
+            session: GroupSessionDefaults.applying(to: session, groups: groups),
+            sets: loginSets, secrets: secrets)) ?? nil
     }
 
     /// Resolves what a session's jump host should actually connect with
@@ -1456,7 +1648,8 @@ public final class SessionListViewModel {
     /// slot it is bound to only when the managed store has none
     /// (`LoginResolver.preferringManagedKeyPassphrase`).
     public func resolvedJumpLogin(for session: StoredSession) throws -> ResolvedLogin? {
-        guard let jump = session.jump else { return nil }
+        let effective = GroupSessionDefaults.applying(to: session, groups: groups)
+        guard let jump = effective.jump else { return nil }
         let login = try LoginResolver.resolveJump(spec: jump, sets: loginSets, secrets: secrets)
         return withManagedKeyPassphrase(login)
     }
@@ -1475,7 +1668,8 @@ public final class SessionListViewModel {
     /// Its login takes the managed key's passphrase in preference to the slot
     /// it reads, as `resolvedJumpLogin(for:)`'s does.
     public func resolvedJump(for session: StoredSession) throws -> ResolvedJump? {
-        guard let jump = session.jump else { return nil }
+        let effective = GroupSessionDefaults.applying(to: session, groups: groups)
+        guard let jump = effective.jump else { return nil }
         var resolved = try LoginResolver.resolveJump(
             spec: jump, sets: loginSets, secrets: secrets, sessions: sessions,
             referencingSessionID: session.id)
@@ -1491,7 +1685,8 @@ public final class SessionListViewModel {
     /// its secret.
     public func diagnosticJump(for session: StoredSession) -> DiagnosticJump? {
         DiagnosticJump.stored(
-            for: session, sets: loginSets, sessions: sessions, secrets: secrets, keys: keys)
+            for: GroupSessionDefaults.applying(to: session, groups: groups),
+            sets: loginSets, sessions: sessions, secrets: secrets, keys: keys)
     }
 
     /// Whether an export may count a login with no secret of its own as
@@ -1542,9 +1737,11 @@ public final class SessionListViewModel {
     }
 
     /// Builds an export payload for the given scope (spec M9a §2.2). Groups
-    /// are only included when `includeGroups`, and only those an exported
-    /// session sits in — plus the folders those hang from, so a nested
-    /// folder's `parentID` names something the file carries. Passwords are
+    /// are only included when `includeGroups`. A group export carries the
+    /// complete selected subtree, including empty subgroups, plus its
+    /// ancestors so the selected root keeps its original nesting. Other
+    /// scopes carry the folders exported sessions sit in plus their ancestors.
+    /// Passwords are
     /// only looked up when
     /// `includePasswords`; a missing keychain entry is omitted from the
     /// payload and counted in `missingPasswordCount` rather than aborting
@@ -1554,14 +1751,36 @@ public final class SessionListViewModel {
     public func exportPayload(
         for scope: ExportScope, includeGroups: Bool, includePasswords: Bool
     ) -> (payload: SessionExportPayload, missingPasswordCount: Int) {
-        let scopedSessions: [StoredSession]
+        var scopedSessions: [StoredSession]
         switch scope {
         case .single(let session):
             scopedSessions = [session]
         case .group(let group):
-            scopedSessions = sessions(inGroup: group.id)
+            scopedSessions = sessions(inSubtreeOf: group.id)
         case .all:
             scopedSessions = sessions
+        }
+        if includeGroups {
+            let scopedGroupIDs: Set<UUID>
+            switch scope {
+            case .single(let session):
+                scopedGroupIDs = session.groupID.map {
+                    GroupTree.selfAndAncestors(of: $0, in: groups)
+                } ?? []
+            case .group(let group):
+                let descendants = GroupTree.selfAndDescendants(of: group.id, in: groups)
+                var ids = Set(descendants)
+                ids.formUnion(GroupTree.selfAndAncestors(of: group.id, in: groups))
+                scopedGroupIDs = ids
+            case .all:
+                scopedGroupIDs = Set(groups.map(\.id))
+            }
+            let relayIDs = Set(groups.filter { scopedGroupIDs.contains($0.id) }
+                .compactMap(\.sshRelaySessionID))
+            let alreadyIncluded = Set(scopedSessions.map(\.id))
+            scopedSessions.append(contentsOf: sessions.filter {
+                relayIDs.contains($0.id) && !alreadyIncluded.contains($0.id)
+            })
         }
 
         var missingPasswordCount = 0
@@ -1704,6 +1923,9 @@ public final class SessionListViewModel {
             return ExportedSession(
                 id: session.id, name: session.name, kind: session.kind, fields: fields.raw,
                 groupID: includeGroups ? session.groupID : nil,
+                loginSetID: session.loginSetID,
+                jumpLoginSetID: session.jump?.sessionID == nil ? session.jump?.loginSetID : nil,
+                jumpSessionID: session.jump?.sessionID,
 
                 appearance: session.appearance,
                 // And the same again for the rank (D2): a number on the
@@ -1718,7 +1940,8 @@ public final class SessionListViewModel {
                 jumpTLSTunnel: jumpTLSTunnel,
                 s3SecretAccessKey: s3SecretAccessKey,
                 importSource: session.importSource, importID: session.importID,
-                importedAt: session.importedAt)
+                importedAt: session.importedAt,
+                portableID: session.portableID ?? session.id)
         }
 
         var exportedGroups: [ExportedGroup] = []
@@ -1733,6 +1956,10 @@ public final class SessionListViewModel {
             let groupsByID = Dictionary(
                 groups.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
             var includedGroupIDs = Set(scopedSessions.compactMap(\.groupID))
+            if case .group(let group) = scope {
+                includedGroupIDs.formUnion(
+                    GroupTree.selfAndDescendants(of: group.id, in: groups))
+            }
             for id in includedGroupIDs {
                 var cursor = groupsByID[id]?.parentID
                 while let parentID = cursor, includedGroupIDs.insert(parentID).inserted {
@@ -1746,7 +1973,11 @@ public final class SessionListViewModel {
                 // the import planner rekeys it along with `groupID`.
                 .map {
                     ExportedGroup(
-                        id: $0.id, name: $0.name, parentID: $0.parentID, position: $0.position, colorHue: $0.colorHue, color: $0.color)
+                        id: $0.id, name: $0.name, parentID: $0.parentID,
+                        position: $0.position, colorHue: $0.colorHue, color: $0.color,
+                        portableID: $0.portableID ?? $0.id,
+                        loginSetID: $0.loginSetID,
+                        sshRelaySessionID: $0.sshRelaySessionID)
                 }
         }
 
@@ -1796,7 +2027,8 @@ public final class SessionListViewModel {
     /// called — checked directly rather than inferred from every array
     /// happening to be empty.
     ///
-    /// Existing GROUPS are never mutated. Existing SESSIONS can be: a
+    /// Planned GROUPS are upserted and may therefore replace a group selected
+    /// by the conflict arbiter. Existing SESSIONS can be: a
     /// `PlannedSession` whose `replacesExisting` is true (M19) carries an
     /// EXISTING record's id, and `store.upsert` overwrites that record in
     /// place.
@@ -1821,8 +2053,9 @@ public final class SessionListViewModel {
     ///   is counted only when a non-empty secret was actually there.
     /// The old record's JUMP slot is cleaned up on the same principle: the
     /// planner mints a FRESH `secretID` for every imported jump, so whatever
-    /// the replaced record referenced is unreachable afterwards and would
-    /// linger in the Keychain forever.
+    /// the replaced record referenced is normally unreachable afterwards and
+    /// would linger in the Keychain forever. A legacy/imported store may have
+    /// reused that slot in another session; that remaining owner protects it.
     ///
     /// A keychain failure for one session's password does not abort the
     /// import; the session is still created/overwritten and the failure is
@@ -1855,6 +2088,15 @@ public final class SessionListViewModel {
         }
         for planned in plan.sessionsToImport {
             let previous = planned.replacesExisting ? previousByID[planned.session.id] : nil
+            // A legacy/imported store may reuse this session's own Keychain
+            // id as another connection's manual-jump slot. Replacing the
+            // credential would either delete or overwrite that other
+            // connection's only copy, so refuse the record before any write.
+            if planned.replacesExisting, !planned.keepsExistingSecret,
+               secretSlotIsUsedElsewhere(planned.session.id, excluding: planned.session.id) {
+                storeFailures += 1
+                continue
+            }
             do {
                 try store.upsert(planned.session)
                 imported += 1
@@ -1906,7 +2148,8 @@ public final class SessionListViewModel {
             // from here on. Best-effort and never counted — nothing the user
             // could act on, unlike the target secret above.
             if let previousJumpID = previous?.jump?.secretID,
-               previousJumpID != planned.session.jump?.secretID
+               previousJumpID != planned.session.jump?.secretID,
+               !secretSlotIsUsedElsewhere(previousJumpID, excluding: planned.session.id)
             {
                 try? secrets.deletePassword(for: previousJumpID)
             }
