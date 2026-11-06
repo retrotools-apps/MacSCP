@@ -46,6 +46,16 @@ class WebsiteIntegrityTests(unittest.TestCase):
             self.assertTrue(target.is_file())
         self.assertTrue((entry.parent / ".nojekyll").is_file())
 
+    def test_legacy_privacy_and_support_urls_redirect_to_existing_pages(self):
+        for name in ["privacy", "support"]:
+            with self.subTest(page=name):
+                entry = ROOT / "docs" / (name + ".html")
+                content = entry.read_text()
+                destination = "web/" + name + ".html"
+                self.assertIn('<meta http-equiv="refresh" content="0; url=' + destination + '">', content)
+                self.assertIn(destination, Document(content).links)
+                self.assertTrue((entry.parent / destination).is_file())
+
     def test_generated_public_documents_are_current(self):
         result = subprocess.run(["python3", str(ROOT / "scripts/prepare-website"), "--check"],
                                 capture_output=True, text=True, timeout=10)

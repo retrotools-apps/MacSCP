@@ -22,6 +22,8 @@
 # Public documentation and static website.
 /docs/*
 !/docs/index.html
+!/docs/privacy.html
+!/docs/support.html
 !/docs/.nojekyll
 !/docs/web/
 !/docs/DEPENDENCY_FORKS.md
