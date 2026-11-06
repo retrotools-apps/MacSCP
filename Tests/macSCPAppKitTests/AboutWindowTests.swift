@@ -21,8 +21,23 @@ struct AboutWindowTests {
         #expect(content.version == version)
         #expect(content.licenseURL == root.appendingPathComponent("LICENSE"))
         #expect(content.noticesURL == root.appendingPathComponent("output/pdf/THIRD_PARTY_NOTICES.pdf"))
-        #expect(AboutContent.privacyURL.absoluteString == "https://retrotools-apps.github.io/MacSCP/privacy.html")
-        #expect(AboutContent.supportURL.absoluteString == "https://retrotools-apps.github.io/MacSCP/support.html")
+        #expect(AboutContent.privacyURL.absoluteString == "https://retrotools-apps.github.io/MacSCP/web/privacy.html")
+        #expect(AboutContent.supportURL.absoluteString == "https://retrotools-apps.github.io/MacSCP/web/support.html")
+    }
+
+    @Test func publicLinksResolveInsideTheGitHubPagesSource() throws {
+        let root = URL(fileURLWithPath: #filePath).deletingLastPathComponent()
+            .deletingLastPathComponent().deletingLastPathComponent()
+        let pagesRoot = root.appendingPathComponent("docs")
+        for url in [AboutContent.privacyURL, AboutContent.supportURL] {
+            #expect(url.scheme == "https")
+            #expect(url.host == "retrotools-apps.github.io")
+            let components = url.pathComponents
+            #expect(components.prefix(2) == ["/", "MacSCP"])
+            let relativePath = components.dropFirst(2).joined(separator: "/")
+            let page = pagesRoot.appendingPathComponent(relativePath)
+            #expect(FileManager.default.fileExists(atPath: page.path))
+        }
     }
 
     @Test func packagedVersionAndDocumentsTakePrecedence() throws {

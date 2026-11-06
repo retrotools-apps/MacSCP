@@ -13,8 +13,8 @@ struct AboutContent {
     let licenseURL: URL?
     let noticesURL: URL?
 
-    static let privacyURL = URL(string: "https://retrotools-apps.github.io/MacSCP/privacy.html")!
-    static let supportURL = URL(string: "https://retrotools-apps.github.io/MacSCP/support.html")!
+    static let privacyURL = URL(string: "https://retrotools-apps.github.io/MacSCP/web/privacy.html")!
+    static let supportURL = URL(string: "https://retrotools-apps.github.io/MacSCP/web/support.html")!
 
     init(bundle: Bundle = .main, sourceRoot: URL = ReleaseMetadata.sourceRoot) {
         version = ReleaseMetadata(bundle: bundle, sourceRoot: sourceRoot).version
