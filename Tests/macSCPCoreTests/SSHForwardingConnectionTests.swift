@@ -117,7 +117,7 @@ struct SSHForwardingConnectionTests {
             })
         await server.close()
 
-        guard case .mismatch(let host, let expected, let presented)? = raised as? HostKeyError else {
+        guard case .mismatch(let host, let expected, let presented, _)? = raised as? HostKeyError else {
             Issue.record("expected HostKeyError.mismatch, got \(String(describing: raised))")
             return
         }

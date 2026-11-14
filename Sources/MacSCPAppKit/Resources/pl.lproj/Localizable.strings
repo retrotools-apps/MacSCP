@@ -759,7 +759,7 @@
 "settings.general.diagnosticLog.info" = "Informacje";
 "settings.general.diagnosticLog.debug" = "Debugowanie";
 "settings.general.diagnosticLog.reveal" = "Pokaż w Finderze";
-"settings.general.diagnosticLogHint" = "Domyślnie wyłączony, również dla dzienników systemowych i sesji. Nie zapisuje haseł, kluczy ani zawartości plików.";
+"settings.general.diagnosticLogHint" = "Szczegółowe dzienniki są domyślnie wyłączone. Ostatnie połączenia i zapisane informacje o serwerze pozostają dostępne. Hasła, klucze i zawartość plików nie są rejestrowane.";
 "sidebar.group.expanded" = "Rozwinięta";
 "sidebar.group.collapsed" = "Zwinięta";
 "group.cards.empty" = "Brak zapisanych sesji w tej grupie.";
@@ -1582,7 +1582,6 @@
 "settings.general.language.es" = "Español";
 "settings.general.language.ro" = "Română";
 "settings.general.language.it" = "Italiano";
-"overview.history.disabled" = "Historia połączeń jest zapisywana tylko wtedy, gdy rejestrowanie diagnostyczne jest włączone w ustawieniach.";
 // Built-in file tools
 "filetools.unsupported" = "Ten serwer nie obsługuje odczytu fragmentami.";
 "filetools.textOnly" = "Zawartość binarna lub inna niż UTF-8: użyj widoku szesnastkowego.";
@@ -1679,7 +1678,7 @@
 "diagnostics.ready" = "Gotowe do diagnostyki";
 "diagnostics.section.system" = "System";
 "diagnostics.section.network" = "Sieć";
-"diagnostics.users.help" = "Zarejestrowani zalogowani użytkownicy / konta logowania; rozpoznane konta usług są wykluczone.";
+"diagnostics.users.help" = "Zalogowani użytkownicy / zwykłe lokalne konta użytkowników. Linux używa skonfigurowanego zakresu UID; root i konta systemowe są wykluczone.";
 "diagnostics.speed.upload" = "Wysyłanie";
 "diagnostics.speed.download" = "Pobieranie";
 "diagnostics.speed.cleanup" = "Usuwanie pliku testowego…";
@@ -1794,3 +1793,41 @@
 "archive.import.tunnels %lld %lld %lld %lld" = "Tunele: %lld zaimportowano, %lld zastąpiono, %lld przemianowano, %lld lokalnych zachowano";
 "share.import.result %lld %lld %lld %lld %lld" = "Połączenia: %lld zaimportowano, %lld zastąpiono, %lld przemianowano, %lld lokalnych zachowano\nZaimportowane tunele: %lld\nDane logowania należy wprowadzić na tym Macu.";
 "import.conflict.replaceSettingsNote" = "Zastąpienie nadpisuje ustawienia lokalnego elementu.";
+
+"overview.snapshot.title" = "Ostatnie znane informacje o serwerze";
+"overview.snapshot.date" = "Zapisano %@ · bez aktualizacji na żywo";
+"overview.snapshot.accounts" = "Lokalne konta użytkowników";
+"overview.snapshot.memory" = "Pamięć całkowita";
+"overview.snapshot.volumes" = "Woluminy pamięci masowej (%lld) — całkowita pojemność na punkt montowania";
+
+"diagnostics.system.devices" = "Dyski i partycje";
+
+"diagnostics.system.storageSummary" = "Pamięć masowa według dysku lub woluminu";
+
+"overview.snapshot.disks" = "Pamięć masowa (%lld) — zamontowana pojemność według dysku lub woluminu";
+
+"overview.snapshot.public" = "Adresy publiczne";
+
+"overview.snapshot.ram" = "RAM";
+
+"overview.snapshot.storage" = "Pamięć masowa";
+
+"overview.snapshot.moreStorage" = "+%lld więcej";
+
+"overview.secret.passphrase" = "Hasło klucza";
+
+"overview.snapshot.accounts.raw" = "Konta logowania";
+
+
+
+
+"tofu.replaceChangedKey" = "Zastąp klucz serwera";
+"tofu.replaceFailed" = "Nie udało się zastąpić klucza. Połącz się ponownie, aby sprawdzić aktualny klucz.";
+
+"tofu.changed.warning" = "Tożsamość serwera uległa zmianie. Połączenie zostało zatrzymane. Zweryfikuj nowy odcisk niezależnym kanałem przed zastąpieniem zapisanego klucza.";
+
+"tofu.changed.saved" = "Zapisany odcisk";
+
+"tofu.changed.presented" = "Przedstawiony odcisk";
+
+"audit.kind.hostKeyReplaced" = "Klucz serwera zastąpiony";

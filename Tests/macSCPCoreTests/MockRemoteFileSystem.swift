@@ -152,6 +152,12 @@ actor MockRemoteFileSystem: RemoteFileSystem {
         return homePath
     }
 
+    private var pathListFailures: [String: any Error] = [:]
+
+    func setListFailure(_ error: (any Error)?, at path: String) {
+        pathListFailures[path] = error
+    }
+
     func list(path: String) async throws -> [RemoteFileItem] {
         listCallCounts[path, default: 0] += 1
         if listGates[path] == true {
@@ -165,6 +171,7 @@ actor MockRemoteFileSystem: RemoteFileSystem {
         if let listFailure {
             throw listFailure
         }
+        if let error = pathListFailures[path] { throw error }
         guard let items = tree[path] else {
             throw RemoteFSError.notFound(path: path)
         }

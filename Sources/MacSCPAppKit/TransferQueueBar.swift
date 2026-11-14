@@ -73,18 +73,36 @@ struct TransferQueueBar: View {
                 .padding(.horizontal, 14)
                 .padding(.vertical, 8)
 
-                ScrollView {
-                    VStack(spacing: 2) {
-                        ForEach(viewModel.items) { item in
-                            row(item)
+                ScrollViewReader { proxy in
+                    ScrollView {
+                        VStack(spacing: TransferQueueViewport.rowSpacing) {
+                            ForEach(viewModel.items) { item in
+                                row(item)
+                                    .frame(height: rowHeight)
+                                    .id(item.id)
+                            }
                         }
+                        .padding(.horizontal, 14)
+                        .padding(.bottom, TransferQueueViewport.bottomPadding)
                     }
-                    .padding(.horizontal, 14)
-                    .padding(.bottom, 8)
+                    .onChange(of: activeScrollTarget, initial: true) { _, target in
+                        if let target { proxy.scrollTo(target, anchor: .top) }
+                    }
                 }
-                .frame(maxHeight: 110)
+                // Reserve room for at most two rows, independently of the
+                // browser panes' higher layout priority.
+                .frame(height: TransferQueueViewport.height(
+                    itemCount: viewModel.items.count, rowHeight: rowHeight))
             }
         }
+    }
+
+    private var rowHeight: CGFloat {
+        settingsStore.transfersShowFullPaths ? 42 : 24
+    }
+
+    private var activeScrollTarget: UUID? {
+        TransferQueueViewport.activeTarget(in: viewModel.items)
     }
 
     /// "Cancel all", beside "Clean up": stops every transfer that has not
@@ -318,5 +336,21 @@ private struct PillProgress: View {
         // The custom shapes replaced ProgressView — keep the determinate
         // value readable for assistive tech.
         .accessibilityRepresentation { ProgressView(value: clampedFraction) }
+    }
+}
+
+/// Presentation only: queue order remains unchanged when following active work.
+enum TransferQueueViewport {
+    static let rowSpacing: CGFloat = 2
+    static let bottomPadding: CGFloat = 8
+
+    static func height(itemCount: Int, rowHeight: CGFloat) -> CGFloat {
+        let rows = min(itemCount, 2)
+        return CGFloat(rows) * rowHeight + CGFloat(max(rows - 1, 0)) * rowSpacing + bottomPadding
+    }
+
+    static func activeTarget(in items: [TransferQueueViewModel.Item]) -> UUID? {
+        items.first(where: { $0.status.isRunning })?.id
+            ?? items.first(where: { $0.status.isCancellable })?.id
     }
 }

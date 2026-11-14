@@ -38,6 +38,45 @@ Browse, edit and transfer files between your Mac and remote systems in a native
 workspace. Continue in the Mac applications and terminal you already use.
 MacSCP supports SFTP over SSH, S3-compatible storage and WebDAV.
 
+SSH/SFTP connections remember the last successfully opened local and remote
+folders on this Mac, including across reconnects and application restarts. If a
+remembered folder has been removed or is no longer readable, that pane falls
+back to its home folder. Folder history stays local and is not included in
+session exports. Use **Transfers** (⌘⇧Y) to show the file queue, progress and
+transfer results. The compact queue shows up to two rows, scrolls internally and
+follows active transfers as earlier files finish.
+
+SFTP payloads use a bounded pipeline of up to 64 requests and a 2 MiB SSH
+receive window to reduce latency bottlenecks on long-distance connections.
+Actual throughput still depends on the route, packet loss and server limits.
+Resuming an SFTP upload verifies the existing prefix before continuing; a damaged
+partial file restarts from the beginning.
+
+Saved sessions retain recent connection dates even when detailed diagnostic
+logging is off. A connected diagnostic saves a dated, local server summary for
+offline viewing: IP addresses, operating system, login-account count, total
+memory and mounted storage capacities. Live utilization is not retained. Expand
+the storage list to inspect each device and mount separately; shared capacity
+is not added into a misleading aggregate. On Linux, diagnostics summarize mounted
+`/dev/` filesystems by parent disk, while RAID and LVM volumes remain separate.
+Loop devices are omitted, duplicate filesystem sources are counted once, and
+the diagnostic shows mounted capacity and used percentage. Offline summaries
+retain only total capacity. Other systems retain their separate mounted-volume
+and device inventories. Public-address lookups remain opt-in, and
+these snapshots are not included in session exports.
+The offline view places OS/version, RAM and storage together and groups all
+addresses under one column per interface. Summary values sit to the right of
+their labels, all storage volumes stay visible, and section bands separate
+configuration, saved information and recent connections. IPv6 addresses use a
+smaller monospaced font to preserve readable columns. Linux account totals cover regular
+local users within the configured UID range, excluding root and system accounts;
+a new diagnostic refreshes counts cached by earlier versions. SSH key logins show
+a saved key passphrase only when present, rather than claiming a login password
+will be requested. Inventory collection reads storage metadata once and performs
+opt-in IPv4 and IPv6 public lookups concurrently.
+
+
+
 - **Move data with control.** Queue files and folders, resolve conflicts, limit
   bandwidth and verify checksums. Drag between panes or Finder when that is the
   fastest path.
@@ -96,6 +135,19 @@ saved SSH connections, an optional jump host and supported TLS-gateway settings.
 ![MacSCP tunnels workspace with an active demonstration HTTPS tunnel and browser-access button](docs/web/assets/screenshots/tunnels-light.webp)
 
 ## Know what connects. Know what is stored.
+
+If an SSH server changes its host key, the connection stops. Verify the new
+fingerprint independently, then choose **Replace host key** on the failure
+screen or connection alert. This single explicit action atomically replaces
+only the old key for the affected host and port with the exact public key from
+the rejected handshake. Reconnecting to that same key requires no second trust
+prompt. A different key on the next handshake still stops the connection, and
+a pin changed elsewhere since the alert appeared is not overwritten. The replacement dialog
+shows both fingerprints at full width and marks **Replace host key** in red.
+Each successful replacement is recorded in the session's connection history
+and audit log, including the endpoint and old/new fingerprints, even when
+detailed diagnostic logging is off.
+
 
 - **Credentials stay out of session files.** Saved passwords and passphrases
   use macOS Keychain. Unknown SSH host keys require explicit confirmation; a

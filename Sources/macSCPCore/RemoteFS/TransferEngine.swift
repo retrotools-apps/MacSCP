@@ -193,11 +193,25 @@ public enum TransferEngine {
             var resumeOffset: UInt64 = 0
             if effectiveResume {
                 do {
-                    let destinationSize =
+                    var destinationSize =
                         try await destination.stat(path: destinationPath).size ?? 0
+                    if destination is any ResumePrefixValidatingFileSystem, destinationSize > 0 {
+                        // A dropped pipelined write may leave later ranges on
+                        // disk while an earlier range is absent. Verify before
+                        // trusting size, including the already-complete case.
+                        if let total, destinationSize > total {
+                            destinationSize = 0
+                        } else if try await !ResumePrefixValidation.matches(
+                            source: source, sourcePath: sourcePath,
+                            destination: destination, destinationPath: destinationPath,
+                            count: destinationSize) {
+                            destinationSize = 0
+                        }
+                    }
                     if let total, destinationSize >= total {
-                        // Already complete by the size heuristic: one final
-                        // progress event at full size, no read/write at all.
+                        // Complete: pipelined destinations were verified above;
+                        // other backends retain their size heuristic. Publish
+                        // final progress without writing the destination.
                         onProgress(TransferProgress(bytesTransferred: total, totalBytes: total))
                         let ms = Int(transferStart.duration(to: clock.now).milliseconds.rounded())
                         DiagnosticLog.shared.log(

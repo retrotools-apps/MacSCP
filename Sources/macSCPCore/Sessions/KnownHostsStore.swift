@@ -87,6 +87,20 @@ public struct KnownHostsStore: Sendable {
         try persist(keys)
     }
 
+    /// Replace one unchanged pin with the exact key captured in the failed
+    /// handshake, only after the user's explicit replacement action.
+    public func replaceChangedKey(_ change: HostKeyMismatchDetails) throws -> Bool {
+        guard let candidate = change.candidate, candidate.host.lowercased() == change.host.lowercased(),
+              candidate.fingerprintSHA256 == change.presented else { return false }
+        var keys = try all()
+        guard let index = keys.firstIndex(where: { $0.host == candidate.host.lowercased() && $0.port == candidate.port }),
+              keys[index].fingerprintSHA256 == change.expected else { return false }
+        keys[index] = KnownHostKey(host: candidate.host, port: candidate.port,
+            keyType: candidate.keyType, publicKeyBase64: candidate.publicKeyBase64)
+        try persist(keys)
+        return true
+    }
+
     private func all() throws -> [KnownHostKey] {
         guard FileManager.default.fileExists(atPath: fileURL.path(percentEncoded: false)) else {
             return []

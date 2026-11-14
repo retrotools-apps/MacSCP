@@ -13,6 +13,7 @@ import Foundation
 /// A namespace with one entry point rather than a value anybody holds; the
 /// rows are the product.
 public struct ConnectionHistory: Sendable, Equatable {
+    static let summaryOnlyConnection = "connected (history only)"
     /// One connection attempt, as the overview shows it.
     public struct Row: Sendable, Equatable, Identifiable {
         /// How the attempt ended.
@@ -29,6 +30,7 @@ public struct ConnectionHistory: Sendable, Equatable {
             /// `DialSupport.reason(for:)` at the point the connect failed
             /// (see `AuditEvent.Kind.connectFailed`).
             case failed(reason: String)
+            case hostKeyReplaced
         }
 
         /// The id of the event that OPENED this row — the `connected` or the
@@ -41,34 +43,19 @@ public struct ConnectionHistory: Sendable, Equatable {
         public let uploads: Int
         public let downloads: Int
         public let failedTransfers: Int
+        public let transferCountsAvailable: Bool
         /// The bytes moved during this connection, when the log says.
         ///
-        /// **Always `nil` today, and honestly so.** `AuditEvent` carries no
-        /// byte count in any field, and no site that appends one writes a
-        /// byte count into its `detail` either: a finished transfer reads
-        /// `"upload report.pdf → /var/www"` (`AuditRecorder.recordTransfer`),
-        /// which names direction, file and destination and nothing else.
-        /// Recounted 2026-09-04 (final fix round, item 3 — the previous pass
-        /// missed `AuditRecorder.recordConnectFailed`'s own construction),
-        /// `grep -rn "AuditEvent(" Sources/ | grep -v ConnectionHistory.swift
-        /// | wc -l`, over every `AuditEvent(` construction site under
-        /// `Sources/` (excluding the one in this comment): TWENTY-SIX —
-        /// `RemoteBrowserViewModel` fifteen, `AuditRecorder` NINE, and one
-        /// each in `ContentView` and `ContentView+Lifecycle`. None of the
-        /// twenty-six names a byte count, and `AuditEvent` declares no field
-        /// that could carry one.
-        ///
-        /// So the field is the shape the view renders against, and `nil` is
-        /// its one value until an event carries the number. `0` would be a
-        /// claim that nothing moved, which is a different and false
-        /// sentence; deriving one from the detail text is not possible
-        /// because the text does not contain one.
+        /// Audit events carry no byte count. Keep this unavailable rather
+        /// than deriving a number from free-form detail or claiming zero.
         public let bytes: Int64?
 
         public init(
             id: UUID, startedAt: Date, outcome: Outcome,
-            uploads: Int, downloads: Int, failedTransfers: Int, bytes: Int64?
+            uploads: Int, downloads: Int, failedTransfers: Int, bytes: Int64?,
+            transferCountsAvailable: Bool = true
         ) {
+            self.transferCountsAvailable = transferCountsAvailable
             self.id = id
             self.startedAt = startedAt
             self.outcome = outcome
@@ -134,7 +121,8 @@ public struct ConnectionHistory: Sendable, Equatable {
                 // An unclosed session followed by a new connect is what a
                 // crash leaves behind: it ended, nothing recorded when.
                 if let previous = open { close(previous, at: nil) }
-                open = OpenSession(id: event.id, startedAt: event.timestamp, openedAt: index)
+                open = OpenSession(id: event.id, startedAt: event.timestamp, openedAt: index,
+                                   transferCountsAvailable: event.detail != summaryOnlyConnection)
             case .disconnected:
                 guard let previous = open else { continue }
                 close(previous, at: event.timestamp)
@@ -151,6 +139,10 @@ public struct ConnectionHistory: Sendable, Equatable {
                             outcome: .failed(reason: event.detail),
                             uploads: 0, downloads: 0, failedTransfers: 0, bytes: nil)
                     ))
+            case .hostKeyReplaced:
+                found.append((openedAt: index, row: Row(id: event.id, startedAt: event.timestamp,
+                    outcome: .hostKeyReplaced, uploads: 0, downloads: 0, failedTransfers: 0,
+                    bytes: nil, transferCountsAvailable: false)))
             case .transferFinished:
                 switch event.transferVerb {
                 case .upload: open?.uploads += 1
@@ -185,6 +177,7 @@ public struct ConnectionHistory: Sendable, Equatable {
         /// age. See `rows(from:limit:)` for why it is carried rather than
         /// derived from `startedAt`.
         let openedAt: Int
+        let transferCountsAvailable: Bool
         var uploads = 0
         var downloads = 0
         var failedTransfers = 0
@@ -194,7 +187,7 @@ public struct ConnectionHistory: Sendable, Equatable {
                 id: id, startedAt: startedAt,
                 outcome: .connected(duration: endedAt.map { duration(to: $0) }),
                 uploads: uploads, downloads: downloads, failedTransfers: failedTransfers,
-                bytes: nil)
+                bytes: nil, transferCountsAvailable: transferCountsAvailable)
         }
 
         /// Clamped at zero: a `disconnected` stamped before its own

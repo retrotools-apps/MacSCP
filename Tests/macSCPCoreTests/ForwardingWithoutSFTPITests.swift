@@ -242,7 +242,7 @@ struct ForwardingWithoutSFTPITests {
             raised = error
         }
 
-        guard case .mismatch(let host, let expected, _) = raised as? HostKeyError else {
+        guard case .mismatch(let host, let expected, _, _) = raised as? HostKeyError else {
             Issue.record("expected HostKeyError.mismatch, got \(String(describing: raised))")
             return
         }

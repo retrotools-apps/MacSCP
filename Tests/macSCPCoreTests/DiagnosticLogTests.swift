@@ -65,22 +65,26 @@ struct DiagnosticLogTests {
         }
     }
 
-    @Test func sessionAuditRespectsOptInAndPreservesExistingHistoryWhenDisabled() {
+    @Test func connectionHistorySurvivesWhenDetailedAuditLoggingIsDisabled() {
         let log = DiagnosticLog()
         let root = makeTempDirectory()
         defer { try? FileManager.default.removeItem(at: root) }
         let auditDirectory = root.appendingPathComponent("audit")
         let store = AuditLogStore(directory: auditDirectory, isLoggingEnabled: { log.isEnabled(.error) })
         let id = UUID()
-        store.append(AuditEvent(kind: .connected, detail: "disabled"), for: id)
-        #expect(store.events(for: id).isEmpty)
-        #expect(!FileManager.default.fileExists(atPath: auditDirectory.path))
+        store.append(AuditEvent(kind: .connected, detail: "fixture endpoint detail"), for: id)
+        store.append(AuditEvent(kind: .rename, detail: "fixture action detail"), for: id)
+        #expect(store.events(for: id).map(\.detail) == [ConnectionHistory.summaryOnlyConnection])
         log.configure(level: .info, directory: root.appendingPathComponent("diagnostics"))
-        store.append(AuditEvent(kind: .connected, detail: "enabled"), for: id)
-        #expect(store.events(for: id).map(\.detail) == ["enabled"])
+        store.append(AuditEvent(kind: .rename, detail: "enabled"), for: id)
+        #expect(store.events(for: id).map(\.detail) == [ConnectionHistory.summaryOnlyConnection, "enabled"])
         log.configure(level: .off, directory: root)
-        store.append(AuditEvent(kind: .connected, detail: "disabled-again"), for: id)
-        #expect(store.events(for: id).map(\.detail) == ["enabled"])
+        store.append(AuditEvent(kind: .disconnected, detail: "fixture detail"), for: id)
+        store.append(AuditEvent(kind: .delete, detail: "disabled action"), for: id)
+        #expect(store.events(for: id).map(\.detail) == [ConnectionHistory.summaryOnlyConnection, "enabled", "disconnected"])
+        let restored = AuditLogStore(directory: auditDirectory)
+        #expect(ConnectionHistory.rows(from: restored.events(for: id)).count == 1)
+        #expect(ConnectionHistory.rows(from: restored.events(for: id)).first?.transferCountsAvailable == false)
     }
 
     /// A fresh, empty directory under the system temp directory, removed by

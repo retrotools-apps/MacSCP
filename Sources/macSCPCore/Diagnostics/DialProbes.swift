@@ -269,7 +269,7 @@ public enum DialSupport {
         switch error {
         case let error as HostKeyError:
             switch error {
-            case .mismatch(let host, _, _):
+            case .mismatch(let host, _, _, _):
                 // Names the host, never the fingerprints (maintainer
                 // decision, 2026-09-16): this sentence is what
                 // `DiagnosticLog`, the tunnel failure reason and the

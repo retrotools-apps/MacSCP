@@ -760,7 +760,7 @@
 "settings.general.diagnosticLog.info" = "Info";
 "settings.general.diagnosticLog.debug" = "Débogage";
 "settings.general.diagnosticLog.reveal" = "Afficher dans le Finder";
-"settings.general.diagnosticLogHint" = "Désactivé par défaut, y compris les journaux système et de session. N'écrit aucun mot de passe, clé ou contenu de fichier.";
+"settings.general.diagnosticLogHint" = "Les journaux détaillés sont désactivés par défaut. Les connexions récentes et les informations serveur enregistrées restent disponibles. Aucun mot de passe, clé ou contenu de fichier n’est journalisé.";
 "sidebar.group.expanded" = "Développé";
 "sidebar.group.collapsed" = "Réduit";
 "group.cards.empty" = "Aucune session enregistrée dans ce groupe.";
@@ -1583,7 +1583,6 @@
 "settings.general.language.es" = "Español";
 "settings.general.language.ro" = "Română";
 "settings.general.language.it" = "Italiano";
-"overview.history.disabled" = "L’historique des connexions est enregistré uniquement lorsque le journal de diagnostic est activé dans les réglages.";
 // Built-in file tools
 "filetools.unsupported" = "Ce serveur ne permet pas la lecture par fenêtres.";
 "filetools.textOnly" = "Contenu binaire ou non UTF-8 : utilisez le visualiseur hexadécimal.";
@@ -1680,7 +1679,7 @@
 "diagnostics.ready" = "Prêt pour le diagnostic";
 "diagnostics.section.system" = "Système";
 "diagnostics.section.network" = "Réseau";
-"diagnostics.users.help" = "Utilisateurs connectés enregistrés / comptes de connexion ; les comptes techniques sont exclus lorsqu’ils sont identifiables.";
+"diagnostics.users.help" = "Utilisateurs connectés / comptes utilisateurs locaux ordinaires. Linux utilise la plage d’UID configurée ; root et les comptes système sont exclus.";
 "diagnostics.speed.upload" = "Envoi";
 "diagnostics.speed.download" = "Réception";
 "diagnostics.speed.cleanup" = "Suppression du fichier de test…";
@@ -1795,3 +1794,41 @@
 "archive.import.tunnels %lld %lld %lld %lld" = "Tunnels : %lld importés, %lld remplacés, %lld renommés, %lld locaux conservés";
 "share.import.result %lld %lld %lld %lld %lld" = "Connexions : %lld importées, %lld remplacées, %lld renommées, %lld locales conservées\nTunnels importés : %lld\nLes identifiants doivent être saisis sur ce Mac.";
 "import.conflict.replaceSettingsNote" = "Le remplacement écrase les réglages de l’élément local.";
+
+"overview.snapshot.title" = "Dernières informations connues du serveur";
+"overview.snapshot.date" = "Relevé du %@ · non actualisé";
+"overview.snapshot.accounts" = "Comptes utilisateurs locaux";
+"overview.snapshot.memory" = "Mémoire totale";
+"overview.snapshot.volumes" = "Volumes de stockage (%lld) — capacité totale par montage";
+
+"diagnostics.system.devices" = "Disques et partitions";
+
+"diagnostics.system.storageSummary" = "Stockage par disque ou volume";
+
+"overview.snapshot.disks" = "Stockage (%lld) — capacité montée par disque ou volume";
+
+"overview.snapshot.public" = "Adresses publiques";
+
+"overview.snapshot.ram" = "RAM";
+
+"overview.snapshot.storage" = "Stockage";
+
+"overview.snapshot.moreStorage" = "+%lld autres";
+
+"overview.secret.passphrase" = "Phrase secrète de la clé";
+
+"overview.snapshot.accounts.raw" = "Comptes de connexion";
+
+
+
+
+"tofu.replaceChangedKey" = "Remplacer la clé du serveur";
+"tofu.replaceFailed" = "La clé n’a pas pu être remplacée. Relancez la connexion pour vérifier la clé actuelle.";
+
+"tofu.changed.warning" = "L’identité du serveur a changé. La connexion a été interrompue. Vérifiez la nouvelle empreinte par un canal indépendant avant de remplacer la clé enregistrée.";
+
+"tofu.changed.saved" = "Empreinte enregistrée";
+
+"tofu.changed.presented" = "Empreinte présentée";
+
+"audit.kind.hostKeyReplaced" = "Clé du serveur remplacée";

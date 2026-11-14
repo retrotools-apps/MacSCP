@@ -32,6 +32,36 @@ struct CitadelFileSystemIntegrationTests {
         }
     }
 
+    @Test func resumeRepairsHolesEvenWhenRemoteSizeAlreadyMatches() async throws {
+        let fs = try await connect()
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        let name = "macscp-pipeline-resume-\(UUID().uuidString).bin"
+        let remotePath = "/config/\(name)"
+        let bytes = Data((0..<(SFTPTransferPipeline.requestBytes * 70 + 137)).map { UInt8($0 % 251) })
+        let localFile = directory.appendingPathComponent(name)
+        try bytes.write(to: localFile)
+        var damaged = bytes
+        damaged.replaceSubrange(32000..<64000, with: Data(repeating: 0, count: 32000))
+        let stream = AsyncThrowingStream<Data, Error> { $0.yield(damaged); $0.finish() }
+        do {
+            try await fs.write(path: remotePath, mode: .overwrite, contents: stream)
+            try await TransferEngine.copyFile(from: LocalFileSystem(), sourcePath: localFile.path,
+                to: fs, destinationDirectory: "/config", fileName: name, resume: true, onProgress: { _ in })
+            var result = Data()
+            for try await chunk in try await fs.readStream(path: remotePath) { result.append(chunk) }
+            #expect(result == bytes)
+            try await fs.delete(path: remotePath)
+            await fs.disconnect()
+            try FileManager.default.removeItem(at: directory)
+        } catch {
+            try? await fs.delete(path: remotePath)
+            await fs.disconnect()
+            try? FileManager.default.removeItem(at: directory)
+            throw error
+        }
+    }
+
     @Test func listsSeededDirectory() async throws {
         let fs = try await connect()
         defer { Task { await fs.disconnect() } }
@@ -126,7 +156,10 @@ struct CitadelFileSystemIntegrationTests {
         for try await chunk in try await fs.readStream(path: "/data/seed/hello.txt") {
             collected.append(chunk)
         }
-        #expect(String(data: collected, encoding: .utf8) == "hello from MacSCP test server\n")
+        let fixture = URL(fileURLWithPath: #filePath).deletingLastPathComponent()
+            .deletingLastPathComponent().deletingLastPathComponent()
+            .appendingPathComponent("docker/test-server/seed/hello.txt")
+        #expect(collected == (try Data(contentsOf: fixture)))
     }
 
     @Test func writeUploadsAndReadsBackRoundtrip() async throws {

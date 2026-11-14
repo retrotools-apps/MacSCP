@@ -71,6 +71,9 @@ public final class RemoteBrowserViewModel {
     public var showHiddenFiles = false
 
     private let fs: any RemoteFileSystem
+    private let initialFallbackPath: String?
+    /// Called only after a successful directory listing, including navigation.
+    public var locationSink: ((String) -> Void)?
 
     /// Diagnostic-log category this pane's `load()` events are filed under.
     /// Set once at construction by the App, which is the only layer that
@@ -93,11 +96,13 @@ public final class RemoteBrowserViewModel {
     public var auditSink: ((AuditEvent) -> Void)?
 
     public init(
-        fs: any RemoteFileSystem, startPath: String = "/", logCategory: String = "browser.remote"
+        fs: any RemoteFileSystem, startPath: String = "/", logCategory: String = "browser.remote",
+        initialFallbackPath: String? = nil
     ) {
         self.fs = fs
         self.currentPath = startPath
         self.logCategory = logCategory
+        self.initialFallbackPath = initialFallbackPath
     }
 
     public var canGoUp: Bool { currentPath != "/" }
@@ -356,6 +361,12 @@ public final class RemoteBrowserViewModel {
     /// and navigation still call `load()` and always query the backend.
     public func loadIfNeeded() async {
         guard !hasStartedLoading else { return }
+        let initialPath = currentPath
+        await load()
+        guard !Task.isCancelled, currentPath == initialPath,
+              case .failed = state, let fallback = initialFallbackPath,
+              fallback != initialPath else { return }
+        currentPath = fallback
         await load()
     }
 
@@ -409,6 +420,7 @@ public final class RemoteBrowserViewModel {
             displayedAll = displayItems(from: listed)
             applySearch()
             state = .loaded
+            locationSink?(path)
             // Its own line, one layer above `LocalFileSystem.list`'s own
             // `browser.local list done` (which the local pane ALSO writes,
             // at the FS level): that line carries the raw read and the

@@ -757,7 +757,7 @@
 "settings.general.diagnosticLog.info" = "Info";
 "settings.general.diagnosticLog.debug" = "Debug";
 "settings.general.diagnosticLog.reveal" = "Im Finder zeigen";
-"settings.general.diagnosticLogHint" = "Standardmäßig aus, einschließlich System- und Sitzungsprotokollen. Schreibt keine Passwörter, Schlüssel oder Dateiinhalte.";
+"settings.general.diagnosticLogHint" = "Detaillierte Protokolle sind standardmäßig aus. Letzte Verbindungen und gespeicherte Serverinformationen bleiben verfügbar. Passwörter, Schlüssel und Dateiinhalte werden nicht protokolliert.";
 "sidebar.group.expanded" = "Ausgeklappt";
 "sidebar.group.collapsed" = "Eingeklappt";
 "group.cards.empty" = "Keine gespeicherten Sitzungen in dieser Gruppe.";
@@ -1580,7 +1580,6 @@
 "settings.general.language.es" = "Español";
 "settings.general.language.ro" = "Română";
 "settings.general.language.it" = "Italiano";
-"overview.history.disabled" = "Der Verbindungsverlauf wird nur aufgezeichnet, wenn die Diagnoseprotokollierung in den Einstellungen aktiviert ist.";
 // Built-in file tools
 "filetools.unsupported" = "Dieser Server unterstützt keinen dateifensterweisen Zugriff.";
 "filetools.textOnly" = "Binärer oder nicht UTF-8-kodierter Inhalt: Verwende die Hexadezimalansicht.";
@@ -1677,7 +1676,7 @@
 "diagnostics.ready" = "Bereit für die Diagnose";
 "diagnostics.section.system" = "System";
 "diagnostics.section.network" = "Netzwerk";
-"diagnostics.users.help" = "Angemeldete Benutzer / Anmeldekonten; erkennbare Dienstkonten werden ausgeschlossen.";
+"diagnostics.users.help" = "Aktive Anmeldungen / reguläre lokale Benutzerkonten. Linux verwendet den konfigurierten UID-Bereich; root und Systemkonten sind ausgeschlossen.";
 "diagnostics.speed.upload" = "Upload";
 "diagnostics.speed.download" = "Download";
 "diagnostics.speed.cleanup" = "Testdatei wird entfernt…";
@@ -1792,3 +1791,41 @@
 "archive.import.tunnels %lld %lld %lld %lld" = "Tunnel: %lld importiert, %lld ersetzt, %lld umbenannt, %lld lokal beibehalten";
 "share.import.result %lld %lld %lld %lld %lld" = "Verbindungen: %lld importiert, %lld ersetzt, %lld umbenannt, %lld lokal beibehalten\nImportierte Tunnel: %lld\nAnmeldedaten müssen auf diesem Mac eingegeben werden.";
 "import.conflict.replaceSettingsNote" = "Beim Ersetzen werden die Einstellungen des lokalen Elements überschrieben.";
+
+"overview.snapshot.title" = "Zuletzt bekannte Serverinformationen";
+"overview.snapshot.date" = "Stand %@ · nicht live";
+"overview.snapshot.accounts" = "Lokale Benutzerkonten";
+"overview.snapshot.memory" = "Gesamter Arbeitsspeicher";
+"overview.snapshot.volumes" = "Speichervolumes (%lld) — Gesamtkapazität pro Einhängepunkt";
+
+"diagnostics.system.devices" = "Festplatten und Partitionen";
+
+"diagnostics.system.storageSummary" = "Speicher nach Datenträger oder Volume";
+
+"overview.snapshot.disks" = "Speicher (%lld) — eingehängte Kapazität nach Datenträger oder Volume";
+
+"overview.snapshot.public" = "Öffentliche Adressen";
+
+"overview.snapshot.ram" = "RAM";
+
+"overview.snapshot.storage" = "Speicher";
+
+"overview.snapshot.moreStorage" = "+%lld weitere";
+
+"overview.secret.passphrase" = "Schlüsselpassphrase";
+
+"overview.snapshot.accounts.raw" = "Anmeldekonten";
+
+
+
+
+"tofu.replaceChangedKey" = "Hostschlüssel ersetzen";
+"tofu.replaceFailed" = "Der Schlüssel konnte nicht ersetzt werden. Verbinde dich erneut, um den aktuellen Schlüssel zu prüfen.";
+
+"tofu.changed.warning" = "Die Serveridentität hat sich geändert. Die Verbindung wurde gestoppt. Prüfe den neuen Fingerabdruck unabhängig, bevor du den gespeicherten Schlüssel ersetzt.";
+
+"tofu.changed.saved" = "Gespeicherter Fingerabdruck";
+
+"tofu.changed.presented" = "Präsentierter Fingerabdruck";
+
+"audit.kind.hostKeyReplaced" = "Hostschlüssel ersetzt";

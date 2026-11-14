@@ -29,6 +29,15 @@ import Testing
 /// catalogs renders as the raw key on screen, in every language.
 @Suite("Connect failure plan")
 struct ConnectFailurePlanTests {
+    @Test func hostIdentityFailuresOfferAnExplicitManagementRoute() {
+        for stored in [false, true] {
+            let content = ConnectFailurePlan.content(hasStoredSession: stored, remedy: nil, category: .hostKey, canReplaceHostKey: true)
+            #expect(content.replaceHostKeyButton?.key == "tofu.replaceChangedKey")
+        }
+        let unrelated = ConnectFailurePlan.content(hasStoredSession: true, remedy: nil, category: .authentication)
+        #expect(unrelated.replaceHostKeyButton == nil)
+    }
+
     /// Saved sessions have one unambiguous editing action, not a second
     /// button that merely returns to the overview.
     @Test func storedSessionsOfferRetryEditSessionAndCloseOnly() {

@@ -244,7 +244,8 @@ final class DiagnosticsViewModel: Identifiable {
         existingConnection: (any RemoteFileSystem)? = nil,
         directory: String = "/",
         collectionSettings: @escaping @MainActor @Sendable () -> DiagnosticCollectionSettings = { .init() },
-        transferTestAllowed: @escaping @MainActor () -> Bool = { true }
+        transferTestAllowed: @escaping @MainActor () -> Bool = { true },
+        onInformation: @escaping @Sendable (ServerNetworkAddresses) async -> Void = { _ in }
     ) {
         let descriptor = BackendDescriptor.descriptor(for: target.kind)
         let version = Self.bundleVersion
@@ -264,7 +265,8 @@ final class DiagnosticsViewModel: Identifiable {
                     if scope == .complete {
                         return await ConnectedDiagnostics.run(
                             on: connection, directory: directory, endpoint: endpoint,
-                            settings: await collectionSettings(), appVersion: version, observer: observer)
+                            settings: await collectionSettings(), appVersion: version, observer: observer,
+                            onInformation: onInformation)
                     }
                 }
                 let diagnostics = ConnectionDiagnostics(

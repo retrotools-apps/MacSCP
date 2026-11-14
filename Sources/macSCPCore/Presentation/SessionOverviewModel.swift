@@ -76,7 +76,19 @@ public struct SessionOverviewModel: Sendable, Equatable {
     /// `BackendDescriptor.requiresSecret`, so the agent case is the
     /// descriptor's answer rather than an `authKind` branch here.
     public let hasStoredSecret: Bool?
+    public enum SecretSummary: Sendable, Equatable {
+        case loginSecret(stored: Bool)
+        case storedKeyPassphrase
+    }
+    private let usesKeyAuthentication: Bool
+    public var secretSummary: SecretSummary? {
+        guard let stored = hasStoredSecret else { return nil }
+        if usesKeyAuthentication { return stored ? .storedKeyPassphrase : nil }
+        return .loginSecret(stored: stored)
+    }
+
     public let history: [ConnectionHistory.Row]
+    public let serverSnapshot: SessionServerSnapshot?
 
     /// - Parameters:
     ///   - knownKey: what `KnownHostsStore.find(host:port:)` answered for
@@ -103,8 +115,17 @@ public struct SessionOverviewModel: Sendable, Equatable {
     public init(
         session: StoredSession, descriptor: BackendDescriptor, knownKey: KnownHostKey?,
         secrets: any SecretPresence, events: [AuditEvent],
-        groupName: String? = nil, loginSetName: String? = nil
+        groupName: String? = nil, loginSetName: String? = nil,
+        serverSnapshot: SessionServerSnapshot? = nil, loginSet: LoginSet? = nil
     ) {
+        var session = session
+        if session.kind == .ssh, let loginSet, loginSet.id == session.loginSetID {
+            session.ssh?.authKind = loginSet.authKind
+            session.ssh?.username = loginSet.username
+            session.ssh?.keyPath = loginSet.keyPath
+        }
+        usesKeyAuthentication = session.kind == .ssh && session.ssh?.authKind == .privateKey
+        self.serverSnapshot = serverSnapshot
         let values = descriptor.sessionValues(session)
 
         name = session.name

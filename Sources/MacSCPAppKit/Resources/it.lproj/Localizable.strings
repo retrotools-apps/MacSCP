@@ -596,7 +596,7 @@
 "settings.general.diagnosticLog.info" = "Info";
 "settings.general.diagnosticLog.debug" = "Debug";
 "settings.general.diagnosticLog.reveal" = "Mostra in Finder";
-"settings.general.diagnosticLogHint" = "Off per impostazione predefinita, compresi i registri di controllo di sistema e sessione. Non scrive password, chiavi o contenuti di file.";
+"settings.general.diagnosticLogHint" = "I registri dettagliati sono disattivati per impostazione predefinita. Le connessioni recenti e le informazioni salvate sul server restano disponibili. Password, chiavi e contenuti dei file non vengono registrati.";
 "sidebar.group.expanded" = "Espansione";
 "sidebar.group.collapsed" = "Collasso";
 "group.cards.empty" = "Non ci sono sessioni salvate in questo gruppo.";
@@ -1351,7 +1351,6 @@
 "settings.general.language.es" = "Español";
 "settings.general.language.ro" = "Română";
 "settings.general.language.it" = "Italiano";
-"overview.history.disabled" = "La cronologia delle connessioni viene registrata solo quando il registro diagnostico è attivato nelle impostazioni.";
 // Built-in file tools
 "filetools.unsupported" = "Questo server non supporta la lettura a finestre.";
 "filetools.textOnly" = "Contenuto binario o non UTF-8: usa il visualizzatore esadecimale.";
@@ -1448,7 +1447,7 @@
 "diagnostics.ready" = "Pronto per la diagnostica";
 "diagnostics.section.system" = "Sistema";
 "diagnostics.section.network" = "Rete";
-"diagnostics.users.help" = "Utenti con accesso registrato / account di accesso; gli account di servizio identificabili sono esclusi.";
+"diagnostics.users.help" = "Utenti connessi / account utente locali ordinari. Linux usa l’intervallo UID configurato; root e gli account di sistema sono esclusi.";
 "diagnostics.speed.upload" = "Invio";
 "diagnostics.speed.download" = "Ricezione";
 "diagnostics.speed.cleanup" = "Rimozione del file di prova…";
@@ -1563,3 +1562,41 @@
 "archive.import.tunnels %lld %lld %lld %lld" = "Tunnel: %lld importati, %lld sostituiti, %lld rinominati, %lld locali mantenuti";
 "share.import.result %lld %lld %lld %lld %lld" = "Connessioni: %lld importate, %lld sostituite, %lld rinominate, %lld locali mantenute\nTunnel importati: %lld\nLe credenziali devono essere inserite su questo Mac.";
 "import.conflict.replaceSettingsNote" = "La sostituzione sovrascrive le impostazioni dell’elemento locale.";
+
+"overview.snapshot.title" = "Ultime informazioni note sul server";
+"overview.snapshot.date" = "Salvato %@ · non in tempo reale";
+"overview.snapshot.accounts" = "Account utente locali";
+"overview.snapshot.memory" = "Memoria totale";
+"overview.snapshot.volumes" = "Volumi di archiviazione (%lld) — capacità totale per punto di montaggio";
+
+"diagnostics.system.devices" = "Dischi e partizioni";
+
+"diagnostics.system.storageSummary" = "Archiviazione per disco o volume";
+
+"overview.snapshot.disks" = "Archiviazione (%lld) — capacità montata per disco o volume";
+
+"overview.snapshot.public" = "Indirizzi pubblici";
+
+"overview.snapshot.ram" = "RAM";
+
+"overview.snapshot.storage" = "Archiviazione";
+
+"overview.snapshot.moreStorage" = "+%lld altri";
+
+"overview.secret.passphrase" = "Passphrase della chiave";
+
+"overview.snapshot.accounts.raw" = "Account di accesso";
+
+
+
+
+"tofu.replaceChangedKey" = "Sostituisci chiave del server";
+"tofu.replaceFailed" = "Impossibile sostituire la chiave. Riconnettiti per verificare la chiave attuale.";
+
+"tofu.changed.warning" = "L’identità del server è cambiata. La connessione è stata interrotta. Verifica la nuova impronta tramite un canale indipendente prima di sostituire la chiave salvata.";
+
+"tofu.changed.saved" = "Impronta salvata";
+
+"tofu.changed.presented" = "Impronta presentata";
+
+"audit.kind.hostKeyReplaced" = "Chiave del server sostituita";

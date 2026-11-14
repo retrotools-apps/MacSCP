@@ -35,7 +35,7 @@ import Synchronization
 
 /// SFTP implementation of RemoteFileSystem based on Citadel.
 /// M1: password auth, no host-key verification (TOFU arrives in M3).
-public final class CitadelFileSystem: RemoteFileSystem, @unchecked Sendable {
+public final class CitadelFileSystem: ResumePrefixValidatingFileSystem, @unchecked Sendable {
     private let client: SSHClient
     private let sftp: BoundedSFTPSession
     private let jumpClient: SSHClient?
@@ -356,9 +356,9 @@ public final class CitadelFileSystem: RemoteFileSystem, @unchecked Sendable {
                 // At most ONE hop can carry a verdict per attempt (stage 2
                 // only starts after stage 1 succeeds) — check the jump hop first.
                 switch jumpBox.result ?? targetBox.result {
-                case .mismatch(let host, let expected, let presented):
+                case .mismatch(let host, let expected, let presented, let candidate):
                     // Hard stop — no override, the decider is NEVER asked.
-                    throw HostKeyError.mismatch(host: host, expected: expected, presented: presented)
+                    throw HostKeyError.mismatch(host: host, expected: expected, presented: presented, candidate: candidate)
                 case .lookupFailed(let reason):
                     // Corrupt known_hosts store → hard, typed error instead of a
                     // silent downgrade to TOFU (fail closed).
@@ -541,12 +541,13 @@ public final class CitadelFileSystem: RemoteFileSystem, @unchecked Sendable {
                 let client = try await connectHop(
                     auth: config.auth, username: config.username, agent: targetAgent, box: targetBox
                 ) { method in
-                    let settings = SSHClientSettings(
+                    var settings = SSHClientSettings(
                         host: config.host,
                         port: config.port,
                         authenticationMethod: { method },
                         hostKeyValidator: .custom(targetValidator)
                     )
+                    settings.protocolOptions = [.maximumPacketSize(SFTPTransferPipeline.windowBytes)]
                     return try await jumpClient.jump(to: settings)
                 }
                 do {
@@ -621,6 +622,8 @@ public final class CitadelFileSystem: RemoteFileSystem, @unchecked Sendable {
             authenticationMethod: method,
             hostKeyValidator: .custom(validator),
             reconnect: .never,
+            // NIOSSH uses this limit for its receive window as well as packets.
+            protocolOptions: [.maximumPacketSize(SFTPTransferPipeline.windowBytes)],
             group: group ?? .singleton,
             channelHandlers: handlers,
             connectTimeout: connectTimeout
@@ -1049,11 +1052,22 @@ public final class CitadelFileSystem: RemoteFileSystem, @unchecked Sendable {
         // `AsyncSequence` single-consumer contract and would hand back
         // overlapping chunks long before the annotation mattered.
         nonisolated(unsafe) var currentOffset = offset
+        // Preserve the shared stream chunk size while retaining at most one
+        // bounded read-ahead batch. No producer runs while the consumer pauses.
+        nonisolated(unsafe) var readAhead = Data()
         return AsyncThrowingStream(unfolding: {
             do {
-                let buffer = try await handle.read(
-                    from: currentOffset, length: UInt32(TransferChunk.size))
-                guard buffer.readableBytes > 0 else {
+                try Task.checkCancellation()
+                if !readAhead.isEmpty {
+                    let chunk = Data(readAhead.prefix(TransferChunk.size))
+                    readAhead.removeFirst(chunk.count)
+                    return chunk
+                }
+                let buffer = try await SFTPTransferPipeline.readBatch(from: currentOffset) { offset, count in
+                    let bytes = try await handle.read(from: offset, length: UInt32(count))
+                    return Data(bytes.readableBytesView)
+                }
+                guard !buffer.isEmpty else {
                     // The other site where a close's own outcome could
                     // have meant something — see the comment on `write`'s
                     // completion close below for what changed here and why
@@ -1061,8 +1075,10 @@ public final class CitadelFileSystem: RemoteFileSystem, @unchecked Sendable {
                     _ = await handle.closeBounded()
                     return nil
                 }
-                currentOffset += UInt64(buffer.readableBytes)
-                return Data(buffer.readableBytesView)
+                currentOffset += UInt64(buffer.count)
+                let chunk = Data(buffer.prefix(TransferChunk.size))
+                readAhead = Data(buffer.dropFirst(chunk.count))
+                return chunk
             } catch is CancellationError {
                 // Cooperative cancellation (M5c/T2): an in-flight read request
                 // throws `CancellationError` on task cancellation — pass it
@@ -1087,15 +1103,12 @@ public final class CitadelFileSystem: RemoteFileSystem, @unchecked Sendable {
         // "how long did the sftp write take" really is this function's
         // total duration, not just a setup cost.
         try await measured("write", path: path) {
-        // SSH_FXF_APPEND (SFTPOpenFileFlags.append) forces the server to
-        // append every write to the file's current end regardless of the
-        // offset the client sends — but not every server implementation
-        // honors that consistently, so belt-and-suspenders: also pre-stat
-        // the file's size and start our own offset counter there.
+        // Resume uses explicit offsets from the existing size. SSH_FXF_APPEND
+        // would ignore those offsets and corrupt pipelined, reordered writes.
         let flags: SFTPOpenFileFlags
         switch mode {
         case .overwrite: flags = [.create, .write, .truncate]
-        case .append: flags = [.create, .write, .append]
+        case .append: flags = [.create, .write]
         }
         let file: BoundedSFTPFile
         do {
@@ -1108,9 +1121,8 @@ public final class CitadelFileSystem: RemoteFileSystem, @unchecked Sendable {
             if mode == .append {
                 offset = try await file.readAttributes().size ?? 0
             }
-            for try await chunk in contents {
-                try await file.write(ByteBuffer(bytes: chunk), at: offset)
-                offset += UInt64(chunk.count)
+            try await SFTPTransferPipeline.write(contents: contents, from: offset) { bytes, position in
+                try await file.write(ByteBuffer(bytes: bytes), at: position)
             }
             // The close of a write that completed. Two sites in this file
             // changed from an unbounded close to `closeBounded()` where the
@@ -1581,10 +1593,9 @@ public final class CitadelFileSystem: RemoteFileSystem, @unchecked Sendable {
 /// ownership argument, and the part that is this box's alone still holds —
 /// `openFile` returns a fresh handle per call, the box is created and
 /// captured in `readStream` and nowhere else, and an `AsyncSequence` has a
-/// single consumer pulling sequentially, so one task at a time reaches the
-/// handle and `deinit` runs only once that task has released the closure. A
-/// read in flight holds the closure alive for its own duration, so the
-/// deinit close can never overlap a read.
+/// single consumer pulling sequentially, so each pull owns one bounded batch
+/// of read tasks. The batch drains before returning or closing; `deinit` runs only once
+/// the closure is released and cannot overlap a read.
 private final class SFTPReadHandle: Sendable {
     private let file: BoundedSFTPFile
 
@@ -1725,7 +1736,7 @@ extension CitadelFileSystem: ServerInformationProvider {
     public func serverInformation(includePublic: Bool, includeSystem: Bool, directory: String) async throws -> ServerNetworkAddresses {
         let answer = await DetachedProbe.run(timeout: .seconds(12)) { [client] in
             try? await client.collectingStandardOutput(
-                of: ServerNetworkAddresses.command(includePublic: includePublic, includeSystem: includeSystem, directory: directory), limit: 16_384)
+                of: ServerNetworkAddresses.command(includePublic: includePublic, includeSystem: includeSystem, directory: directory), limit: 262_144)
         }
         try Task.checkCancellation()
         guard let output = answer.value ?? nil else {
@@ -1736,7 +1747,7 @@ extension CitadelFileSystem: ServerInformationProvider {
         let windows = await DetachedProbe.run(timeout: .seconds(15)) { [client] in
             try? await client.collectingStandardOutput(
                 of: ServerNetworkAddresses.windowsCommand(includePublic: includePublic,
-                    includeSystem: includeSystem, directory: directory), limit: 16_384)
+                    includeSystem: includeSystem, directory: directory), limit: 262_144)
         }
         try Task.checkCancellation()
         if let output = windows.value ?? nil, output.exitStatus == 0 {

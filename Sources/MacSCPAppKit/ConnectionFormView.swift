@@ -608,7 +608,7 @@ struct ConnectionFormView: View {
         .alert(
             L10n.string("connection.error.title", "Connection failed"),
             isPresented: Binding(
-                get: { alertMessage != nil },
+                get: { alertMessage != nil && viewModel.lastHostKeyMismatch?.candidate == nil },
                 // Any way out of the alert — either button — is the person
                 // having seen the text, so the failure is acknowledged here
                 // and the form will not raise it again on its next mount.
@@ -629,6 +629,10 @@ struct ConnectionFormView: View {
         } message: {
             Text(alertMessage ?? "")
         }
+        .modifier(HostKeyReplacementPresentation(form: viewModel,
+            store: KnownHostsStore(directory: SessionStore.defaultDirectory),
+            auditStore: AuditLogStore(directory: AuditLogStore.defaultDirectory,
+                isLoggingEnabled: { DiagnosticLog.shared.isEnabled(.error) })))
         // Opened from the TOFU prompt's footnote below — kept at the outer
         // `body` level (like the alert above) so it presents over whichever
         // sub-view (`hostKeyPromptView` or the scrolling form) is currently shown,

@@ -26,10 +26,27 @@ public struct HostKeyCandidate: Equatable, Sendable {
     }
 }
 
+/// A failed handshake's public identity evidence, for an explicit management flow.
+/// The public candidate is retained for a separate, explicit post-failure
+/// replacement; it never authorizes the rejected handshake.
+public struct HostKeyMismatchDetails: Equatable, Sendable {
+    public let host: String
+    public let expected: String
+    public let presented: String
+    public let candidate: HostKeyCandidate?
+
+    public init(host: String, expected: String, presented: String, candidate: HostKeyCandidate? = nil) {
+        self.host = host
+        self.expected = expected
+        self.presented = presented
+        self.candidate = candidate
+    }
+}
+
 /// Errors from host-key verification. `mismatch` is a hard stop with no override.
 public enum HostKeyError: Error, Equatable, Sendable {
     /// A known host presents a DIFFERENT key — hard stop, no override.
-    case mismatch(host: String, expected: String, presented: String)  // fingerprints
+    case mismatch(host: String, expected: String, presented: String, candidate: HostKeyCandidate? = nil)  // fingerprints
     case rejectedByUser
 }
 
@@ -72,7 +89,7 @@ extension HostKeyCandidate {
 /// or hard mismatch stop).
 enum HostKeyProbeResult: Sendable {
     case unknown(HostKeyCandidate)
-    case mismatch(host: String, expected: String, presented: String)
+    case mismatch(host: String, expected: String, presented: String, candidate: HostKeyCandidate? = nil)
     /// The known_hosts store wasn't readable (e.g. corrupt JSON). Reported
     /// outward as a hard error — NOT treated as "unknown", so a broken store
     /// doesn't silently lead to re-TOFU/overwrite (fail closed).
@@ -135,9 +152,9 @@ final class TOFUHostKeyValidator: NIOSSHClientServerAuthenticationDelegate, @unc
             validationCompletePromise.fail(HostKeyError.rejectedByUser)
         case .mismatch(let expected):
             box.set(.mismatch(host: host, expected: expected,
-                              presented: candidate.fingerprintSHA256))
+                              presented: candidate.fingerprintSHA256, candidate: candidate))
             validationCompletePromise.fail(HostKeyError.mismatch(
-                host: host, expected: expected, presented: candidate.fingerprintSHA256))
+                host: host, expected: expected, presented: candidate.fingerprintSHA256, candidate: candidate))
         }
     }
 

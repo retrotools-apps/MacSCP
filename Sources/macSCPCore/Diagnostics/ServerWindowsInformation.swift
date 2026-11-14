@@ -4,8 +4,6 @@ extension ServerNetworkAddresses {
     /// Encoded PowerShell avoids interpretation by either cmd.exe or a
     /// PowerShell OpenSSH default shell. Paths remain literal data, not code.
     static func windowsCommand(includePublic: Bool, includeSystem: Bool, directory: String) -> String {
-        let path = directory.hasPrefix("/") && directory.dropFirst().dropFirst().first == ":"
-            ? String(directory.dropFirst()) : directory
         var script = "[Console]::OutputEncoding = [Text.UTF8Encoding]::new($false); $ErrorActionPreference = 'SilentlyContinue';\n"
         if includeSystem {
             script += #"""
@@ -28,8 +26,24 @@ extension ServerNetworkAddresses {
               }
             } catch {}
             """#
-            script += "\ntry { $drive = (Get-Item -LiteralPath '" + path.replacingOccurrences(of: "'", with: "''")
-                + "' -ErrorAction Stop).PSDrive; if ($null -ne $drive.Free -and $null -ne $drive.Used) { 'disk ' + $drive.Free + ' ' + ($drive.Free + $drive.Used) } } catch {}\n"
+            script += #"""
+
+            try {
+              Get-CimInstance Win32_Volume -Filter 'DriveType=3 OR DriveType=2' -ErrorAction Stop | ForEach-Object {
+                if ($null -ne $_.Capacity -and $_.Capacity -gt 0) {
+                  $mount = if ($_.Name) { $_.Name } else { $_.DeviceID }
+                  "volume`t" + $_.FreeSpace + "`t" + $_.Capacity + "`t" + $_.DeviceID + "`t" + $mount
+                }
+              }
+            } catch {}
+            try {
+              $devices = @(Get-CimInstance Win32_DiskDrive | ForEach-Object { @{name=$_.DeviceID; type='disk'; size=$_.Size} })
+              $devices += @(Get-CimInstance Win32_DiskPartition | ForEach-Object { @{name=$_.DeviceID; type='partition'; size=$_.Size} })
+              'blocks-json-begin'
+              @{blockdevices=$devices} | ConvertTo-Json -Depth 4 -Compress
+              'blocks-json-end'
+            } catch {}
+            """#
         }
         if includePublic {
             script += #"""
@@ -44,6 +58,6 @@ extension ServerNetworkAddresses {
     }
 
     var hasInformation: Bool {
-        !system.isEmpty || !local.isEmpty || publicIPv4 != nil || publicIPv6 != nil
+        !system.isEmpty || storageSummary?.isEmpty == false || !storageDevices.isEmpty || !volumes.isEmpty || !local.isEmpty || publicIPv4 != nil || publicIPv6 != nil
     }
 }

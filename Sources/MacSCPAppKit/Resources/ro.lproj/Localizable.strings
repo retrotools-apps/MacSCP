@@ -596,7 +596,7 @@
 "settings.general.diagnosticLog.info" = "Informaţii";
 "settings.general.diagnosticLog.debug" = "Depanare";
 "settings.general.diagnosticLog.reveal" = "Arată în Finder";
-"settings.general.diagnosticLogHint" = "Off în mod implicit, inclusiv jurnalele de audit ale sistemului și ale sesiunii. Scrie fără parole, chei sau conţinut de fişier.";
+"settings.general.diagnosticLogHint" = "Jurnalele detaliate sunt dezactivate implicit. Conexiunile recente și informațiile salvate despre server rămân disponibile. Nu sunt înregistrate parole, chei sau conținuturi de fișiere.";
 "sidebar.group.expanded" = "Extins";
 "sidebar.group.collapsed" = "Colapsed";
 "group.cards.empty" = "Nu există sesiuni salvate în acest grup.";
@@ -1351,7 +1351,6 @@
 "settings.general.language.es" = "Español";
 "settings.general.language.ro" = "Română";
 "settings.general.language.it" = "Italiano";
-"overview.history.disabled" = "Istoricul conexiunilor este înregistrat numai când jurnalul de diagnosticare este activat în setări.";
 // Built-in file tools
 "filetools.unsupported" = "Acest server nu acceptă citirea pe ferestre.";
 "filetools.textOnly" = "Conținut binar sau non-UTF-8: utilizați vizualizatorul hexazecimal.";
@@ -1448,7 +1447,7 @@
 "diagnostics.ready" = "Pregătit pentru diagnosticare";
 "diagnostics.section.system" = "Sistem";
 "diagnostics.section.network" = "Rețea";
-"diagnostics.users.help" = "Utilizatori conectați înregistrați / conturi de acces; conturile tehnice identificabile sunt excluse.";
+"diagnostics.users.help" = "Utilizatori conectați / conturi locale obișnuite. Linux folosește intervalul UID configurat; root și conturile de sistem sunt excluse.";
 "diagnostics.speed.upload" = "Trimitere";
 "diagnostics.speed.download" = "Primire";
 "diagnostics.speed.cleanup" = "Se șterge fișierul de test…";
@@ -1563,3 +1562,41 @@
 "archive.import.tunnels %lld %lld %lld %lld" = "Tuneluri: %lld importate, %lld înlocuite, %lld redenumite, %lld locale păstrate";
 "share.import.result %lld %lld %lld %lld %lld" = "Conexiuni: %lld importate, %lld înlocuite, %lld redenumite, %lld locale păstrate\nTuneluri importate: %lld\nDatele de autentificare trebuie introduse pe acest Mac.";
 "import.conflict.replaceSettingsNote" = "Înlocuirea suprascrie configurările elementului local.";
+
+"overview.snapshot.title" = "Ultimele informații cunoscute despre server";
+"overview.snapshot.date" = "Salvat %@ · nu în timp real";
+"overview.snapshot.accounts" = "Conturi locale de utilizator";
+"overview.snapshot.memory" = "Memorie totală";
+"overview.snapshot.volumes" = "Volume de stocare (%lld) — capacitate totală per punct de montare";
+
+"diagnostics.system.devices" = "Discuri și partiții";
+
+"diagnostics.system.storageSummary" = "Stocare pe disc sau volum";
+
+"overview.snapshot.disks" = "Stocare (%lld) — capacitate montată pe disc sau volum";
+
+"overview.snapshot.public" = "Adrese publice";
+
+"overview.snapshot.ram" = "RAM";
+
+"overview.snapshot.storage" = "Stocare";
+
+"overview.snapshot.moreStorage" = "+%lld altele";
+
+"overview.secret.passphrase" = "Fraza de acces a cheii";
+
+"overview.snapshot.accounts.raw" = "Conturi de conectare";
+
+
+
+
+"tofu.replaceChangedKey" = "Înlocuiește cheia serverului";
+"tofu.replaceFailed" = "Cheia nu a putut fi înlocuită. Reconectează-te pentru a verifica cheia actuală.";
+
+"tofu.changed.warning" = "Identitatea serverului s-a schimbat. Conexiunea a fost oprită. Verifică independent noua amprentă înainte de a înlocui cheia salvată.";
+
+"tofu.changed.saved" = "Amprenta salvată";
+
+"tofu.changed.presented" = "Amprenta prezentată";
+
+"audit.kind.hostKeyReplaced" = "Cheia serverului a fost înlocuită";

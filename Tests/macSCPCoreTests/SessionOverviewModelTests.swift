@@ -78,6 +78,26 @@ struct SessionOverviewModelTests {
         model.facts.first { $0.id == id }?.text
     }
 
+    @Test func keyAuthenticationNeverClaimsAnAbsentLoginPasswordWillBeAskedFor() {
+        let session = sshSession(authKind: .privateKey)
+        let absent = model(session, secrets: FakeSecretPresence(slots: []))
+        #expect(absent.secretSummary == nil)
+        let present = model(session, secrets: FakeSecretPresence(slots: [session.secretSlot]))
+        #expect(present.secretSummary == .storedKeyPassphrase)
+        let password = model(sshSession(authKind: .password), secrets: FakeSecretPresence(slots: []))
+        #expect(password.secretSummary == .loginSecret(stored: false))
+    }
+
+    @Test func loginSetDeterminesTheActualAuthenticationAndSecretSummary() {
+        let login = LoginSet(name: "Fixture", username: "fixture", authKind: .privateKey, keyPath: "/fixture/key")
+        let session = sshSession(authKind: .password, loginSetID: login.id)
+        let overview = SessionOverviewModel(session: session, descriptor: .descriptor(for: .ssh), knownKey: nil,
+            secrets: Self.noSecrets, events: [], loginSet: login)
+        #expect(overview.secretSummary == nil)
+        #expect(text(overview, "keyPath") == "/fixture/key")
+        #expect(text(overview, "authentication") == CoreL10n.string(SessionOverviewModel.authTextKey(for: .privateKey)))
+    }
+
     // MARK: - Head
 
     @Test func theHeadIsTheNameTheKindAndTheDescriptorsEndpoint() {

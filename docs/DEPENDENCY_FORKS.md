@@ -1,5 +1,31 @@
 # Vendored SSH dependencies
 
+## Release readiness review — 2026-11-14
+
+Rechecked upstream heads, commit summaries and public advisory APIs for 1.5.0.
+No dependency sources or inventory were refreshed.
+
+- Citadel and Joannis NIOSSH still match the upstream heads recorded below;
+  both advisory APIs returned empty arrays. Native key/agent, keepalive and
+  TLS-gateway adaptations still prevent retiring these local forks.
+- BigInt HEAD remains `96fb3b174cb919b57de3edbb6ab7bb4a775137af` and its
+  latest release is 6.0.1. The four commits after the pinned 5.7.0 base cover
+  WASI mantissa handling, test infrastructure and the watchOS deployment
+  floor. Its public advisory API returned an empty array. Retain the reviewed
+  base and local deployment-floor adaptation.
+- Sparkle's latest release remains 2.10.1. Reviewed intervening commit
+  summaries covering installer behavior, appcast parsing, localization and
+  release tooling. All five published advisory ranges exclude the pinned
+  2.9.6 snapshot. Retain that snapshot and its local Argument Parser
+  integration; a source upgrade requires separate update qualification.
+
+Sources: [Citadel](https://github.com/orlandos-nl/Citadel),
+[NIOSSH](https://github.com/Joannis/swift-nio-ssh),
+[BigInt](https://github.com/attaswift/BigInt),
+[Sparkle](https://github.com/sparkle-project/Sparkle/releases/tag/2.10.1)
+and their public security-advisory APIs. Public listings cannot rule out
+unpublished vulnerabilities.
+
 ## Release readiness review — 2026-10-27
 
 Rechecked upstream revisions, release notes and public advisory APIs for 1.2.0.

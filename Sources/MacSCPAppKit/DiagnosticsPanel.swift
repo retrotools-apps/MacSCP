@@ -146,7 +146,8 @@ struct DiagnosticsPanel: View {
 
     private func serverInformation(_ measured: DiagnosticTable) -> some View {
         let systemFields: Set<String> = ["diagnostics.system.os", "diagnostics.system.kernel", "diagnostics.system.uptime",
-            "diagnostics.system.load", "diagnostics.system.memory", "diagnostics.system.disk", "diagnostics.system.users"]
+            "diagnostics.system.load", "diagnostics.system.memory", "diagnostics.system.disk", "diagnostics.system.users",
+            "diagnostics.system.devices", "diagnostics.system.storageSummary"]
         let system = measured.rows.filter { $0.count >= 2 && systemFields.contains($0[0]) }
         let network = measured.rows.filter { $0.count >= 2 && !systemFields.contains($0[0]) && $0[1] != "—" }
         return HStack(alignment: .top, spacing: 28) {
@@ -160,7 +161,7 @@ struct DiagnosticsPanel: View {
                             .frame(maxWidth: .infinity, alignment: .leading)
                     }
                     .help(cells[0] == "diagnostics.system.users"
-                          ? L10n.string("diagnostics.users.help", "Active login users / login accounts; service accounts are excluded where identifiable.") : "")
+                          ? L10n.string("diagnostics.users.help", "Active login users / regular local user accounts. Linux uses the configured UID range; root and system accounts are excluded.") : "")
                 }
             }.frame(maxWidth: .infinity, alignment: .leading)
             if !network.isEmpty {

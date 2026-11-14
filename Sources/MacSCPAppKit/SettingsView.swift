@@ -388,7 +388,7 @@ private struct GeneralSettingsSection: View {
         } footer: {
             Text(L10n.string(
                 "settings.general.diagnosticLogHint",
-                "Off by default, including system and session audit logs. Writes no passwords, keys or file contents."))
+                "Detailed logs are off by default. Recent connections and saved server information remain available. No passwords, keys or file contents are logged."))
                 .foregroundStyle(.secondary)
         }
     }

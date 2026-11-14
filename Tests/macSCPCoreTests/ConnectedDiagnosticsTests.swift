@@ -30,6 +30,48 @@ struct ConnectedDiagnosticsTests {
         #expect(await filesystem.calls == ["health", "health", "information false true /home/test"])
     }
 
+    @Test func groupedStorageReplacesTheRawPartitionAndMountLists() async {
+        let information = ServerNetworkAddresses.parse("""
+        os Synthetic Linux
+        disk 500 1000
+        volume\t500\t1000\t/dev/sda1\t/
+        blocks-json-begin
+        {"blockdevices":[{"name":"/dev/loop0","type":"loop","size":1000}]}
+        blocks-json-end
+        storage-summary-begin
+        storage-group\tsda\t1000\t200
+        storage-group\tsda\t2000\t800
+        storage-group\tmd0\t8192\t4096
+        storage-summary-end
+        """)
+        let capture = Capture()
+        let report = await ConnectedDiagnostics.collect(on: InformationFilesystem(information: information),
+            directory: "/", endpoint: nil, settings: .init(), appVersion: "fixture", observer: .init(),
+            accessProbe: { await $0() }, onInformation: { await capture.append($0) })
+        #expect(await capture.values.count == 1)
+        let rows = report.steps.last?.table?.rows ?? []
+        #expect(rows.contains(["diagnostics.system.storageSummary", "md0 — 8.0 KiB · 50.0%\nsda — 2.9 KiB · 33.3%"]))
+        #expect(rows.filter { $0.first == "diagnostics.system.storageSummary" }.count == 1)
+        #expect(!rows.contains { $0.first == "diagnostics.system.disk" || $0.first == "diagnostics.system.devices" })
+    }
+
+    private actor Capture {
+        var values: [ServerNetworkAddresses] = []
+        func append(_ value: ServerNetworkAddresses) { values.append(value) }
+    }
+
+    @Test func onlySuccessfulEnabledSystemCollectionPublishesAnOfflineInventory() async {
+        let capture = Capture()
+        for (enabled, failed) in [(true, false), (false, false), (true, true)] {
+            _ = await ConnectedDiagnostics.collect(on: InformationFilesystem(failsCommands: failed), directory: "/",
+                endpoint: nil, settings: .init(systemInformation: enabled, publicAddresses: true),
+                appVersion: "fixture", observer: .init(), accessProbe: { await $0() },
+                onInformation: { await capture.append($0) })
+        }
+        #expect(await capture.values.count == 1)
+        #expect(await capture.values.first?.system["os"] == "Debian GNU/Linux 13 (trixie)")
+    }
+
     @Test func unavailableCommandsDoNotTurnHealthyAccessIntoSSHFailure() async {
         let filesystem = InformationFilesystem(failsCommands: true)
         let report = await ConnectedDiagnostics.collect(on: filesystem, directory: "/",
@@ -104,7 +146,11 @@ private final class ProgressLog: @unchecked Sendable {
 private actor InformationFilesystem: RemoteFileSystem, ServerInformationProvider {
     private(set) var calls: [String] = []
     let failsCommands: Bool
-    init(failsCommands: Bool = false) { self.failsCommands = failsCommands }
+    let information: ServerNetworkAddresses?
+    init(failsCommands: Bool = false, information: ServerNetworkAddresses? = nil) {
+        self.failsCommands = failsCommands
+        self.information = information
+    }
     func stat(path: String) async throws -> RemoteFileItem {
         calls.append("stat \(path)")
         return RemoteFileItem(name: "test", path: path, kind: .directory)
@@ -112,6 +158,7 @@ private actor InformationFilesystem: RemoteFileSystem, ServerInformationProvider
     func serverInformation(includePublic: Bool, includeSystem: Bool, directory: String) async throws -> ServerNetworkAddresses {
         calls.append("information \(includePublic) \(includeSystem) \(directory)")
         if failsCommands { throw RemoteFSError.permissionDenied(path: directory) }
+        if let information { return information }
         return ServerNetworkAddresses.parse("""
         os Debian GNU/Linux 13 (trixie)
         uptime 1634580

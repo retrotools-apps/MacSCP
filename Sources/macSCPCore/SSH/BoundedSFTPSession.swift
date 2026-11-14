@@ -163,8 +163,10 @@ final class BoundedSFTPSession: Sendable {
 /// task keeps running on once that box is gone. What makes it safe is
 /// ownership, not luck: `openFile` returns a fresh handle per call, each
 /// of this project's two callers (`readStream`, `write`) keeps its own
-/// and never shares it, and the abandoned task's only remaining act is the
-/// one close it was handed.
+/// and shares it only with its bounded payload task group. Those tasks read
+/// `isActive` and allocate request IDs through Citadel's lock; request/reply
+/// bookkeeping runs on the event loop. The group drains before close can
+/// mutate `isActive`. An abandoned close task only performs its one close.
 ///
 /// One pair of tasks that this change makes possible for the FIRST time, and
 /// why it holds: a `closeBounded()` whose bound won leaves its operation task

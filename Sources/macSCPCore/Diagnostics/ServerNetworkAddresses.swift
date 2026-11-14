@@ -7,11 +7,21 @@ public protocol ServerInformationProvider: Sendable {
 }
 
 public struct ServerNetworkAddresses: Sendable, Equatable {
-    public struct InterfaceAddress: Sendable, Hashable {
+    public struct InterfaceAddress: Sendable, Hashable, Codable {
         public let interface: String
         public let address: String
     }
 
+    public struct Volume: Sendable, Equatable, Codable {
+        public let device: String
+        public let mount: String
+        public let availableBytes: UInt64
+        public let totalBytes: UInt64
+    }
+
+    public var volumes: [Volume] = []
+    public var storageDevices: [StorageDevice] = []
+    public var storageSummary: [StorageGroup]? = nil
     public let local: [InterfaceAddress]
     public let publicIPv4: String?
     public let publicIPv6: String?
@@ -22,10 +32,23 @@ public struct ServerNetworkAddresses: Sendable, Equatable {
         var ipv4: String?
         var ipv6: String?
         var system: [String: String] = [:]
+        var volumes: [Volume] = []
         for line in output.split(whereSeparator: \.isNewline) {
+            let volume = line.split(separator: "\t", omittingEmptySubsequences: false).map(String.init)
+            if volume.count == 5, volume[0] == "volume",
+               let available = UInt64(volume[1]), let total = UInt64(volume[2]), total > 0,
+               volume[3...4].allSatisfy({ !$0.isEmpty && $0.utf8.count <= 1024
+                   && !$0.unicodeScalars.contains(where: CharacterSet.controlCharacters.contains) }) {
+                let entry = Volume(device: URLText.withoutUserinfo(volume[3]), mount: volume[4],
+                                   availableBytes: min(available, total), totalBytes: total)
+                if !volumes.contains(where: { $0.device == entry.device && $0.mount == entry.mount }) {
+                    volumes.append(entry)
+                }
+                continue
+            }
             let fields = line.split(whereSeparator: \.isWhitespace).map(String.init)
             if let key = fields.first,
-               ["os", "kernel", "uptime", "load", "memory", "disk", "users"].contains(key) {
+               ["os", "kernel", "uptime", "load", "memory", "disk", "users", "account-scope"].contains(key) {
                 let value = fields.dropFirst().joined(separator: " ").trimmingCharacters(in: CharacterSet(charactersIn: "\"'"))
                 if !value.isEmpty, value.utf8.count <= 512,
                    !value.unicodeScalars.contains(where: CharacterSet.controlCharacters.contains) {
@@ -56,7 +79,7 @@ public struct ServerNetworkAddresses: Sendable, Equatable {
                 }
             }
         }
-        return Self(local: local, publicIPv4: ipv4, publicIPv6: ipv6, system: system)
+        return Self(volumes: volumes, storageDevices: storageDevices(in: output), storageSummary: storageSummary(in: output), local: local, publicIPv4: ipv4, publicIPv6: ipv6, system: system)
     }
 
     /// Fixed commands; the selected directory is passed as one shell-quoted argument.
@@ -111,13 +134,9 @@ public struct ServerNetworkAddresses: Sendable, Equatable {
             done
             [ -z "$total" ] || printf 'memory %s %s\n' "$available" "$total"
           fi
-          accounts=
-          if command -v getent >/dev/null 2>&1 && entries=$(getent passwd 2>/dev/null); then
-            accounts=$(printf '%s\n' "$entries" | awk -F: '$7!="" && $7!~/\/(nologin|false|sync|shutdown|halt)$/ {n++} END {print n+0}')
-          elif [ -r /etc/passwd ]; then
-            accounts=$(awk -F: '$7!="" && $7!~/\/(nologin|false|sync|shutdown|halt)$/ {n++} END {print n+0}' /etc/passwd)
-          fi
+        """# + "\n" + ServerLoginAccounts.linuxCommand + "\n" + #"""
         fi
+        [ -z "$accounts" ] || printf 'account-scope regular-local\n'
         printf 'kernel '; uname -sr 2>/dev/null
         if command -v who >/dev/null 2>&1 && people=$(who 2>/dev/null); then
           printf '%s\n' "$people" | awk -v accounts="$accounts" 'NF && !seen[$1]++ {n++} END {print "users", n+0, accounts}'
@@ -125,22 +144,40 @@ public struct ServerNetworkAddresses: Sendable, Equatable {
         """#
         let path = PosixQuoting.singleQuoted(directory.hasPrefix("/") ? directory : "./" + directory)
         let disk = "\ndf -Pk \(path) 2>/dev/null | awk 'NR==2 {printf \"disk %.0f %.0f\\n\", $4*1024, $2*1024}'\n"
-        let local = interfaces + (includeSystem ? "\n" + system + disk : "")
+        let volumes = #"""
+        if [ "$(uname -s 2>/dev/null)" != Linux ]; then
+        df -Pk 2>/dev/null | awk 'NR>1 && $2 ~ /^[0-9]+$/ && $4 ~ /^[0-9]+$/ && $2>0 {
+          device=$1
+          if (device ~ /^(tmpfs|devtmpfs|devfs|proc|sysfs|cgroup|map|none|shm)$/) next
+          mount=$0; for(i=0;i<5;i++) sub(/^[^ \t]+[ \t]+/, "", mount)
+          printf "volume\t%.0f\t%.0f\t%s\t%s\n", $4*1024, $2*1024, device, mount
+        }'
+        fi
+        """#
+        let local = interfaces + (includeSystem ? "\n" + system + disk + volumes + "\n" + storageCommand : "")
         guard includePublic else { return local }
         return local + "\n" + #"""
-        v4=; v6=
-        if command -v curl >/dev/null 2>&1; then
-          v4=$(curl -q -4 -fsS --noproxy '*' --connect-timeout 2 --max-time 3 --max-filesize 256 --proto '=https' https://api.ipify.org 2>/dev/null)
-          v6=$(curl -q -6 -fsS --noproxy '*' --connect-timeout 2 --max-time 3 --max-filesize 256 --proto '=https' https://api6.ipify.org 2>/dev/null)
-          [ -z "$v4" ] || printf 'public %s\n' "$v4"
-          [ -z "$v6" ] || printf 'public %s\n' "$v6"
-        fi
-        if [ -z "$v4" ] && command -v host >/dev/null 2>&1; then
-          host -W 2 -t A myip.opendns.com resolver1.opendns.com 2>/dev/null | awk '/has address/ {print "public", $NF}'
-        fi
-        if { [ -z "$v4" ] || [ -z "$v6" ]; } && command -v nslookup >/dev/null 2>&1; then
-          nslookup -timeout=2 -retry=1 -type=TXT o-o.myaddr.l.google.com ns1.google.com 2>/dev/null | awk '/text =/ {gsub(/"/, "", $NF); print "public", $NF}'
-        fi
+        (
+          v4=
+          if command -v curl >/dev/null 2>&1; then
+            v4=$(curl -q -4 -fsS --noproxy '*' --connect-timeout 2 --max-time 3 --max-filesize 256 --proto '=https' https://api.ipify.org 2>/dev/null)
+          fi
+          if [ -n "$v4" ]; then printf 'public %s\n' "$v4"
+          elif command -v host >/dev/null 2>&1; then
+            host -W 2 -t A myip.opendns.com resolver1.opendns.com 2>/dev/null | awk '/has address/ {print "public", $NF}'
+          fi
+        ) &
+        (
+          v6=
+          if command -v curl >/dev/null 2>&1; then
+            v6=$(curl -q -6 -fsS --noproxy '*' --connect-timeout 2 --max-time 3 --max-filesize 256 --proto '=https' https://api6.ipify.org 2>/dev/null)
+          fi
+          if [ -n "$v6" ]; then printf 'public %s\n' "$v6"
+          elif command -v nslookup >/dev/null 2>&1; then
+            nslookup -timeout=2 -retry=1 -type=TXT o-o.myaddr.l.google.com ns1.google.com 2>/dev/null | awk '/text =/ {gsub(/"/, "", $NF); print "public", $NF}'
+          fi
+        ) &
+        wait
         :
         """#
     }

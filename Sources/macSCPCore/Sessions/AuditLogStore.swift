@@ -68,8 +68,8 @@ public final class AuditLogStore: @unchecked Sendable {
     /// replace the whole on-disk history rather than append to it.
     private var partiallyRead: Set<UUID> = []
 
-    /// Always uses the production cap. The application supplies a live opt-in
-    /// gate; standalone stores default to recording for explicit callers.
+    /// Always uses the production cap. Connection boundaries are retained
+    /// independently; the live opt-in gate controls detailed actions.
     public init(directory: URL, isLoggingEnabled: @escaping @Sendable () -> Bool = { true }) {
         self.directory = directory
         self.maxEntries = Self.maxEntriesPerSession
@@ -102,12 +102,19 @@ public final class AuditLogStore: @unchecked Sendable {
     /// `queue.sync`) always observes a state consistent with every `append`
     /// submitted before it — FIFO ordering on a serial queue is the flush.
     public func append(_ event: AuditEvent, for sessionID: UUID) {
-        guard isLoggingEnabled() else { return }
+        let isConnectionBoundary = [.connected, .disconnected, .connectFailed, .hostKeyReplaced].contains(event.kind)
+        guard isConnectionBoundary || isLoggingEnabled() else { return }
         queue.async { [self] in
-            guard isLoggingEnabled() else { return }
+            let detailed = isLoggingEnabled()
+            guard isConnectionBoundary || detailed else { return }
             loadIfNeeded(sessionID)
             var events = cache[sessionID] ?? []
-            events.append(event)
+            // Recent connections remain available without detailed logging.
+            // Drop endpoint/user detail from successful boundaries when off.
+            let recorded = detailed || event.kind == .connectFailed || event.kind == .hostKeyReplaced ? event : AuditEvent(
+                id: event.id, timestamp: event.timestamp, kind: event.kind,
+                detail: event.kind == .connected ? ConnectionHistory.summaryOnlyConnection : event.kind.rawValue)
+            events.append(recorded)
             if events.count > maxEntries {
                 events.removeFirst(events.count - maxEntries)
             }

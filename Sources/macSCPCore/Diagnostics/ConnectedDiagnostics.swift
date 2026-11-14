@@ -16,13 +16,14 @@ public enum ConnectedDiagnostics {
     public static func run(
         on filesystem: any RemoteFileSystem, directory: String,
         endpoint: Endpoint?, settings: DiagnosticCollectionSettings,
-        appVersion: String, observer: DiagnosticRunObserver
+        appVersion: String, observer: DiagnosticRunObserver,
+        onInformation: @escaping @Sendable (ServerNetworkAddresses) async -> Void = { _ in }
     ) async -> DiagnosticReport {
         await collect(on: filesystem, directory: directory, endpoint: endpoint,
             settings: settings, appVersion: appVersion, observer: observer, accessProbe: { operation in
                 let answer = await DetachedProbe.run(timeout: .seconds(5), operation)
                 return answer.value == true
-            })
+            }, onInformation: onInformation)
     }
 
     /// Collection tests can execute the access operation deterministically;
@@ -31,7 +32,8 @@ public enum ConnectedDiagnostics {
         on filesystem: any RemoteFileSystem, directory: String,
         endpoint: Endpoint?, settings: DiagnosticCollectionSettings,
         appVersion: String, observer: DiagnosticRunObserver,
-        accessProbe: @Sendable (_ operation: @escaping @Sendable () async -> Bool) async -> Bool
+        accessProbe: @Sendable (_ operation: @escaping @Sendable () async -> Bool) async -> Bool,
+        onInformation: @Sendable (ServerNetworkAddresses) async -> Void = { _ in }
     ) async -> DiagnosticReport {
         var steps: [DiagnosticStep] = []
         func report() -> DiagnosticReport {
@@ -61,6 +63,11 @@ public enum ConnectedDiagnostics {
         do {
             let result = try await provider.serverInformation(includePublic: settings.publicAddresses, includeSystem: settings.systemInformation, directory: directory)
             try Task.checkCancellation()
+            if settings.systemInformation,
+               !result.system.isEmpty || !result.volumes.isEmpty || !result.storageDevices.isEmpty
+                || result.storageSummary?.isEmpty == false {
+                await onInformation(result)
+            }
             var rows: [[String]] = []
             if settings.systemInformation {
                 for (key, title) in [
@@ -72,7 +79,24 @@ public enum ConnectedDiagnostics {
                     ("disk", "diagnostics.system.disk"),
                     ("users", "diagnostics.system.users")
                 ] {
+                    if key == "disk", !result.volumes.isEmpty || result.storageSummary?.isEmpty == false { continue }
                     if let value = result.system[key] { rows.append([title, ServerSystemFormatting.value(value, field: key)]) }
+                }
+                if let summary = result.storageSummary {
+                    if !summary.isEmpty {
+                        rows.append(["diagnostics.system.storageSummary", summary.map {
+                            "\($0.name) — \($0.diagnosticText)"
+                        }.joined(separator: "\n")])
+                    }
+                } else {
+                    rows += result.volumes.map { volume in
+                        ["diagnostics.system.disk", "\(volume.device) — \(volume.mount)\n"
+                            + ServerSystemFormatting.value("\(volume.availableBytes) \(volume.totalBytes)", field: "disk")]
+                    }
+                    rows += result.storageDevices.map { device in
+                        ["diagnostics.system.devices", "\(device.name) (\(device.kind))\n"
+                            + SessionServerSnapshot.capacityText(device.totalBytes)]
+                    }
                 }
                 let interfaces = Dictionary(grouping: result.local, by: \.interface)
                 rows += interfaces.keys.sorted().map { [$0, interfaces[$0, default: []].map(\.address).joined(separator: "\n")] }

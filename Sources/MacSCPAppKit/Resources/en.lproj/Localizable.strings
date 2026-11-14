@@ -762,7 +762,7 @@
 "settings.general.diagnosticLog.info" = "Info";
 "settings.general.diagnosticLog.debug" = "Debug";
 "settings.general.diagnosticLog.reveal" = "Show in Finder";
-"settings.general.diagnosticLogHint" = "Off by default, including system and session audit logs. Writes no passwords, keys or file contents.";
+"settings.general.diagnosticLogHint" = "Detailed logs are off by default. Recent connections and saved server information remain available. No passwords, keys or file contents are logged.";
 "sidebar.group.expanded" = "Expanded";
 "sidebar.group.collapsed" = "Collapsed";
 "group.cards.empty" = "No saved sessions in this group.";
@@ -1583,7 +1583,6 @@
 "settings.general.language.es" = "Español";
 "settings.general.language.ro" = "Română";
 "settings.general.language.it" = "Italiano";
-"overview.history.disabled" = "Connection history is recorded only when diagnostic logging is enabled in Settings.";
 // Built-in file tools
 "filetools.unsupported" = "This server does not support windowed file access.";
 "filetools.textOnly" = "Binary or non-UTF-8 content: use the hexadecimal viewer instead.";
@@ -1680,7 +1679,7 @@
 "diagnostics.ready" = "Ready to run diagnostics";
 "diagnostics.section.system" = "System";
 "diagnostics.section.network" = "Network";
-"diagnostics.users.help" = "Active login users / login accounts; service accounts are excluded where identifiable.";
+"diagnostics.users.help" = "Active login users / regular local user accounts. Linux uses the configured UID range; root and system accounts are excluded.";
 "diagnostics.speed.upload" = "Upload";
 "diagnostics.speed.download" = "Download";
 "diagnostics.speed.cleanup" = "Removing test file…";
@@ -1795,3 +1794,41 @@
 "archive.import.tunnels %lld %lld %lld %lld" = "Tunnels: %lld imported, %lld replaced, %lld renamed, %lld kept local";
 "share.import.result %lld %lld %lld %lld %lld" = "Connections: %lld imported, %lld replaced, %lld renamed, %lld kept local\nImported tunnels: %lld\nLogins must be entered on this Mac.";
 "import.conflict.replaceSettingsNote" = "Replacing overwrites the local item’s settings.";
+
+"overview.snapshot.title" = "Last known server information";
+"overview.snapshot.date" = "Saved %@ · not live";
+"overview.snapshot.accounts" = "Local user accounts";
+"overview.snapshot.memory" = "Total memory";
+"overview.snapshot.volumes" = "Storage volumes (%lld) — total capacity per mount";
+
+"diagnostics.system.devices" = "Disks and partitions";
+
+"diagnostics.system.storageSummary" = "Storage by disk or volume";
+
+"overview.snapshot.disks" = "Storage (%lld) — mounted capacity by disk or volume";
+
+"overview.snapshot.public" = "Public addresses";
+
+"overview.snapshot.ram" = "RAM";
+
+"overview.snapshot.storage" = "Storage";
+
+"overview.snapshot.moreStorage" = "+%lld more";
+
+"overview.secret.passphrase" = "Key passphrase";
+
+"overview.snapshot.accounts.raw" = "Login accounts";
+
+
+
+
+"tofu.replaceChangedKey" = "Replace host key";
+"tofu.replaceFailed" = "The key could not be replaced. Run the connection again to review the current key.";
+
+"tofu.changed.warning" = "The server identity has changed. The connection was stopped. Verify the new fingerprint independently before replacing the saved key.";
+
+"tofu.changed.saved" = "Saved fingerprint";
+
+"tofu.changed.presented" = "Presented fingerprint";
+
+"audit.kind.hostKeyReplaced" = "Host key replaced";

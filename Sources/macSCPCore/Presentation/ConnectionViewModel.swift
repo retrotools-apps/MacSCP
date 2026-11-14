@@ -729,6 +729,7 @@ public final class ConnectionViewModel {
     /// fills them, so a fifth statement would push `state = newState` out of
     /// the window the guard reads.
     public private(set) var lastFailureRemedy: ConnectFailureRemedy?
+    public private(set) var lastHostKeyMismatch: HostKeyMismatchDetails?
 
     /// Identifies whichever `connect()` call is currently allowed to write
     /// to this instance (connection-liveness plan, Task 6 fix round 1).
@@ -1010,6 +1011,7 @@ public final class ConnectionViewModel {
         lastFailureReason = nil
         lastFailureCategory = nil
         lastFailureRemedy = nil
+        lastHostKeyMismatch = nil
         let myAttempt = UUID()
         currentAttempt = myAttempt
         // Assigned WITH the attempt, and after the refusal above — see
@@ -1107,6 +1109,9 @@ public final class ConnectionViewModel {
             // hard stop, evaluated before the decider is ever asked), so it
             // is the one host-key outcome this catch has to log itself.
             if let hostKeyError = error as? HostKeyError, case .mismatch = hostKeyError {
+                if case .mismatch(let host, let expected, let presented, let candidate) = hostKeyError {
+                    lastHostKeyMismatch = .init(host: host, expected: expected, presented: presented, candidate: candidate)
+                }
                 DiagnosticLog.shared.log(.info, "connect", "hostkey mismatch")
             }
             // The ORIGINAL `error`, not `lastFailureReason` (fix round 1,
@@ -1289,6 +1294,19 @@ public final class ConnectionViewModel {
         default:
             return nil
         }
+    }
+
+    /// Explicit post-failure trust update. The aborted handshake is never resumed.
+    public func replaceChangedHostKey(in store: KnownHostsStore, auditStore: AuditLogStore) throws -> Bool {
+        guard let change = lastHostKeyMismatch, try store.replaceChangedKey(change) else { return false }
+        let port = change.candidate?.port ?? 22
+        let detail = "host key replaced host=\(change.host) port=\(port) expected=\(change.expected) presented=\(change.presented)"
+        auditStore.append(AuditEvent(kind: .hostKeyReplaced, detail: detail),
+                          for: AdHocAudit.logSessionID(storedID: attemptOrigin))
+        DiagnosticLog.shared.log(.info, "connect", detail)
+        lastHostKeyMismatch = nil
+        state = .idle
+        return true
     }
 
     /// The form's key path as the file system spells it: trimmed, then
@@ -2485,7 +2503,7 @@ public final class ConnectionViewModel {
             return .failed(
                 message: CoreL10n.string("core.connect.keyUnsupportedFormat"),
                 field: Self.sshField(.keyPath))
-        case HostKeyError.mismatch(let host, let expected, let presented):
+        case HostKeyError.mismatch(let host, let expected, let presented, _):
             return .failed(
                 message: String(
                     format: CoreL10n.string("core.hostkey.mismatch %@ %@ %@"),

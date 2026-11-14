@@ -74,6 +74,7 @@ struct SessionOverviewView: View {
             ScrollView(.vertical) {
                 VStack(alignment: .leading, spacing: 20) {
                     factsSection
+                    serverSnapshotSection
                     historySection
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
@@ -283,7 +284,7 @@ struct SessionOverviewView: View {
                  isMonospaced: $0.isMonospaced)
         }
         if let line = hostKeyLine(model.hostKey) { lines.append(line) }
-        if let line = secretLine(model.hasStoredSecret) { lines.append(line) }
+        if let line = secretLine(model.secretSummary) { lines.append(line) }
         return lines
     }
 
@@ -306,17 +307,19 @@ struct SessionOverviewView: View {
         }
     }
 
-    /// `nil` yields no row: a login that keeps its key in the ssh-agent
-    /// stores nothing, and "no secret stored" would read there as a warning
-    /// about a setup that is complete.
-    private func secretLine(_ stored: Bool?) -> Line? {
-        guard let stored else { return nil }
-        return Line(
-            id: "secret", label: L10n.string("overview.secret", "Password"),
-            text: stored
-                ? L10n.string("overview.secret.stored", "Saved in the keychain")
-                : L10n.string("overview.secret.missing", "Not saved — asked at connect"),
-            isMonospaced: false)
+    /// A missing key passphrase is not evidence that a login password is
+    /// required. Only show a passphrase row when one is actually stored.
+    private func secretLine(_ summary: SessionOverviewModel.SecretSummary?) -> Line? {
+        guard let summary else { return nil }
+        switch summary {
+        case .storedKeyPassphrase:
+            return Line(id: "secret", label: L10n.string("overview.secret.passphrase", "Key passphrase"),
+                        text: L10n.string("overview.secret.stored", "Saved in the keychain"), isMonospaced: false)
+        case .loginSecret(let stored):
+            return Line(id: "secret", label: L10n.string("overview.secret", "Password"),
+                        text: stored ? L10n.string("overview.secret.stored", "Saved in the keychain")
+                            : L10n.string("overview.secret.missing", "Not saved — asked at connect"), isMonospaced: false)
+        }
     }
 
     @ViewBuilder
@@ -359,17 +362,25 @@ struct SessionOverviewView: View {
     }
 
     private func factCell(_ line: Line) -> some View {
-        VStack(alignment: .leading, spacing: 1) {
+        HStack(alignment: .firstTextBaseline, spacing: 8) {
             Text(line.label)
                 .font(.caption)
                 .foregroundStyle(DesignTokens.inkTertiary)
+                .frame(width: 92, alignment: .leading)
             Text(line.text)
                 .font(line.isMonospaced ? .system(.callout, design: .monospaced) : .callout)
                 .foregroundStyle(DesignTokens.ink)
                 .textSelection(.enabled)
-                .fixedSize(horizontal: false, vertical: true)
+                .lineLimit(1).truncationMode(.middle).help(line.text)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    @ViewBuilder
+    private var serverSnapshotSection: some View {
+        if let snapshot = model?.serverSnapshot {
+            SessionServerSnapshotView(snapshot: snapshot)
+        }
     }
 
     // MARK: - Recent connections
@@ -380,7 +391,7 @@ struct SessionOverviewView: View {
             VStack(alignment: .leading, spacing: 8) {
                 sectionTitle(L10n.string("overview.section.history", "Recent connections"))
                 if model.history.isEmpty {
-                    Text(Self.historyEmptyLabel(recordingEnabled: DiagnosticLog.shared.isEnabled(.error)))
+                    Text(Self.historyEmptyLabel())
                         .font(.callout)
                         .foregroundStyle(DesignTokens.inkTertiary)
                 } else {
@@ -451,6 +462,9 @@ struct SessionOverviewView: View {
             )
             .font(.caption)
             .foregroundStyle(DesignTokens.inkSecondary)
+        case .hostKeyReplaced:
+            L10n.text("audit.kind.hostKeyReplaced", "Host key replaced")
+                .font(.caption).foregroundStyle(DesignTokens.inkSecondary)
         case .failed(let reason):
             Text(reason)
                 .font(.caption)
@@ -468,7 +482,8 @@ struct SessionOverviewView: View {
     /// not a sentence with plurals: the three numbers are the point, and a
     /// symbol carries no plural category to get wrong in four languages.
     private func transfersText(_ row: ConnectionHistory.Row) -> String {
-        String(
+        guard row.transferCountsAvailable else { return "—" }
+        return String(
             format: L10n.string(
                 "overview.history.transfers %1$lld %2$lld %3$lld", "↑%1$lld ↓%2$lld ✗%3$lld"),
             row.uploads, row.downloads, row.failedTransfers)
@@ -482,10 +497,7 @@ struct SessionOverviewView: View {
     // MARK: - Shared bits
 
     private func sectionTitle(_ text: String) -> some View {
-        Text(text)
-            .font(.caption.weight(.semibold))
-            .foregroundStyle(DesignTokens.inkTertiary)
-            .textCase(.uppercase)
+        SessionOverviewSectionHeading(title: text)
     }
 
     private func columnTitle(_ text: String) -> some View {
@@ -496,10 +508,8 @@ struct SessionOverviewView: View {
 
     // MARK: - Loading
 
-    nonisolated static func historyEmptyLabel(recordingEnabled: Bool) -> String {
-        recordingEnabled
-            ? L10n.string("overview.history.empty", "Nothing recorded for this connection yet.")
-            : L10n.string("overview.history.disabled", "Connection history is recorded only when diagnostic logging is enabled in Settings.")
+    nonisolated static func historyEmptyLabel() -> String {
+        L10n.string("overview.history.empty", "Nothing recorded for this connection yet.")
     }
 
     nonisolated static func load(
@@ -521,6 +531,8 @@ struct SessionOverviewView: View {
             secrets: secrets,
             events: AuditLogStore(directory: directory.appendingPathComponent("audit", isDirectory: true))
                 .events(for: session.id),
-            groupName: groupName, loginSetName: loginSetName)
+            groupName: groupName, loginSetName: loginSetName,
+            serverSnapshot: SessionServerSnapshotStore(directory: directory).load(for: session),
+            loginSet: (try? LoginSetStore(directory: directory).all())?.first { $0.id == session.loginSetID })
     }
 }

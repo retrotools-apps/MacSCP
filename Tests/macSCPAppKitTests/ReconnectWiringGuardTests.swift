@@ -370,7 +370,7 @@ struct ReconnectWiringGuardTests {
             reason: "`handleAdHocConnected` — the ad-hoc path's hand-off, behind its own attempt-token check."),
         SanctionedSite(
             file: "Sources/MacSCPAppKit/ContentView.swift",
-            code: "startSession(in: tab, with: fs, storedName: stored.name, startPath: home)",
+            code: "startSession(in: tab, with: fs, storedName: stored.name, startPath: home, storedSessionID: stored.id)",
             occurrences: 1,
             reason: "`connect(in:stored:)` — the stored-session path's hand-off, behind its own attempt-token check."),
         SanctionedSite(

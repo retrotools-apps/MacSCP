@@ -1,5 +1,14 @@
 # Changelog
 
+## [1.5.0] (2026-11-14)
+
+### Highlights
+
+* **transfers:** Faster SFTP transfers on high-latency links and a compact transfer panel that follows active files.
+* **connections:** Restore local and remote folders, with automatic home fallback when unavailable.
+* **diagnostics:** Keep recent connections and compact offline server summaries, with improved network, account and disk reporting.
+* **security:** Replace changed SSH host keys explicitly from a readable warning and record the operation in connection history.
+
 ## [1.4.4] (2026-11-04)
 
 ### Highlights

@@ -1115,16 +1115,35 @@ struct ContentView: View {
         guard let stored = persistFormAsSession(form) else { return }
         form.shouldSaveSession = false
         form.beginEditing(stored)
+        if form.kind == .ssh, let session = tab.session {
+            let locations = BrowserLocationStore(host: form.host, port: form.port,
+                username: form.username, sessionID: stored.id)
+            if session.local.state == .loaded { locations.save(session.local.currentPath, for: .local) }
+            if session.remote.state == .loaded { locations.save(session.remote.currentPath, for: .remote) }
+            session.local.locationSink = { locations.save($0, for: .local) }
+            session.remote.locationSink = { locations.save($0, for: .remote) }
+        }
     }
 
     func startSession(
         in tab: SessionTab, with fs: any RemoteFileSystem, storedName: String? = nil,
-        startPath: String = "/"
+        startPath: String = "/", storedSessionID: UUID? = nil
     ) {
         // Clear any stale edit error from a previous session so a late
         // openInEditor task cannot misattribute its failure to this session.
         tab.editErrorMessage = nil
         let form = tab.connectionViewModel
+        var titleName = storedName
+        // M31: hoisted out of the branch below so the audit recorder can be
+        // attached for BOTH cases -- see the comment at the attach itself.
+        var storedSession: StoredSession?
+        if form.shouldSaveSession {
+            let stored = persistFormAsSession(form)
+            storedSession = stored
+            tab.activeStoredSessionID = stored?.id
+            form.shouldSaveSession = false
+            titleName = stored?.name ?? titleName
+        }
         // One UUID, shared by the session and its edit manager (M5e/T4) — see
         // `BrowserSession.id`'s doc comment.
         let sessionID = UUID()
@@ -1147,15 +1166,20 @@ struct ContentView: View {
         // folder — the folder one keeps returning to — does not spend a
         // fresh thread rediscovering the same stuck entry on every visit.
         let stuckPaths = StuckPaths()
+        let locations = form.kind == .ssh
+            ? BrowserLocationStore(host: form.host, port: form.port, username: form.username,
+                                   sessionID: storedSessionID ?? storedSession?.id) : nil
         tab.session = BrowserSession(
             id: sessionID,
             localFS: LocalFileSystem(fetchesOwnerGroup: wantsOwnerGroup, stuckPaths: stuckPaths),
             remoteFS: fs,
             local: RemoteBrowserViewModel(
                 fs: LocalFileSystem(fetchesOwnerGroup: wantsOwnerGroup, stuckPaths: stuckPaths),
-                startPath: NSHomeDirectory(),
-                logCategory: "browser.local"),
-            remote: RemoteBrowserViewModel(fs: fs, startPath: startPath, logCategory: "browser.remote"),
+                startPath: locations?.path(for: .local) ?? NSHomeDirectory(),
+                logCategory: "browser.local", initialFallbackPath: NSHomeDirectory()),
+            remote: RemoteBrowserViewModel(
+                fs: fs, startPath: locations?.path(for: .remote) ?? startPath,
+                logCategory: "browser.remote", initialFallbackPath: startPath),
 
             editManager: EditSessionManager(sessionID: sessionID, queue: queue),
             // Both callers of `startSession` already resolved this via
@@ -1164,6 +1188,8 @@ struct ContentView: View {
             // the liveness probe, see `BrowserSession.homePath`'s doc comment.
             homePath: startPath
         )
+        tab.session?.local.locationSink = { locations?.save($0, for: .local) }
+        tab.session?.remote.locationSink = { locations?.save($0, for: .remote) }
         // Fresh liveness for a fresh session (Task 4, fix round 1):
         // `SessionTab.liveness` lives on the tab, not the session (see that
         // property's own doc comment for why), so it needs its own reset
@@ -1205,18 +1231,6 @@ struct ContentView: View {
         // the minimum size, and never smaller than the window already is.
         // The decisions are `MainWindowSizePlan`'s; see `growToBrowserSize()`.
         growToBrowserSize()
-
-        var titleName = storedName
-        // M31: hoisted out of the branch below so the audit recorder can be
-        // attached for BOTH cases -- see the comment at the attach itself.
-        var storedSession: StoredSession?
-        if form.shouldSaveSession {
-            let stored = persistFormAsSession(form)
-            storedSession = stored
-            tab.activeStoredSessionID = stored?.id
-            form.shouldSaveSession = false
-            titleName = stored?.name ?? titleName
-        }
 
         // Audit recorder (M9b/T3, un-nested in M31). This used to sit INSIDE
         // the branch above, so the audit trail depended on whether the
@@ -1477,7 +1491,7 @@ struct ContentView: View {
                     await fs.disconnect()
                     return
                 }
-                startSession(in: tab, with: fs, storedName: stored.name, startPath: home)
+                startSession(in: tab, with: fs, storedName: stored.name, startPath: home, storedSessionID: stored.id)
                 tab.activeStoredSessionID = stored.id
                 // And the restored pointer with it: a connected tab shows
                 // its browser, and on a later disconnect it should fall

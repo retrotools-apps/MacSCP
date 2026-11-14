@@ -49,6 +49,43 @@ struct RemoteBrowserViewModelTests {
         #expect(vm.currentPath == path)
         #expect(vm.state == .loaded)
     }
+    @Test(arguments: [RemoteFSError.notFound(path: "/saved"), .permissionDenied(path: "/saved")])
+    func inaccessibleSavedDirectoryFallsBackToHome(error: RemoteFSError) async {
+        let fs = MockRemoteFileSystem(tree: ["/home/fixture": []])
+        await fs.setListFailure(error, at: "/saved")
+        let vm = RemoteBrowserViewModel(fs: fs, startPath: "/saved", initialFallbackPath: "/home/fixture")
+        var saved: [String] = []
+        vm.locationSink = { saved.append($0) }
+        await vm.loadIfNeeded()
+        #expect(vm.currentPath == "/home/fixture")
+        #expect(vm.state == .loaded)
+        #expect(saved == ["/home/fixture"])
+        #expect(await fs.listCallCounts["/saved"] == 1)
+        #expect(await fs.listCallCounts["/home/fixture"] == 1)
+    }
+
+    @Test func validSavedDirectoryIsKeptAndFailedNavigationIsNotSaved() async {
+        let fs = MockRemoteFileSystem(tree: ["/saved": []])
+        let vm = RemoteBrowserViewModel(fs: fs, startPath: "/saved", initialFallbackPath: "/home/fixture")
+        var saved: [String] = []
+        vm.locationSink = { saved.append($0) }
+        await vm.loadIfNeeded()
+        #expect(vm.currentPath == "/saved")
+        #expect(await fs.listCallCounts["/home/fixture"] == nil)
+        _ = await vm.navigate(to: "/missing")
+        #expect(saved == ["/saved"])
+    }
+
+    @Test func unavailableHomeReportsFailureWithoutRetryLoop() async {
+        let fs = MockRemoteFileSystem()
+        let vm = RemoteBrowserViewModel(fs: fs, startPath: "/saved", initialFallbackPath: "/home/fixture")
+        await vm.loadIfNeeded()
+        await vm.loadIfNeeded()
+        #expect(vm.currentPath == "/home/fixture")
+        #expect(vm.state != .loaded)
+        #expect(await fs.listCallCounts["/home/fixture"] == 1)
+    }
+
     private func makeFS() -> MockRemoteFileSystem {
         MockRemoteFileSystem(tree: [
             "/": [

@@ -21,13 +21,21 @@ struct SessionRecentConnectionsTests {
         #expect(store.events(for: session.id).count == 8)
     }
 
-    @Test func aDisabledHistoryExplainsTheRecordingSetting() {
-        #expect(SessionOverviewView.historyEmptyLabel(recordingEnabled: false)
-            == L10n.string("overview.history.disabled", "missing"))
-        #expect(SessionOverviewView.historyEmptyLabel(recordingEnabled: true)
-            == L10n.string("overview.history.empty", "missing"))
-        #expect(SessionOverviewView.historyEmptyLabel(recordingEnabled: false)
-            != SessionOverviewView.historyEmptyLabel(recordingEnabled: true))
+    @Test func emptyHistoryDoesNotDependOnTheDiagnosticSetting() {
+        #expect(SessionOverviewView.historyEmptyLabel() == L10n.string("overview.history.empty", "missing"))
+    }
+
+    @Test func overviewLoadsADatedInventoryWithoutOpeningAConnection() async throws {
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: directory) }
+        let session = StoredSession(name: "Fixture", ssh: .init(host: "fixture.invalid", username: "fixture", authKind: .agent))
+        let information = ServerNetworkAddresses.parse("os Synthetic Linux\nmemory 100 1000\nusers 0 4")
+        let snapshot = SessionServerSnapshot(session: session, information: information,
+            collectedAt: Date(timeIntervalSince1970: 12345))
+        SessionServerSnapshotStore(directory: directory).save(snapshot, for: session)
+        let model = await SessionOverviewView.load(session: session, groupName: nil, loginSetName: nil,
+            directory: directory, secrets: NoSecrets())
+        #expect(model.serverSnapshot == snapshot)
     }
 
     private struct NoSecrets: SecretPresence {

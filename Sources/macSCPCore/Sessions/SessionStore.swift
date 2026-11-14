@@ -184,6 +184,7 @@ public struct SessionStore: Sendable {
             file.groups[index].sshRelaySessionID = nil
         }
         try persist(file)
+        SessionServerSnapshotStore(directory: directory).delete(for: id)
     }
 
     /// Clears group references to a login set in the same atomic write as a

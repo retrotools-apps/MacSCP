@@ -73,6 +73,7 @@ public struct AuditEvent: Codable, Equatable, Sendable, Identifiable {
         case editUpload
         case crossSessionTransfer
         case plaintextConfirmed
+        case hostKeyReplaced
     }
 }
 

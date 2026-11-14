@@ -42,6 +42,7 @@ extension ContentView {
 
     func showDiagnostics(for source: DiagnosticsSource) {
         let target: DiagnosticsTarget
+        let snapshotSession: StoredSession?
         let existingConnection: (any RemoteFileSystem)?
         let directory: String
         let transferAllowed: @MainActor () -> Bool
@@ -52,6 +53,15 @@ extension ContentView {
             transferAllowed = { !tab.transferQueue.isActive }
             let stored = sessionListViewModel.sessions.first {
                 $0.id == tab.activeStoredSessionID
+            }
+            snapshotSession = stored.flatMap { candidate in
+                // A saved record may have been edited while this tab kept
+                // its original connection. Do not label the old host's
+                // inventory with the edited endpoint's identity.
+                guard let ssh = candidate.ssh,
+                      ssh.host.lowercased() == tab.connectionViewModel.host.trimmingCharacters(in: .whitespacesAndNewlines).lowercased(),
+                      ssh.port == Int(tab.connectionViewModel.port) else { return nil }
+                return candidate
             }
             // The form's jump — where and who, as the tab dialled — with the
             // secret looked up through the stored session behind the tab,
@@ -68,6 +78,7 @@ extension ContentView {
                         stored: stored.flatMap(sessionListViewModel.diagnosticJump(for:)))
                     : nil)
         case .stored(let stored):
+            snapshotSession = stored
             existingConnection = nil
             directory = "/"
             transferAllowed = { false }
@@ -95,7 +106,14 @@ extension ContentView {
                 collectionSettings: { [settingsStore] in
                     DiagnosticCollectionSettings(systemInformation: settingsStore.diagnosticSystemInformation,
                                                  publicAddresses: settingsStore.diagnosticPublicAddresses)
-                }, transferTestAllowed: transferAllowed),
+                }, transferTestAllowed: transferAllowed,
+                onInformation: { information in
+                    guard let snapshotSession, snapshotSession.kind == .ssh else { return }
+                    let snapshot = SessionServerSnapshot(session: snapshotSession, information: information)
+                    await Task.detached {
+                        SessionServerSnapshotStore().save(snapshot, for: snapshotSession)
+                    }.value
+                }),
             for: source.tabID)
     }
 

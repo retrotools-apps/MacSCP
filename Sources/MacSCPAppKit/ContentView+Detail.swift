@@ -856,7 +856,8 @@ extension ContentView {
                             content: ConnectFailurePlan.content(
                                 hasStoredSession: failedConnectTarget(for: tab) != nil,
                                 remedy: tab.connectionViewModel.lastFailureRemedy,
-                                category: tab.connectionViewModel.lastFailureCategory),
+                                category: tab.connectionViewModel.lastFailureCategory,
+                                canReplaceHostKey: tab.connectionViewModel.lastHostKeyMismatch?.candidate != nil),
                             details: ConnectFailureDetailText.read(
                                 from: tab.connectionViewModel.state),
                             onRetry: { retryConnect(tab) },
@@ -870,6 +871,18 @@ extension ContentView {
                             // connect does not start a diagnosis by itself,
                             // so this stays a control the user presses.
                             onDiagnose: { showDiagnostics(for: .tab(tab)) },
+                            onReplaceHostKey: {
+                                do {
+                                    if try tab.connectionViewModel.replaceChangedHostKey(in: KnownHostsStore(directory: SessionStore.defaultDirectory), auditStore: auditStore) {
+                                        if failedConnectTarget(for: tab) != nil { retryConnect(tab) }
+                                        else { dismissConnectFailure(tab) }
+                                    } else {
+                                        tab.connectionViewModel.showFailure(message: L10n.string("tofu.replaceFailed", "The key could not be replaced. Run the connection again to review the current key."))
+                                    }
+                                } catch {
+                                    tab.connectionViewModel.showFailure(message: L10n.string("tofu.replaceFailed", "The key could not be replaced. Run the connection again to review the current key."))
+                                }
+                            },
                             onConvertKey: { convertFailedKey(tab) },
                             onCopyCommand: { copyConversionCommand(for: tab) },
                             onClose: { requestClose(tab) })
@@ -934,7 +947,7 @@ extension ContentView {
                             onDiagnose: { showDiagnostics(for: .stored($0)) },
                             )
                             .modifier(SessionOverviewFailureAlert(
-                                form: tab.connectionViewModel, onEdit: { editStored(stored) }))
+                                form: tab.connectionViewModel, auditStore: auditStore, onEdit: { editStored(stored) }))
                     } else if surface == .dismissedForm {
                         VStack(spacing: 16) {
                             Button(L10n.string("connection.title", "New connection")) {
@@ -1797,6 +1810,7 @@ struct ConnectFailureContent: Equatable {
     /// Optional for the same reason `retryButton` is: an action that cannot
     /// act is worse than an action that is not offered. Without a remedy
     /// there is no file to hand the sheet.
+    var replaceHostKeyButton: Message? = nil
     let convertKeyButton: Message?
     /// Puts the in-place conversion command on the pasteboard, for the
     /// person who would rather run it themselves (PEM private keys plan,
@@ -1837,7 +1851,7 @@ enum ConnectFailurePlan {
     /// surface without the remedy the layer below had already worked out,
     /// and the compiler is the cheapest place to catch that.
     static func content(
-        hasStoredSession: Bool, remedy: ConnectFailureRemedy?, category: ConnectFailureCategory? = nil
+        hasStoredSession: Bool, remedy: ConnectFailureRemedy?, category: ConnectFailureCategory? = nil, canReplaceHostKey: Bool = false
     ) -> ConnectFailureContent {
         // Both, or neither: they are two ways to run the same conversion,
         // and a surface that offered one of them alone would be answering a
@@ -1877,6 +1891,8 @@ enum ConnectFailurePlan {
             closeButton: .init(key: "connection.failed.close", fallback: "Close"),
             detailsButton: .init(key: "connection.failed.details", fallback: "Details…"),
             diagnoseButton: .init(key: "diagnostics.menu", fallback: "Diagnose…"),
+            replaceHostKeyButton: category == .hostKey && canReplaceHostKey
+                ? .init(key: "tofu.replaceChangedKey", fallback: "Replace host key") : nil,
             convertKeyButton: convertKeyButton,
             copyCommandButton: copyCommandButton,
             detailsTitle: .init(
@@ -2387,6 +2403,7 @@ private struct ConnectFailureView: View {
     /// Opens the key-import sheet over the PEM key that failed, which is
     /// where the conversion and the redial happen (PEM private keys plan,
     /// Task 4). Offered only when `content.convertKeyButton` is non-nil.
+    let onReplaceHostKey: () -> Void
     let onConvertKey: () -> Void
     /// Copies the in-place `ssh-keygen -p` command line to the pasteboard.
     /// The command is built in `ContentView`, from `SSHKeyConverter`; this
@@ -2441,6 +2458,11 @@ private struct ConnectFailureView: View {
                 // particular failure, not a way off this surface, and it is
                 // offered at all only when the layer below said this
                 // failure has one.
+                if let manage = content.replaceHostKeyButton {
+                    Button(role: .destructive, action: onReplaceHostKey) {
+                        Text(L10n.string(manage.key, manage.fallback))
+                    }.buttonStyle(HostKeyReplacementButtonStyle())
+                }
                 if let convert = content.convertKeyButton {
                     Button(L10n.string(convert.key, convert.fallback), action: onConvertKey)
                 }
