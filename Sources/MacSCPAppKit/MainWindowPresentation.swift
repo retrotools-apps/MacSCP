@@ -9,6 +9,7 @@ final class WindowPresentation<Window: AnyObject> {
     }
 
     private var windows: [Entry] = []
+    private var closedWindows: [Entry] = []
     private weak var preferred: Window?
     private var pending = false
     private var mayOpen = false
@@ -34,6 +35,10 @@ final class WindowPresentation<Window: AnyObject> {
     }
 
     func register(_ window: Window) {
+        closedWindows.removeAll { $0.window == nil }
+        // SwiftUI can still deliver queued accessor updates after willClose.
+        // A closed window's tabs are already being torn down; never reuse it.
+        guard !closedWindows.contains(where: { $0.window === window }) else { return }
         windows.removeAll { $0.window == nil }
         if !windows.contains(where: { $0.window === window }) {
             windows.append(Entry(window: window))
@@ -47,6 +52,8 @@ final class WindowPresentation<Window: AnyObject> {
     }
 
     func unregister(_ window: Window) {
+        closedWindows.removeAll { $0.window == nil || $0.window === window }
+        closedWindows.append(Entry(window: window))
         windows.removeAll { $0.window == nil || $0.window === window }
         if preferred === window { preferred = nil }
     }
@@ -108,7 +115,6 @@ enum MainWindowPresentation {
 
 /// Installed outside credential loading so even the initial unlock UI is raised.
 struct MainWindowPresentationHost<Content: View>: View {
-    @Environment(\.openWindow) private var openWindow
     @ViewBuilder let content: () -> Content
 
     var body: some View {
@@ -119,12 +125,6 @@ struct MainWindowPresentationHost<Content: View>: View {
                     if window.isKeyWindow { MainWindowPresentation.shared.didBecomeKey(window) }
                 }
             })
-            .onAppear {
-                let opener = openWindow
-                MainWindowPresentation.shared.setOpener {
-                    opener(id: MainWindowPresentation.sceneID)
-                }
-            }
             .onReceive(NotificationCenter.default.publisher(for: NSWindow.didBecomeKeyNotification)) {
                 if let window = $0.object as? NSWindow {
                     MainWindowPresentation.shared.didBecomeKey(window)

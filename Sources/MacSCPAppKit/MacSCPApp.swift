@@ -673,6 +673,8 @@ struct MacSCPApp: App {
     /// doesn't matter the way it would for a plain stored property, but it
     /// is listed first as the thing the whole app's lifecycle depends on.
     @NSApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
+    @Environment(\.openWindow) private var openWindow
+    @Environment(\.scenePhase) private var scenePhase
     /// Single instance for the whole app — passed to `ContentView` and the
     /// `Settings` scene below (M5c/T3: no singleton, per the v2 multi-window
     /// rule).
@@ -957,6 +959,14 @@ struct MacSCPApp: App {
         // name (`ContentView.applyFrameAutosave(to:)`).
         .defaultSize(width: MainWindowSizePlan.defaultSize.width, height: MainWindowSizePlan.defaultSize.height)
         .restorationBehavior(.disabled)
+        .onChange(of: scenePhase, initial: true) { _, _ in
+            // The app's opener exists even if launch creates no window, and
+            // outlives every window. Do not capture a closing view's action.
+            let opener = openWindow
+            MainWindowPresentation.shared.setOpener {
+                opener(id: MainWindowPresentation.sceneID)
+            }
+        }
         .commands { MacSCPCommands(settingsStore: settingsStore, settingsBridge: settingsBridge, updater: applicationUpdater) }
 
         // The menu-bar status item is an AppKit `NSStatusItem` driven by

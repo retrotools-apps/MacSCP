@@ -194,6 +194,11 @@ windows or start configured tunnels. Restored file tabs are disconnected until
 you connect them. Configure automatic reconnection separately for each tunnel.
 The menu bar icon also provides tunnel status and start/stop actions.
 
+To bring MacSCP back to the foreground, click its Dock icon or choose
+**Show MacSCP** from the menu bar icon. This also restores a minimized window.
+If all main windows have been closed, the same actions open a new window;
+previously closed file connections remain disconnected.
+
 ## Customize the display
 
 Open **Settings → View** to adjust the sidebar and contrast.

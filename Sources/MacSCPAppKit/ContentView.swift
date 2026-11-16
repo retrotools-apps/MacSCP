@@ -109,20 +109,38 @@ extension View {
 }
 
 /// Mediates access to the enclosing `NSWindow` — SwiftUI offers no API of
-/// its own for this. `view.window` is only set AFTER the `NSView` has been
-/// hooked into the window hierarchy, hence the `DispatchQueue.main.async`
-/// detour (M5c/T0).
+/// its own for this. Observe attachment as well as SwiftUI updates: a single
+/// main-queue hop can run before AppKit attaches the view to its window.
+/// Deliver asynchronously because callers update SwiftUI state.
 struct WindowAccessor: NSViewRepresentable {
     let onResolve: (NSWindow?) -> Void
 
-    func makeNSView(context: Context) -> NSView {
-        let view = NSView()
-        DispatchQueue.main.async { onResolve(view.window) }
+    func makeNSView(context: Context) -> ResolverView {
+        let view = ResolverView()
+        view.onResolve = onResolve
+        view.resolve()
         return view
     }
 
-    func updateNSView(_ nsView: NSView, context: Context) {
-        DispatchQueue.main.async { onResolve(nsView.window) }
+    func updateNSView(_ nsView: ResolverView, context: Context) {
+        nsView.onResolve = onResolve
+        nsView.resolve()
+    }
+
+    final class ResolverView: NSView {
+        var onResolve: ((NSWindow?) -> Void)?
+
+        override func viewDidMoveToWindow() {
+            super.viewDidMoveToWindow()
+            resolve()
+        }
+
+        func resolve() {
+            DispatchQueue.main.async { [weak self] in
+                guard let self else { return }
+                self.onResolve?(self.window)
+            }
+        }
     }
 }
 

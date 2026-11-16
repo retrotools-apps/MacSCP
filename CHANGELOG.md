@@ -1,5 +1,11 @@
 # Changelog
 
+## [1.5.1] (2026-11-16)
+
+### Highlights
+
+* **interface:** Restore the main window from the Dock or Show MacSCP after background startup, hiding, minimizing or closing all main windows.
+
 ## [1.5.0] (2026-11-14)
 
 ### Highlights
