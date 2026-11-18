@@ -36,13 +36,24 @@ final class FileInspectionModel {
     var searchStatus = ""
     var searchFocusToken = 0
     var searchTask: Task<Void, Never>?
+    private(set) var previewTask: Task<Void, Never>?
+    private(set) var previewRevision = 0
+    private(set) var previewPlacement: Double = 0
     private var reader: (any ByteWindowReader)?
     private var original: RemoteFileItem?
     private var preservesBOM = false
     private var matchOffset: UInt64?
+    private var showsMatch = false
+    private var pendingPreview: PreviewRequest?
+
+    private struct PreviewRequest: Equatable {
+        let offset: UInt64
+        let count: Int
+        let placement: Double
+    }
 
     var selectedRanges: [NSRange] {
-        guard matchOffset == offset, matchOffset != nil, !query.isEmpty else { return [] }
+        guard showsMatch, matchOffset == offset, !query.isEmpty else { return [] }
         if !hexadecimal { return [NSRange(location: 0, length: query.utf16.count)] }
         let count = query.utf8.count
         return stride(from: 0, to: count, by: 16).map {
@@ -101,9 +112,8 @@ final class FileInspectionModel {
                 originalText = text
             } else {
                 guard let reader else { throw FileToolError.unsupported }
-                data = try await reader.read(offset: 0, count: Int(min(UInt64(FileWindow.size), size)))
+                data = try await Self.readPreview(reader, offset: 0, count: Int(min(UInt64(FileWindow.size), size)))
                 hexadecimal = FileWindow.isBinary(data, allowingIncompleteUTF8Suffix: UInt64(data.count) < size)
-                updateDisplay()
             }
             try Task.checkCancellation()
             ready = true
@@ -114,15 +124,96 @@ final class FileInspectionModel {
         }
     }
 
+    func movePreviewWindow(forward: Bool) {
+        guard previewTask == nil else { return }
+        let windowSize = UInt64(FileWindow.size)
+        if forward {
+            let end = offset + UInt64(data.count)
+            guard end < size else { return }
+            requestPreview(.init(offset: end, count: Int(min(windowSize, size - end)), placement: 0))
+        } else {
+            let count = min(offset, windowSize)
+            guard count > 0 else { return }
+            requestPreview(.init(offset: offset - count, count: Int(count), placement: 1))
+        }
+    }
+
+    func seekPreview(to fraction: Double, visibleBytes: Double) {
+        guard size > 0 else { return }
+        let count = min(size, UInt64(FileWindow.size))
+        let lastStart = size - count
+        if fraction >= 1 {
+            requestPreview(.init(offset: lastStart, count: Int(count), placement: 1))
+            return
+        }
+        let visible = min(Double(count), max(1, visibleBytes))
+        let target = (Double(size) - visible) * max(0, fraction)
+        let start = min(lastStart, UInt64(min(Double(lastStart), target)))
+        let placement = min(1, max(0, target - Double(lastStart)) / max(1, Double(count) - visible))
+        let request = PreviewRequest(offset: start, count: Int(min(UInt64(FileWindow.size), size - start)), placement: placement)
+        requestPreview(request)
+    }
+
+    private func requestPreview(_ request: PreviewRequest) {
+        guard ready, !editing, !busy, let reader else { return }
+        pendingPreview = request
+        guard previewTask == nil else { return }
+        previewTask = Task {
+            defer { previewTask = nil }
+            while !Task.isCancelled, let request = pendingPreview {
+                pendingPreview = nil
+                do {
+                    let bytes = request.offset == offset && request.count == data.count
+                        ? data : try await Self.readPreview(reader, offset: request.offset, count: request.count)
+                    try Task.checkCancellation()
+                    // A thumb drag can submit new positions during an SFTP read.
+                    // Only the latest destination is presented.
+                    if let pendingPreview, pendingPreview != request { continue }
+                    pendingPreview = nil
+                    data = bytes
+                    offset = request.offset
+                    showsMatch = false
+                    previewPlacement = request.placement
+                    previewRevision += 1
+                    errorMessage = nil
+                    updateDisplay()
+                } catch is CancellationError {
+                    return
+                } catch {
+                    if pendingPreview == nil { errorMessage = FileToolLabels.error(error) }
+                }
+            }
+        }
+    }
+
+    private static func readPreview(_ reader: any ByteWindowReader, offset: UInt64, count: Int) async throws -> Data {
+        var bytes = Data()
+        while bytes.count < count {
+            try Task.checkCancellation()
+            let remaining = count - bytes.count
+            let chunk = try await reader.read(offset: offset + UInt64(bytes.count), count: remaining)
+            guard !chunk.isEmpty else { throw FileToolError.changed }
+            guard chunk.count <= remaining else { throw FileToolError.oversizedResponse }
+            bytes.append(chunk)
+        }
+        return bytes
+    }
+
     func findNext() { find(.forward) }
     func findPrevious() { find(.backward) }
 
     private func find(_ direction: FileSearchDirection) {
         guard ready, !editing, !busy, !query.isEmpty else { return }
+        pendingPreview = nil
+        let previewing = previewTask
+        previewing?.cancel()
         busy = true; errorMessage = nil
         searchStatus = L10n.string("filetools.searching", "Searching…")
         let source = source, path = path, query = query, match = matchOffset
         searchTask = Task {
+            defer { busy = false; searchTask = nil }
+            await previewing?.value
+            guard !Task.isCancelled else { searchStatus = ""; return }
             // Conversion and scanning stay off the UI actor. The SSH backend
             // searches remotely and returns only the matched display window.
             let worker = Task.detached(priority: .userInitiated) {
@@ -137,7 +228,6 @@ final class FileInspectionModel {
                 }
                 return (result, false)
             }
-            defer { busy = false; searchTask = nil }
             do {
                 let (result, wrapped) = try await withTaskCancellationHandler {
                     try await worker.value
@@ -146,20 +236,24 @@ final class FileInspectionModel {
                 guard ready, self.query == query else { return }
                 if let result {
                     matchOffset = result.offset
+                    showsMatch = true
                     data = result.data; offset = result.offset; size = result.size
+                    previewPlacement = 0
+                    previewRevision += 1
                     updateDisplay()
                     searchStatus = wrapped
                         ? L10n.string("filetools.searchWrapped", "Search wrapped around to a match.")
                         : L10n.string("filetools.matchFound", "Match found.")
                 } else {
                     matchOffset = nil
+                    showsMatch = false
                     searchStatus = L10n.string("filetools.notFound", "No match found.")
                 }
             } catch is CancellationError { searchStatus = "" }
             catch { searchStatus = ""; errorMessage = FileToolLabels.error(error) }
         }
     }
-    func resetSearch() { searchTask?.cancel(); matchOffset = nil; searchStatus = "" }
+    func resetSearch() { searchTask?.cancel(); matchOffset = nil; showsMatch = false; searchStatus = "" }
 
     func save() async {
         guard ready, editing, !busy, let original else { return }
@@ -181,8 +275,12 @@ final class FileInspectionModel {
 
     func close() async {
         ready = false
+        pendingPreview = nil
+        let previewing = previewTask
+        previewing?.cancel()
         let searching = searchTask
         searching?.cancel()
+        await previewing?.value
         await searching?.value
         let opened = reader; reader = nil
         await opened?.close()
@@ -195,14 +293,17 @@ final class FileInspectionModel {
     }
 }
 
-/// AppKit text storage avoids SwiftUI laying out one view per character or
-/// byte. The viewer receives only one bounded window, never the whole file.
+/// AppKit text storage lays out the editor buffer or the current preview window.
 struct FileToolTextView: NSViewRepresentable {
     @Binding var text: String
     var editable: Bool
     var selectedRanges: [NSRange] = []
-    func makeNSView(context: Context) -> NSScrollView {
-        let scroll = NSScrollView()
+    var preview: FilePreviewScrollView.Window?
+    var seek: ((Double, Double) -> Void)?
+    var moveWindow: ((Bool) -> Void)?
+
+    func makeNSView(context: Context) -> NSView {
+        let scroll = preview == nil ? NSScrollView() : FilePreviewScrollView()
         scroll.hasVerticalScroller = true; scroll.hasHorizontalScroller = true
         let view = NSTextView(frame: NSRect(x: 0, y: 0, width: 720, height: 440))
         view.minSize = NSSize(width: 0, height: 0)
@@ -220,28 +321,60 @@ struct FileToolTextView: NSViewRepresentable {
         view.textContainer?.containerSize = NSSize(width: CGFloat.greatestFiniteMagnitude, height: CGFloat.greatestFiniteMagnitude)
         view.delegate = context.coordinator
         scroll.documentView = view
+        context.coordinator.scroll = scroll
+        if let preview = scroll as? FilePreviewScrollView { return preview.makeContainer() }
         return scroll
     }
-    func updateNSView(_ scroll: NSScrollView, context: Context) {
+    func updateNSView(_ root: NSView, context: Context) {
         context.coordinator.parent = self
-        guard let view = scroll.documentView as? NSTextView else { return }
+        guard let scroll = context.coordinator.scroll, let view = scroll.documentView as? NSTextView else { return }
+        let previewScroll = scroll as? FilePreviewScrollView
+        let windowChanged = previewScroll?.fileWindow?.revision != preview?.revision
+        let horizontalOffset = scroll.contentView.bounds.minX
+        previewScroll?.fileWindow = preview
+        previewScroll?.seek = seek
+        previewScroll?.moveWindow = moveWindow
         view.isEditable = editable
         let replaced = view.string != text
-        if replaced { view.string = text; view.scrollRangeToVisible(NSRange(location: 0, length: 0)) }
-        if !editable, replaced || context.coordinator.searchRanges != selectedRanges {
+        if replaced { view.string = text }
+        if let previewScroll, let preview, replaced || windowChanged {
+            if let container = view.textContainer { view.layoutManager?.ensureLayout(for: container) }
+            previewScroll.placeWindow(at: preview.placement, horizontalOffset: horizontalOffset)
+        } else if replaced {
+            view.scrollRangeToVisible(NSRange(location: 0, length: 0))
+        }
+        if !editable, windowChanged || replaced || context.coordinator.searchRanges != selectedRanges {
             let ranges = selectedRanges.isEmpty ? [NSRange(location: 0, length: 0)] : selectedRanges
             view.selectedRanges = ranges.map { NSValue(range: $0) }
             if let first = selectedRanges.first { view.scrollRangeToVisible(first) }
             context.coordinator.searchRanges = selectedRanges
         }
+        previewScroll?.updateFileScroller()
     }
     func makeCoordinator() -> Coordinator { Coordinator(parent: self) }
     @MainActor final class Coordinator: NSObject, NSTextViewDelegate {
         var parent: FileToolTextView
         var searchRanges: [NSRange] = []
+        weak var scroll: NSScrollView?
         init(parent: FileToolTextView) { self.parent = parent }
         func textDidChange(_ notification: Notification) {
             if let view = notification.object as? NSTextView { parent.text = view.string }
+        }
+
+        func textView(_ textView: NSTextView, doCommandBy commandSelector: Selector) -> Bool {
+            guard let scroll = scroll as? FilePreviewScrollView else { return false }
+            switch commandSelector {
+            case #selector(NSResponder.pageDown(_:)), #selector(NSResponder.scrollPageDown(_:)):
+                scroll.scrollPageDown(nil)
+            case #selector(NSResponder.pageUp(_:)), #selector(NSResponder.scrollPageUp(_:)):
+                scroll.scrollPageUp(nil)
+            case #selector(NSResponder.scrollToBeginningOfDocument(_:)):
+                scroll.scrollToBeginningOfDocument(nil)
+            case #selector(NSResponder.scrollToEndOfDocument(_:)):
+                scroll.scrollToEndOfDocument(nil)
+            default: return false
+            }
+            return true
         }
     }
 }
@@ -257,7 +390,7 @@ struct FileInspectionSheet: View {
             HStack {
                 Text(model.path).font(.headline).lineLimit(1).truncationMode(.middle)
                 Spacer()
-                if model.busy { ProgressView().controlSize(.small) }
+                if model.busy || model.previewTask != nil { ProgressView().controlSize(.small) }
                 if model.editing {
                     Button(L10n.string("common.save", "Save"), action: onSave)
                         .keyboardShortcut("s", modifiers: .command).disabled(model.busy || !model.dirty)
@@ -295,9 +428,17 @@ struct FileInspectionSheet: View {
                 Button(L10n.string("filetools.view", "View"), action: onView)
             }
             if !model.searchStatus.isEmpty { Text(model.searchStatus).font(.caption).monospacedDigit() }
-            FileToolTextView(text: model.editing ? $model.text : .constant(model.displayed),
-                editable: model.editing && model.ready && !model.busy, selectedRanges: model.selectedRanges)
-                .border(Color.secondary.opacity(0.2))
+            if model.editing {
+                FileToolTextView(text: $model.text, editable: model.ready && !model.busy)
+                    .border(Color.secondary.opacity(0.2))
+            } else {
+                FileToolTextView(text: .constant(model.displayed), editable: false, selectedRanges: model.selectedRanges,
+                    preview: .init(offset: model.offset, count: model.data.count, size: model.size,
+                        revision: model.previewRevision, placement: model.previewPlacement,
+                        enabled: model.ready && !model.busy, loading: model.previewTask != nil),
+                    seek: model.seekPreview, moveWindow: model.movePreviewWindow)
+                    .border(Color.secondary.opacity(0.2))
+            }
         }
         .padding(16).frame(minWidth: 640, minHeight: 380, maxHeight: .infinity)
         .onChange(of: model.searchFocusToken) { _, _ in searchFocused = true }

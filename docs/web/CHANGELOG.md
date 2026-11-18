@@ -1,5 +1,11 @@
 # Changelog
 
+## [1.5.2] (2026-11-18)
+
+### Highlights
+
+* **files:** Scroll across preview windows in text and hexadecimal mode, or drag the vertical scrollbar to jump anywhere in a large file.
+
 ## [1.5.1] (2026-11-16)
 
 ### Highlights

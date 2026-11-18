@@ -207,6 +207,84 @@ import Testing
         await model.close()
     }
 
+    @Test func previewMovesBetweenWindowsAndSeeksDirectlyThroughASparse265GBFile() async throws {
+        let size: UInt64 = 265_000_000_000
+        let windowSize = UInt64(FileWindow.size)
+        let midpoint = (size - 64) / 2
+        let url = try fixture(Data(repeating: 65, count: FileWindow.size))
+        defer { try? FileManager.default.removeItem(at: url) }
+        let writer = try FileHandle(forWritingTo: url)
+        try writer.truncate(atOffset: size)
+        for (offset, marker) in [(windowSize, "adjacent"), (midpoint, "middle"), (size - 4, "last")] {
+            try writer.seek(toOffset: offset)
+            try writer.write(contentsOf: Data(marker.utf8))
+        }
+        try writer.close()
+
+        let model = FileInspectionModel(source: LocalFileSystem(), path: url.path, editing: false)
+        await model.open()
+        #expect(model.ready)
+        #expect(model.size == size)
+        model.movePreviewWindow(forward: true)
+        await model.previewTask?.value
+        #expect(model.offset == windowSize)
+        #expect(model.data.starts(with: Data("adjacent".utf8)))
+        model.movePreviewWindow(forward: false)
+        await model.previewTask?.value
+        #expect(model.offset == 0)
+        #expect(model.previewPlacement == 1)
+
+        model.seekPreview(to: 0.25, visibleBytes: 64)
+        model.seekPreview(to: 0.5, visibleBytes: 64)
+        await model.previewTask?.value
+        #expect(model.offset == midpoint)
+        #expect(model.data.starts(with: Data("middle".utf8)))
+        #expect(model.data.count == FileWindow.size)
+        model.seekPreview(to: 1, visibleBytes: 64)
+        await model.previewTask?.value
+        #expect(model.offset == size - windowSize)
+        #expect(model.data.suffix(4) == Data("last".utf8))
+        #expect(model.previewPlacement == 1)
+        model.movePreviewWindow(forward: true)
+        #expect(model.previewTask == nil)
+        await model.close()
+    }
+
+    @Test func nativePreviewThumbUsesTheFileSizeAndWheelLoadsTheNextWindow() async throws {
+        let line = String(repeating: "a", count: 1023) + "\n"
+        let url = try fixture(Data(String(repeating: line, count: 640).utf8))
+        defer { try? FileManager.default.removeItem(at: url) }
+        let model = FileInspectionModel(source: LocalFileSystem(), path: url.path, editing: false)
+        await model.open()
+        let root = NSHostingView(rootView: FileInspectionSheet(model: model, onClose: {}, onSave: {}, onView: {}))
+        root.frame = NSRect(x: 0, y: 0, width: 800, height: 500)
+        root.layoutSubtreeIfNeeded()
+
+        func previewScroll(in view: NSView) -> FilePreviewScrollView? {
+            (view as? FilePreviewScrollView) ?? view.subviews.lazy.compactMap(previewScroll).first
+        }
+        let scroll = try #require(previewScroll(in: root))
+        let thumb = try #require(scroll.superview?.subviews.compactMap { $0 as? NSScroller }.first)
+        let document = try #require(scroll.documentView)
+        #expect(thumb.isEnabled)
+        #expect(thumb.doubleValue == 0)
+        #expect(thumb.knobProportion > 0 && thumb.knobProportion < 0.1)
+        #expect(document.frame.height > scroll.contentView.bounds.height)
+        scroll.placeWindow(at: 1, horizontalOffset: 0)
+        #expect(thumb.doubleValue > 0 && thumb.doubleValue < 0.1)
+
+        let wheel = try #require(CGEvent(scrollWheelEvent2Source: nil, units: .line, wheelCount: 1,
+            wheel1: -3, wheel2: 0, wheel3: 0))
+        scroll.scrollWheel(with: try #require(NSEvent(cgEvent: wheel)))
+        await model.previewTask?.value
+        #expect(model.offset == UInt64(FileWindow.size))
+        scroll.seekFile(to: 1)
+        await model.previewTask?.value
+        #expect(model.offset + UInt64(model.data.count) == model.size)
+        #expect(model.previewPlacement == 1)
+        await model.close()
+    }
+
     @Test func previousAndNextNavigateOccurrencesWithoutACountOrAnOffsetField() async throws {
         let url = try fixture(Data("é x é x é".utf8))
         defer { try? FileManager.default.removeItem(at: url) }

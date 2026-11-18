@@ -84,8 +84,10 @@ Select a file, then choose **File → View** (**F3**) or **File → Edit** (**F4
 Depending on your keyboard settings, you may need to hold **Fn** as well.
 
 The viewer reads bounded windows rather than downloading the complete remote
-file. It detects binary content, offers a hexadecimal view and can search
-supported remote files. The editor is intentionally limited to UTF-8 text up
+file. Keep scrolling to load the adjacent window, or drag the vertical
+scrollbar to jump to a position in the full file. The viewer detects binary
+content, offers a hexadecimal view and can search supported remote files.
+The editor is intentionally limited to UTF-8 text up
 to 8 MiB; use the viewer for larger files or binary data. Both open in separate
 windows, so you can keep a document open while switching tabs.
 
